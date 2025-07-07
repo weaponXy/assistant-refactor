@@ -1,0 +1,12 @@
+{
+  "Version": 1,
+  "Hash": "Rxr/JZ0wN8jzHD6KHuvuwLnq6oBwndekMjNUM8ZKL5o=",
+  "Source": "csharp-backend",
+  "BasePath": "_content/csharp-backend",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": [],
+  "Endpoints": []
+}
