@@ -3,20 +3,34 @@ import { supabase } from './supabase';
 import './stylecss/login.css';
 
 const Login = () => {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      setError(error.message);
-    } else {
-      setError('');
-      alert('Login successful!');
+    setError('');
+    setSuccess('');
+
+    const { data, error: queryError } = await supabase
+      .from('systemuser')
+      .select('*')
+      .eq('username', username)
+      .single();
+
+    if (queryError || !data || data.password !== password) {
+      setError('Invalid username or password.');
+      return;
     }
+
+    if (rememberMe) {
+      localStorage.setItem('user', JSON.stringify(data));
+    }
+
+    setSuccess('Login successful!');
+    // ✅ Ready to navigate in the future if needed
   };
 
   return (
@@ -24,15 +38,15 @@ const Login = () => {
       <div className="login-left">
         <form onSubmit={handleLogin} className="login-form">
           <h2 className="login-title">Sign In</h2>
-          <p className="login-subtitle">Enter your email and password to sign in!</p>
+          <p className="login-subtitle">Enter your username and password to sign in!</p>
 
-          <label className="login-label">Email*</label>
+          <label className="login-label">Username*</label>
           <input
-            type="email"
+            type="text"
             required
-            placeholder="sample@buiswAIz.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            placeholder="yourusername"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
             className="login-input"
           />
 
@@ -59,6 +73,7 @@ const Login = () => {
           </div>
 
           {error && <p className="error-message">{error}</p>}
+          {success && <p className="success-message">{success}</p>}
 
           <button type="submit" className="login-button">Sign In</button>
         </form>
