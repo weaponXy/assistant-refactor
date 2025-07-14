@@ -1,0 +1,269 @@
+import React, { useState, useEffect, useRef } from "react";
+import "../stylecss/ViewProduct.css";
+import { supabase } from "../supabase";
+import imageCompression from "browser-image-compression";
+
+const ViewProduct = ({ product, onClose, onProductUpdated }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [form, setForm] = useState({ ...product });
+  const [suppliers, setSuppliers] = useState([]);
+  const [newImageFile, setNewImageFile] = useState(null);
+  const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    const fetchSuppliers = async () => {
+      const { data, error } = await supabase
+        .from("suppliers")
+        .select("supplierid, suppliername");
+      if (error) {
+        console.error("Error fetching suppliers:", error);
+      } else {
+        setSuppliers(data);
+      }
+    };
+
+    fetchSuppliers();
+  }, []);
+
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setForm((prev) => ({ ...prev, [name]: value }));
+    };
+
+    const handleImageClick = () => {
+        if (isEditing) {
+        fileInputRef.current.click();
+        }
+    };
+
+    const handleImageChange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const options = {
+            maxSizeMB: 0.1,
+            maxWidthOrHeight: 500,
+            useWebWorker: true,
+        };
+
+        try {
+            const compressedFile = await imageCompression(file, options);
+            compressedFile.name = file.name; // retain original file name
+            setNewImageFile(compressedFile);
+
+            const previewUrl = URL.createObjectURL(compressedFile);
+            setForm((prev) => ({ ...prev, image_url: previewUrl }));
+        } catch (err) {
+            console.error("Image compression failed:", err);
+        }
+    };
+
+    const handleUpdate = () => {
+        setIsEditing(true);
+    };
+
+    const handleSave = async () => {
+        try {
+        let imageUrl = form.image_url;
+
+        if (newImageFile) {
+            if (product.image_url) {
+            const oldPath = product.image_url.split("/").pop();
+            await supabase.storage.from("product-images").remove([oldPath]);
+            }
+
+            const filename = `${Date.now()}_${newImageFile.name}`;
+            const { error: uploadError } = await supabase
+            .storage
+            .from("product-images")
+            .upload(filename, newImageFile);
+
+            if (uploadError) throw uploadError;
+
+            const { data: urlData } = supabase
+            .storage
+            .from("product-images")
+            .getPublicUrl(filename);
+
+            imageUrl = urlData.publicUrl;
+        }
+
+        const { error } = await supabase
+            .from("products")
+            .update({
+            productname: form.productname,
+            description: form.description,
+            reorderpoint: Number(form.reorderpoint),
+            currentstock: Number(form.currentstock),
+            price: Number(form.price),
+            cost: Number(form.cost),
+            supplierid: form.supplierid,
+            image_url: imageUrl,
+            })
+            .eq("productid", product.productid);
+
+        if (error) throw error;
+
+        setIsEditing(false);
+        setNewImageFile(null);
+
+        if (onProductUpdated) onProductUpdated(); 
+
+        console.log("Product updated.");
+        } catch (err) {
+        console.error("Error saving product:", err.message);
+        }
+    };
+
+    const handleDelete = async () => {
+        try {
+        const { error } = await supabase
+            .from("products")
+            .delete()
+            .eq("productid", product.productid);
+        if (error) throw error;
+
+        if (product.image_url) {
+            const filename = product.image_url.split("/").pop();
+            await supabase.storage.from("product-images").remove([filename]);
+        }
+
+        if (onProductUpdated) onProductUpdated(); 
+
+        onClose(); // close modal
+        } catch (err) {
+        console.error("Error deleting product:", err.message);
+        }
+    };
+
+    return (
+        <div className="view-product-overlay">
+        <div className="view-product-modal">
+            <div className="modal-header">
+            <button onClick={onClose} className="back-button">←</button>
+            <h2>Product</h2>
+            <span className="product-id-tag">#{product.productid}</span>
+            <div className="header-actions">
+                <button className="delete-button" onClick={handleDelete}>🗑 Delete</button>
+                <button className="update-button" onClick={handleUpdate} disabled={isEditing}>Update Item</button>
+            </div>
+            </div>
+
+            <div className="modal-body">
+            <div className="image-section">
+                {form.image_url ? (
+                <img src={form.image_url} alt="Product" className="product-image" />
+                ) : (
+                <div className="img-placeholder" />
+                )}
+                <button className="update-image-button" onClick={handleImageClick} disabled={!isEditing}>
+                Update Image
+                </button>
+                <input
+                type="file"
+                accept="image/*"
+                ref={fileInputRef}
+                style={{ display: "none" }}
+                onChange={handleImageChange}
+                />
+            </div>
+
+            <div className="info-section">
+                <label>Product title</label>
+                <input
+                type="text"
+                name="productname"
+                value={form.productname}
+                onChange={handleChange}
+                disabled={!isEditing}
+                />
+
+                <div className="input-row">
+                <input
+                    type="text"
+                    name="description"
+                    placeholder="Description"
+                    value={form.description}
+                    onChange={handleChange}
+                    disabled={!isEditing}
+                />
+                <input
+                    type="number"
+                    name="reorderpoint"
+                    placeholder="Reorderpoint"
+                    value={form.reorderpoint}
+                    onChange={handleChange}
+                    disabled={!isEditing}
+                />
+                </div>
+
+                <div className="input-row">
+                <div className="with-label">
+                    <label>Pcs.</label>
+                    <input
+                    type="number"
+                    name="currentstock"
+                    placeholder="Stock"
+                    value={form.currentstock}
+                    onChange={handleChange}
+                    disabled={!isEditing}
+                    />
+                </div>
+
+                <div className="with-label">
+                    <label>₱</label>
+                    <input
+                    type="number"
+                    name="price"
+                    onChange={handleChange}
+                    value={form.price}
+                    disabled={!isEditing}
+                    />
+                </div>
+                </div>
+
+                <div className="input-row">
+                <div className="with-label">
+                    <label>₱</label>
+                    <input
+                    type="number"
+                    name="cost"
+                    placeholder="Cost"
+                    value={form.cost}
+                    onChange={handleChange}
+                    disabled={!isEditing}
+                    />
+                </div>
+
+                <div className="with-label">
+                    <label>Supplier</label>
+                    <select
+                    name="supplierid"
+                    value={form.supplierid}
+                    onChange={handleChange}
+                    disabled={!isEditing}
+                    className="supplier-select"
+                    >
+                    <option value="">-- Select Supplier --</option>
+                    {suppliers.map((supplier) => (
+                        <option key={supplier.supplierid} value={supplier.supplierid}>
+                        {supplier.suppliername}
+                        </option>
+                    ))}
+                    </select>
+                </div>
+                </div>
+            </div>
+            </div>
+
+            {isEditing && (
+            <div className="modal-footer">
+                <button className="save-button" onClick={handleSave}>Save</button>
+            </div>
+            )}
+        </div>
+        </div>
+    );
+};
+
+export default ViewProduct;

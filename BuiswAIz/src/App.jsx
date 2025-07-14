@@ -1,7 +1,7 @@
-import Login from './login';
+import Inventory from './inventory/inventory';
 
 function App() {
-  return <Login />;
+  return <Inventory/>;
 }
 
 export default App;
