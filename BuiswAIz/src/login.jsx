@@ -1,36 +1,51 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from './supabase';
 import './stylecss/login.css';
 
 const Login = () => {
-  const [username, setUsername] = useState('');
+  const navigate = useNavigate();
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
-    setSuccess('');
 
-    const { data, error: queryError } = await supabase
-      .from('systemuser')
-      .select('*')
-      .eq('username', username)
-      .single();
+    // 1. Sign in via Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-    if (queryError || !data || data.password !== password) {
-      setError('Invalid username or password.');
+    if (authError || !authData.user) {
+      setError('Invalid email or password.');
       return;
     }
 
-    if (rememberMe) {
-      localStorage.setItem('user', JSON.stringify(data));
+    const userId = authData.user.id;
+
+    // 2. Get matching user row from systemuser using auth.user.id
+    const { data: userProfile, error: userError } = await supabase
+      .from('systemuser')
+      .select('*')
+      .eq('userid', userId)
+      .single();
+
+    if (userError || !userProfile) {
+      setError('User profile not found.');
+      return;
     }
 
-    setSuccess('Login successful!');
-    // ✅ Ready to navigate in the future if needed
+    // 3. Save to localStorage if needed
+    if (rememberMe) {
+      localStorage.setItem('user', JSON.stringify(userProfile));
+    }
+
+    // 4. Redirect
+    navigate('/inventory');
   };
 
   return (
@@ -38,15 +53,15 @@ const Login = () => {
       <div className="login-left">
         <form onSubmit={handleLogin} className="login-form">
           <h2 className="login-title">Sign In</h2>
-          <p className="login-subtitle">Enter your username and password to sign in!</p>
+          <p className="login-subtitle">Enter your Email and password to sign in!</p>
 
-          <label className="login-label">Username*</label>
+          <label className="login-label">Email*</label>
           <input
-            type="text"
+            type="email"
             required
-            placeholder="yourusername"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            placeholder="Enter Your Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             className="login-input"
           />
 
@@ -69,11 +84,9 @@ const Login = () => {
               />
               Keep me logged in
             </label>
-            <a href="#" className="forgot-password">Forgot password?</a>
           </div>
 
           {error && <p className="error-message">{error}</p>}
-          {success && <p className="success-message">{success}</p>}
 
           <button type="submit" className="login-button">Sign In</button>
         </form>
