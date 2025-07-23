@@ -3,11 +3,12 @@ import "../stylecss/ViewProduct.css";
 import { supabase } from "../supabase";
 import imageCompression from "browser-image-compression";
 
-const ViewProduct = ({ product, onClose, onProductUpdated }) => {
+const ViewProduct = ({ product, onClose, onProductUpdated, user}) => {
   const [isEditing, setIsEditing] = useState(false);
   const [form, setForm] = useState({ ...product });
   const [suppliers, setSuppliers] = useState([]);
   const [newImageFile, setNewImageFile] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -63,8 +64,32 @@ const ViewProduct = ({ product, onClose, onProductUpdated }) => {
     };
 
     const handleSave = async () => {
+        setIsSaving(true);
         try {
         let imageUrl = form.image_url;
+        let activityDesc = "";
+        if (user) {
+            const nameChanged = form.productname !== product.productname;
+            const restocked =
+                Number(form.currentstock) !== Number(product.currentstock) &&
+                form.productname === product.productname &&
+                form.description === product.description &&
+                Number(form.reorderpoint) === Number(product.reorderpoint) &&
+                Number(form.price) === Number(product.price) &&
+                Number(form.cost) === Number(product.cost) &&
+                form.supplierid === product.supplierid &&
+                form.image_url === product.image_url;
+
+            if (restocked) {
+                const stockdiff = Number(form.currentstock) - Number(product.currentstock);
+                activityDesc = `${form.productname} was restocked with ${stockdiff} piece${stockdiff > 1 ? "s": ""}`;
+            } else if (nameChanged) {
+                activityDesc = `changed ${product.productname} to ${form.productname}`;
+            } else {
+                activityDesc = `updated ${form.productname}`;
+            }
+        }
+
 
         if (newImageFile) {
             if (product.image_url) {
@@ -88,7 +113,7 @@ const ViewProduct = ({ product, onClose, onProductUpdated }) => {
             imageUrl = urlData.publicUrl;
         }
 
-        const { error } = await supabase
+        const { error:updateError } = await supabase
             .from("products")
             .update({
             productname: form.productname,
@@ -102,9 +127,26 @@ const ViewProduct = ({ product, onClose, onProductUpdated }) => {
             })
             .eq("productid", product.productid);
 
-        if (error) throw error;
+        if (updateError) throw updateError;
+
+        if (user && activityDesc) {
+            const { error: logError } = await supabase.from("activitylog").insert([
+                {
+                action_type: "update_product",
+                action_desc: activityDesc,
+                done_user: user.userid,
+                },
+            ]);
+
+            if (logError) {
+                console.error("Failed to insert activity log:", logError.message);
+            } else {
+                console.log("Activity log inserted successfully:", activityDesc);
+            }
+        }
 
         setIsEditing(false);
+        setIsSaving(false); 
         setNewImageFile(null);
 
         if (onProductUpdated) onProductUpdated(); 
@@ -130,7 +172,17 @@ const ViewProduct = ({ product, onClose, onProductUpdated }) => {
 
         if (onProductUpdated) onProductUpdated(); 
 
-        onClose(); // close modal
+        if (user) {
+                await supabase.from("activitylog").insert([
+                    {
+                      action_type: "Delete Product",
+                      action_desc: `deleted ${product.productname} from the inventory`,
+                      done_user: user.userid,
+                    },
+                    ]);
+                }
+
+        onClose();
         } catch (err) {
         console.error("Error deleting product:", err.message);
         }
@@ -258,7 +310,7 @@ const ViewProduct = ({ product, onClose, onProductUpdated }) => {
 
             {isEditing && (
             <div className="modal-footer">
-                <button className="save-button" onClick={handleSave}>Save</button>
+                <button className="save-button" onClick={handleSave}>{isSaving ? "Saving..." : "Save"}</button>
             </div>
             )}
         </div>

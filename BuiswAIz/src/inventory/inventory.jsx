@@ -1,14 +1,28 @@
 import React, { useEffect, useState } from "react";
 import { fetchProducts } from "../inventory/fetchproducttable";
 import "../stylecss/inventory.css";
+import { supabase } from "../supabase";
 import AddProduct from "../inventory/AddProduct";
 import ViewProduct from "../inventory/ViewProduct";
+import AddDefect from "../inventory/AddDefect";
+import { useNavigate } from "react-router-dom";
+import { fetchLowStockProducts } from "../inventory/fetchLowStockProduct";
+import { formatDistanceToNow, parseISO } from "date-fns";
+import { fetchDefectiveItems } from "../inventory/fetchdefectitem";
+import { updateDefectStatus } from "../inventory/UpdateStatusDefect"; 
+
 
 const Inventory = () => {
   const [products, setProducts] = useState([]);
   const [showModal, setShowModal] = useState(false);
+  const [showDefectModal, setShowDefectModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [lowStockProducts, setLowStockProducts] = useState([]);
+  const [defectiveItems, setDefectiveItems] = useState([]);
+  const [user, setUser] = useState(null);
+  const [activityLogs, setActivityLogs] = useState([]);
+  const navigate = useNavigate();
 
   const loadProducts = async () => {
     try {
@@ -17,10 +31,66 @@ const Inventory = () => {
     } catch (err) {
       console.error("Error loading products", err);
     }
+    
+  };
+  const loadLowStock = async () => {
+    const data = await fetchLowStockProducts();
+    console.log("Fetched Low Stock:", data);
+    setLowStockProducts(data);
+  };
+
+  const loadDefectiveItems = async () => {
+    const data = await fetchDefectiveItems();
+    setDefectiveItems(data);
+  };
+
+  const loadActivityLogs = async () => {
+    const { data, error } = await supabase
+      .from("activitylog")
+      .select("*, systemuser(username)")
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (error) {
+      console.error("Failed to fetch activity logs:", error);
+    } else {
+      setActivityLogs(data);
+    }
   };
 
   useEffect(() => {
+    const getUser = async () => {
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error || !user) {
+      window.location.href = '/'; // redirect to login
+      return;
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from('systemuser')
+      .select('*')
+      .eq('userid', user.id)
+      .single();
+
+    if (profileError) {
+      console.error("Error fetching user profile:", profileError);
+      return;
+    }
+
+    setUser(profile);
+  };
+    getUser();
     loadProducts();
+    loadLowStock();
+    loadDefectiveItems();
+    loadActivityLogs();
+    const interval = setInterval(() => {
+      loadLowStock();
+      loadActivityLogs();
+      loadDefectiveItems();
+    }, 30000);
+
+    return () => clearInterval(interval); 
   }, []);
 
   const filteredProducts = products.filter((product) =>
@@ -41,6 +111,7 @@ const Inventory = () => {
             <ul>
               <li>Dashboard</li>
               <li className="active">Inventory</li>
+              <li onClick={() => navigate("/supplier")}>Supplier</li>
               <li>Sales</li>
               <li>Expenses</li>
               <li>AI Assistant</li>
@@ -119,53 +190,136 @@ const Inventory = () => {
             <div className="user-info-card">
               <div className="user-left">
                 <div className="user-avatar" />
-                <div className="user-username">person</div>
+                <div className="user-username">
+                  {user ? user.username : "Loading..."}
+                </div>
               </div>
-              <button className="logout-button">Logout</button>
+              <button className="logout-button"
+              onClick={async () => {
+                await supabase.auth.signOut();
+                localStorage.clear();
+                window.location.href = '/'; // redirect to login
+              }}
+              >Logout</button>
             </div>
 
             <div className="availability-panel">
               <h3>Product Availability</h3>
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="availability-item">
-                  <div className="img-placeholder" />
-                  <div className="availability-details">
-                    <span className="name">Product Name</span>
-                    <span className="stock">4 pcs left</span>
-                    <span className="time">1 hour ago</span>
-                  </div>
-                </div>
-              ))}
+              <div className="availability-container">
+                {lowStockProducts.length === 0 ? (
+                  <p className="no-low-stock">All items are sufficiently stocked.</p>
+                  ) : (
+                  lowStockProducts.map((product, i) => {
+                    let timeAgo = "N/A";
+                    if (product.updatedstock) {
+                      try {
+                        timeAgo = formatDistanceToNow(parseISO(product.updatedstock), { addSuffix: true });
+                      } catch (e) {
+                        console.warn("Invalid updatedstock date:", e);
+                      }
+                    }
+
+                    return (
+                      <div key={i} className="availability-item">
+                        {product.image_url ? (
+                          <img src={product.image_url} alt="Product" className="product-thumbnail" />
+                        ) : (
+                          <div className="img-placeholder" />
+                        )}
+                        <div className="availability-details">
+                          <span className="name">{product.productname}</span>
+                          <span className="stock">{product.currentstock} pcs left</span>
+                          <span className="time">{timeAgo}</span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
 
             <div className="defective-panel">
               <div className="panel-title-row">
                 <h3>Defective Item</h3>
-                <button className="panel-action-button">+Add-Defect</button>
+                <button className="panel-action-button" onClick={() => setShowDefectModal(true)}>+Add-Defect</button>
               </div>
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="defective-item">
-                  <div className="defectimg-placeholder" />
-                  <div className="defective-details">
-                    <span className="defect-name">Product Name</span>
-                    <span className="Description">Description</span>
-                    <span className="Quantity"># pcs left</span>
-                    <span className="Status">In-progress</span>
-                  </div>
-                </div>
-              ))}
+              <div className="defective-container">
+                {defectiveItems.length === 0 ? (
+                  <p className="no-low-stock">No defective items reported.</p>
+                ) : (
+                  defectiveItems.map((item) => (
+                    <div key={item.defectiveitemid} className="defective-item">
+                      {item.products?.image_url ? (
+                        <img
+                          src={item.products.image_url}
+                          alt="Product"
+                          className="defectimg-placeholder"
+                        />
+                      ) : (
+                        <div className="defectimg-placeholder" />
+                      )}
+
+                      <div className="defective-details">
+                        <div className="defect-main">
+                          <span className="defect-name">{item.products?.productname || "Unnamed"}</span>
+                          <span className="Description">{item.defectdescription}</span>
+                          <span className="Quantity">{item.quantity} pcs</span>
+                        </div>
+
+                        <div className="defect-status">
+                          <select
+                          className="status-dropdown"
+                          value={item.status}
+                          onChange={async (e) => {
+                            if (!user) {
+                              alert("User not loaded. Please wait...");
+                              return;
+                            }
+
+                            try {
+                              await updateDefectStatus(item.defectiveitemid, e.target.value, user);
+                              loadDefectiveItems();
+                            } catch (err) {
+                              console.error("Update failed:", err);
+                              alert("Failed to update status. See console for details.");
+                            }
+                          }}
+                          >
+                          <option value="In-Process">In-Process</option>
+                          <option value="Returned">Returned</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
 
+            
             <div className="activity-panel">
               <h3>Recent Activity</h3>
-              <ul>
-                {[...Array(4)].map((_, i) => (
-                  <li key={i} className="activity-item">
-                    <span>removed a product</span>
-                    <span className="time">2h ago</span>
-                  </li>
-                ))}
-              </ul>
+              <div className="activity-container">
+                <ul>
+                  {activityLogs.length === 0 ? (
+                    <li className="activity-item">No recent activity</li>
+                  ) : (
+                    activityLogs.map((log, i) => (
+                      <li key={i} className="activity-item">
+                        <span>
+                          <span className="log-username">
+                            {log.systemuser?.username ? log.systemuser.username : "Someone"}
+                          </span>{" "}
+                          {log.action_desc}
+                        </span>
+                        <span className="time">
+                          {formatDistanceToNow(new Date(log.created_at), { addSuffix: true })}
+                        </span>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              </div>
             </div>
           </div>
         </div>
@@ -175,8 +329,10 @@ const Inventory = () => {
         <AddProduct
           onClose={() => {
             setShowModal(false);
-            loadProducts(); 
+            loadProducts();
+            loadActivityLogs();
           }}
+           user={user}
         />
       )}
 
@@ -187,6 +343,18 @@ const Inventory = () => {
             setSelectedProduct(null);
             loadProducts();
           }}
+          user={user}
+        />
+      )}
+
+      {showDefectModal && (
+        <AddDefect
+          onClose={() => {
+            setShowDefectModal(false);
+            loadDefectiveItems();
+            loadProducts();
+          }}
+          user={user}
         />
       )}
     </div>

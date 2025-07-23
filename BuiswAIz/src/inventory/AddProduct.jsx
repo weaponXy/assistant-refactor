@@ -3,7 +3,7 @@ import "../stylecss/AddProduct.css";
 import { supabase } from "../supabase";
 import imageCompression from "browser-image-compression";
 
-const AddProduct = ({ onClose }) => {
+const AddProduct = ({ onClose, user }) => {
   const [suppliers, setSuppliers] = useState([]);
   const [imageFile, setImageFile] = useState(null);
   const [formData, setFormData] = useState({
@@ -99,6 +99,15 @@ const AddProduct = ({ onClose }) => {
       console.error("Insert failed:", error);
       alert("Failed to add product.");
     } else {
+        if (user) {
+          await supabase.from("activitylog").insert([
+            {
+              action_type: "add_product",
+              action_desc: `added ${formData.productname} to the inventory`,
+              done_user: user.userid,
+            },
+          ]);
+        }
       onClose();
     }
   };

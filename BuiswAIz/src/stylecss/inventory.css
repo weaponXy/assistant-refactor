@@ -1,4 +1,4 @@
-/* Reset */
+
 * {
   margin: 0;
   padding: 0;
@@ -10,7 +10,7 @@ body {
   background-color: #f6f9ff;
 }
 
-.inventory-page {
+.supplier-page {
   display: flex;
   flex-direction: column;
   min-height: 100vh; 
@@ -170,14 +170,22 @@ tbody td {
 .availability-panel,
 .defective-panel,
 .activity-panel {
-  height: 200px;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   background: white;
   border-radius: 18px;
   padding: 20px;
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+  flex: 1; /* Let it grow */
+  min-height: 0; /* Prevent overflow issues */
 }
-
+.activity-container {
+  flex: 1;
+  overflow-y: auto;
+  border: hidden;
+  border-radius: 8px;
+  max-height: 100%;
+}
 .availability-item {
   display: flex;
   align-items: center;
@@ -223,12 +231,31 @@ tbody td {
   color: #888;
 }
 
+.product-thumbnail {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
 .defective-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-top: 16px;
+  padding: 12px 18px;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  background-color: #fff;
 }
+
+.availability-container {
+  flex: 1;
+  overflow-y: auto;
+  border: hidden;
+  border-radius: 8px;
+  max-height: 100%;
+}
+
 .panel-title-row {
   display: flex;
   justify-content: space-between;
@@ -261,13 +288,40 @@ tbody td {
 
 .defective-details {
   display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex: 1;
+  margin-left: 16px;
+}
+.defective-container {
+  flex: 1;
+  overflow-y: auto;
+  border: hidden;
+  border-radius: 8px;
+  max-height: 100%;
+}
+.defect-main {
+  display: flex;
   flex-direction: column;
-  font-size: 12px;
-  color: #555;
+  gap: 4px;
+}
+
+.defect-status {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+.status-dropdown {
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: none;
+  font-weight: 500;
+  cursor: pointer;
 }
 
 .defect-name {
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .Description,
@@ -298,6 +352,10 @@ tbody td {
 
 .activity-item:last-child {
   border-bottom: none;
+}
+.log-username {
+  font-weight: 600;
+  color: #2a6df4; /* highlight color */
 }
 .panel-actions {
   display: flex;
