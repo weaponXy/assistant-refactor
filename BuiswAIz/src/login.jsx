@@ -84,7 +84,13 @@ const Login = () => {
               />
               Keep me logged in
             </label>
+
+            <p className="forgot-password">
+              <span onClick={() => navigate('/forgot-password')}>Forgot password?</span>
+            </p>
           </div>
+
+         
 
           {error && <p className="error-message">{error}</p>}
 
