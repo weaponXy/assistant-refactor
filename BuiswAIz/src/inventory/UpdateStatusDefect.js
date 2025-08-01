@@ -13,13 +13,25 @@ export const updateDefectStatus = async (defectiveItemId, newStatus, user) => {
     console.error("Error updating defect status:", updateError.message);
     throw updateError;
   }
-  console.log("Logging action by user:", user);
-  
+
+  // Fetch product name for logging
+  const { data: defectData, error: fetchProductError } = await supabase
+    .from("defectiveitems")
+    .select("productid, products(productname)")
+    .eq("defectiveitemid", defectiveItemId)
+    .single();
+
+  const productName = defectData?.products?.productname || `Product ID ${defectData?.productid}`;
+
+  if (fetchProductError) {
+    console.error("Error fetching product name for logging:", fetchProductError.message);
+  }
+
   if (user) {
     await supabase.from("activitylog").insert([
       {
         action_type: "update_defect_status",
-        action_desc: `updated status of defect ${defectiveItemId} to ${newStatus}`,
+        action_desc: `updated status of defect for ${productName} to ${newStatus}`,
         done_user: user.userid,
       },
     ]);
@@ -28,9 +40,7 @@ export const updateDefectStatus = async (defectiveItemId, newStatus, user) => {
   if (newStatus === "Returned") {
     clearTimeout(deletionTimers[defectiveItemId]);
 
-     deletionTimers[defectiveItemId] = setTimeout(() => {
-
-    
+    deletionTimers[defectiveItemId] = setTimeout(() => {
       (async () => {
         const { data, error: fetchError } = await supabase
           .from("defectiveitems")
@@ -50,14 +60,13 @@ export const updateDefectStatus = async (defectiveItemId, newStatus, user) => {
             .eq("defectiveitemid", defectiveItemId);
 
           if (!deleteError) {
-            console.log(`Defect item ${defectiveItemId} deleted after 1 minute.`);
+            console.log(`Defect item ${defectiveItemId} deleted after 15 seconds.`);
 
             if (user) {
-              // ✅ Now this should actually run as expected
               const { error: logError } = await supabase.from("activitylog").insert([
                 {
                   action_type: "return_defect",
-                  action_desc: `Successfully returned defective ${defectiveItemId} to the supplier.`,
+                  action_desc: `Successfully returned defective item: ${productName} to the supplier.`,
                   done_user: user.userid,
                 },
               ]);
@@ -70,11 +79,10 @@ export const updateDefectStatus = async (defectiveItemId, newStatus, user) => {
             console.error("Error deleting returned defect:", deleteError.message);
           }
         }
-      })(); // ✅ <-- This actually runs the async function
-    }, 15000); // 🕒 1-minute delay
+      })();
+    }, 15000); // 15 seconds
   } else {
     clearTimeout(deletionTimers[defectiveItemId]);
     delete deletionTimers[defectiveItemId];
   }
 };
-
