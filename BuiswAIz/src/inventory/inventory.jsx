@@ -10,6 +10,7 @@ import { fetchLowStockProducts } from "../inventory/fetchLowStockProduct";
 import { formatDistanceToNow, parseISO } from "date-fns";
 import { fetchDefectiveItems } from "../inventory/fetchdefectitem";
 import { updateDefectStatus } from "../inventory/UpdateStatusDefect"; 
+import TablePage from "../TablePage";
 
 
 const Inventory = () => {
@@ -112,7 +113,7 @@ const Inventory = () => {
               <li>Dashboard</li>
               <li className="active">Inventory</li>
               <li onClick={() => navigate("/supplier")}>Supplier</li>
-              <li>Sales</li>
+              <li onClick={() => navigate("/TablePage")}>Sales</li>
               <li>Expenses</li>
               <li>AI Assistant</li>
             </ul>

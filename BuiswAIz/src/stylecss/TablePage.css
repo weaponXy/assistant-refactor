@@ -1,0 +1,1231 @@
+.table-container {
+  color: black;
+  padding: 20px;
+  font-family: 'Montserrat', sans-serif;
+}
+
+/* Headings */
+h2 {
+  margin-bottom: 10px;
+  color: #222;
+  font-family: 'Montserrat', sans-serif;
+}
+
+h3 {
+  margin-bottom: 10px;
+  color: #333;
+  font-family: 'Montserrat', sans-serif;
+}
+
+/* Flex layout for tables */
+.table-flex-wrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0px; /* Removed gap to make containers stick together */
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+.sales-table-wrapper {
+  flex: 1;
+  width: 1500px;
+  text-align: left;
+  position: relative; /* search box will now position here */
+  /* Box container styles */
+  border: 1px solid #ddd;
+  border-right: none; /* Remove right border to connect with next container */
+  padding: 20px;
+  background-color: #fff;
+  height: 522px; /* Fixed height to prevent container from changing size */
+  display: flex;
+  flex-direction: column;
+}
+
+.table-header {
+  justify-content: flex-end;
+  position: relative; /* Changed from absolute */
+  display: flex; /* Added */
+  align-items: center; /* Added */
+  gap: 15px; /* Added */
+  margin-bottom: 20px; /* Added */
+}
+
+.search-input {
+  color: #000000;
+  padding: 12px 12px;
+  background-color: #f1f1f1;
+  border: 1px solid #e1cfcf;
+  width: 300px;
+  border-radius: 4px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 12px;
+  outline: none;
+  transition: all 0.2s ease;
+  order: 2;
+}
+
+.search-input:focus {
+  border-color: #04B4FC;
+  box-shadow: 0 0 3px #04B4FC;
+}
+  
+/* Right column wrapper for user management and bestseller */
+.right-column-wrapper {
+  flex: 1;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 0px; /* No gap to make containers stick together */
+}
+
+.bestseller-table-wrapper {
+  text-align: left;
+  border: 1px solid #ddd;
+  padding: 20px;
+  background-color: #fff;
+  height: 422px;
+  max-height: 422px;
+}
+
+.no-image-text {
+  color: #888;
+  font-style: italic;
+  display: inline-block;
+  border: rgba(0, 0, 0, 0.1);
+}
+
+
+/* Scrollable box for tables */
+.table-scroll-box {
+  flex: 1; /* Take up remaining space in the container */
+  overflow-y: auto;
+  overflow-x: hidden;
+  border: transparent;
+  background-color: #fff;
+  scrollbar-width: thin;
+  scrollbar-color: #04B4FC #f1f1f1;
+}
+
+/* Tables */
+table {
+  color: black;
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 0;
+}
+
+table th,
+table td {
+  padding: 10px;
+  border-bottom: 1px solid #fff; /* invisible line */
+  line-height: 3;
+  text-align: center;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 12px;
+}
+
+table th {
+  background-color: rgb(214, 241, 251);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+/* Reduce text contrast in table body rows only */
+table tbody td {
+  color: rgba(0, 0, 0, 0.8); /* or use #00000099 for ~60% opacity */
+  font-size: 11px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Dropdown filter in table header */
+.table-filter-header {
+  padding: 8px 10px;
+  background-color: rgb(214, 241, 251);
+}
+
+.table-filter {
+  color: #333;
+  border: none;
+  background-color: transparent;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  padding: 6px 12px;
+  border-radius: 10px;
+  font-family: 'Montserrat', sans-serif;
+  transition: all 0.2s ease;
+  width: 50%;
+  text-align: center;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 3px center;
+  background-size: 15px;
+  padding-right: 30px;
+}
+
+.table-filter:focus {
+  background-color: rgba(4, 180, 252, 0.1);
+  color: #04B4FC;
+}
+
+.table-filter:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+  color: #04B4FC;
+}
+
+/* Custom dropdown arrow styling */
+.table-filter option {
+  background-color: #ffffff;
+  color: #333;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 12px;
+  padding: 8px 12px;
+}
+
+/* Product image styling in bestseller table */
+.product-image-cell {
+  padding: 8px !important;
+  width: 60px;
+  text-align: center;
+  position: relative;
+}
+
+.product-image {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
+  transition: transform 0.2s ease;
+  display: block;
+  margin: 0 auto;
+}
+
+.product-image:hover {
+  transform: scale(1.05);
+}
+
+.image-placeholder {
+  width: 40px;
+  height: 40px;
+  background-color: #f5f5f5;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  color: #999;
+  margin: 0 auto;
+  font-family: 'Montserrat', sans-serif;
+}
+
+/* Adjust bestseller table for better image display */
+.bestseller-table {
+  table-layout: fixed;
+}
+
+.bestseller-table th:first-child,
+.bestseller-table td:first-child {
+  width: 70px;
+  min-width: 70px;
+}
+
+.bestseller-table th:nth-child(2),
+.bestseller-table td:nth-child(2) {
+  width: auto;
+  text-align: left;
+  padding-left: 15px;
+}
+
+.bestseller-table th:last-child,
+.bestseller-table td:last-child {
+  width: 80px;
+  min-width: 80px;
+}
+
+/* Action buttons in table */
+.table-action {
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+  align-items: center;
+}
+
+.invoice-btn {
+  padding: 4px 8px;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 10px;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.invoice-btn {
+  background-color: #04B4FC;
+  color: white;
+}
+
+.invoice-btn:hover {
+  background-color: #0290c4;
+}
+
+.download-btn-small {
+  background-color: #28a745;
+  color: white;
+}
+
+.download-btn-small:hover {
+  background-color: #218838;
+}
+
+/* Stats container - main container for earnings and customers */
+.stats-container {
+  background-color: #ffffff;
+  border: 1px solid #ddd;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  font-family: 'Montserrat', sans-serif;
+  width: 1212px;
+  max-width: 1212px;
+}
+
+/* Stats container header with title and dropdown */
+.stats-container-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.stats-container-header h3 {
+  margin: 0;
+  color: #333;
+  font-size: 1.2rem;
+}
+
+/* Single dropdown filter for stats container */
+.stats-container-filter {
+  color: #333;
+  border: 1px solid #ddd;
+  background-color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-family: 'Montserrat', sans-serif;
+  transition: all 0.2s ease;
+  text-align: center;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 14px;
+  padding-right: 32px;
+  min-width: 120px;
+}
+
+.stats-container-filter:focus {
+  border-color: #04B4FC;
+  box-shadow: 0 0 4px rgba(4, 180, 252, 0.3);
+}
+
+.stats-container-filter:hover {
+  border-color: #04B4FC;
+  background-color: rgba(4, 180, 252, 0.05);
+}
+
+.stats-container-filter option {
+  background-color: #ffffff;
+  color: #333;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 12px;
+  padding: 8px 12px;
+}
+
+/* Container for the stats boxes */
+.stats-boxes {
+  display: flex;
+  gap: 300px;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+/* Individual boxes inside stats container */
+.earnings-box {
+  background-color: #f8f9fa;
+  border: 3px solid green;
+  color: rgba(0, 0, 0, 0.8);
+  padding: 20px;
+  border-radius: 15px;
+  flex: 1;
+  max-width: 200px;
+  text-align: center;
+  font-family: 'Montserrat', sans-serif;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.customers-box {
+  background-color: #f8f9fa;
+  border: 3px solid  #04B4FC;
+  color: rgba(0, 0, 0, 0.8);
+  padding: 20px;
+  border-radius: 15px;
+  flex: 1;
+  max-width: 200px;
+  text-align: center;
+  font-family: 'Montserrat', sans-serif;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Stats box header with icon */
+.stats-box-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+/* Earnings icon styling */
+.earnings-icon {
+  width: 24px;
+  height: 24px;
+  filter: brightness(0) saturate(100%) invert(20%) sepia(100%) saturate(2500%) hue-rotate(200deg) brightness(98%) contrast(95%);
+  transition: transform 0.2s ease;
+}
+
+.earnings-box:hover .earnings-icon {
+  transform: scale(1.1);
+}
+
+/* Updated stats box headings */
+.earnings-box h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: green;
+}
+
+.customers-box h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #04B4FC;;
+}
+
+.earnings-box p {
+  font-size: 1.8rem;
+  font-weight: bold;
+  margin: 0;
+  color: green;
+}
+
+.customers-box p {
+  font-size: 1.8rem;
+  font-weight: bold;
+  margin: 0;
+  color: #04B4FC;
+}
+
+/* Custom radio buttons */
+input[type="radio"] {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #ccc;
+  border-radius: 50%;
+  background-color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+input[type="radio"]:hover {
+  opacity: .5;
+}
+
+input[type="radio"]:checked {
+  border: 3px solid #ccc;
+  background-color: #04B4FC;
+  border-color: #f1f1f1;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end; /* or 'space-between' */
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.modal-footer button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  background-color: #04B4FC;
+  color: white;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.3s ease;
+  outline: none;
+}
+
+.modal-footer button:hover {
+  background-color: rgba(0, 0, 0, 0.5)
+}
+
+.customers-icon {
+  width: 24px;
+  height: 24px;
+  filter: brightness(0) saturate(100%) invert(20%) sepia(100%) saturate(2500%) hue-rotate(200deg) brightness(98%) contrast(95%);
+  transition: transform 0.2s ease;
+}
+
+.customers-box:hover .customers-icon {
+  transform: scale(1.1);
+}
+
+/* Update the customers box header to match earnings box */
+.customers-box .stats-box-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.modal-header h3 {
+  margin: 0;
+}
+
+/* Update modal content for better spacing */
+.modal-content {
+  background: white;
+  padding: 25px 30px;
+  border-radius: 10px;
+  max-width: 450px; /* Slightly wider for edit mode */
+  width: 100%;
+  font-family: 'Montserrat', sans-serif;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  animation: fadeIn 0.3s ease-in-out;
+}
+/* InvoiceModal Styling - Similar to AddSaleModal */
+.invoice-modal-content {
+  background: white;
+  padding: 30px;
+  border-radius: 15px;
+  max-width: 600px;
+  width: 100%;
+  font-family: 'Montserrat', sans-serif;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  animation: slideIn 0.3s ease-out;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.invoice-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Invoice Details View (non-edit mode) */
+.invoice-details {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.invoice-separator {
+  color: #666;
+  font-family: monospace;
+  text-align: center;
+  font-size: 12px;
+  margin: 10px 0;
+  letter-spacing: -1px;
+}
+
+.invoice-info-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.invoice-info-row {
+  display: flex;
+  gap: 30px;
+  justify-content: space-between;
+}
+
+.invoice-info-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.invoice-info-item strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.invoice-info-item span {
+  font-size: 14px;
+  color: #555;
+  padding: 8px 0;
+}
+
+.invoice-info-item.total-item {
+  border-top: 2px solid #04B4FC;
+  padding-top: 10px;
+  margin-top: 10px;
+}
+
+.total-amount {
+  font-size: 18px !important;
+  font-weight: bold !important;
+  color: #04B4FC !important;
+}
+
+/* Button styling for invoice modal */
+.download-pdf-btn {
+  padding: 12px 24px;
+  border: 2px solid #28a745;
+  border-radius: 8px;
+  background-color: #28a745;
+  color: white;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  font-family: 'Montserrat', sans-serif;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3);
+}
+
+.download-pdf-btn:hover {
+  background-color: #218838;
+  border-color: #218838;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+}
+
+.close-btn {
+  padding: 12px 24px;
+  border: 2px solid #6c757d;
+  border-radius: 8px;
+  background-color: transparent;
+  color: #6c757d;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  font-family: 'Montserrat', sans-serif;
+  transition: all 0.3s ease;
+}
+
+.close-btn:hover {
+  background-color: #6c757d;
+  color: white;
+  transform: translateY(-1px);
+}
+
+/* Update edit button styling to match form style */
+.invoice-modal-content .edit-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  background-color: #ffc107;
+  color: #000;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 12px;
+  font-family: 'Montserrat', sans-serif;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(255, 193, 7, 0.3);
+}
+
+.invoice-modal-content .edit-btn:hover {
+  background-color: #ffca2c;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(255, 193, 7, 0.4);
+}
+
+/* Modal Footer for Invoice Modal */
+.invoice-modal-content .modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 15px;
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid #e1e1e1;
+}
+
+.invoice-modal-content .cancel-btn {
+  padding: 12px 24px;
+  border: 2px solid #6c757d;
+  border-radius: 8px;
+  background-color: transparent;
+  color: #6c757d;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  font-family: 'Montserrat', sans-serif;
+  transition: all 0.3s ease;
+}
+
+.invoice-modal-content .cancel-btn:hover {
+  background-color: #6c757d;
+  color: white;
+  transform: translateY(-1px);
+}
+
+.invoice-modal-content .save-btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  background: #04B4FC;
+  color: white;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  font-family: 'Montserrat', sans-serif;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 6px rgba(4, 180, 252, 0.3);
+}
+
+.invoice-modal-content .save-btn:hover {
+  background: linear-gradient(135deg, #0290c4, #026b8a);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(4, 180, 252, 0.4);
+}
+
+.invoice-modal-content .save-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(4, 180, 252, 0.3);
+}
+
+/* Responsive design for Invoice Modal */
+@media (max-width: 768px) {
+  .invoice-modal-content {
+    max-width: 95%;
+    padding: 20px;
+    margin: 10px;
+  }
+  
+  .invoice-info-row {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .invoice-modal-content .modal-footer {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .invoice-modal-content .cancel-btn,
+  .invoice-modal-content .save-btn,
+  .download-pdf-btn,
+  .close-btn {
+    width: 100%;
+    padding: 14px;
+  }
+}
+
+.sales-comparison-box {
+  background-color: #f8f9fa;
+  border: 3px solid #ffc107;
+  color: rgba(0, 0, 0, 0.8);
+  padding: 20px;
+  border-radius: 15px;
+  flex: 1;
+  max-width: 200px;
+  text-align: center;
+  font-family: 'Montserrat', sans-serif;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sales-comparison-box:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.sales-comparison-box h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #ffc107;
+}
+
+/* Trend icon styling */
+.trend-icon {
+  width: 24px;
+  height: 24px;
+  transition: transform 0.2s ease;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+}
+
+.sales-comparison-box:hover .trend-icon {
+  transform: scale(1.1);
+}
+
+/* Trend content styling */
+.trend-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.comparison-period {
+  background-color: rgba(255, 193, 7, 0.1);
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-style: italic;
+  border: 1px solid rgba(255, 193, 7, 0.3);
+}
+
+/* Update stats-boxes to accommodate three boxes */
+.stats-boxes {
+  display: flex;
+  gap: 150px; /* Reduced gap to fit three boxes */
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+/* Responsive adjustments for three boxes */
+@media (max-width: 1200px) {
+  .stats-boxes {
+    gap: 100px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .stats-boxes {
+    gap: 50px;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 768px) {
+  .stats-boxes {
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+  
+  .earnings-box,
+  .customers-box,
+  .sales-comparison-box {
+    max-width: 300px;
+    width: 100%;
+  }
+}
+@media (max-width: 768px) {
+  .stats-boxes {
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+  
+  .earnings-box,
+  .customers-box,
+  .sales-comparison-box {
+    max-width: 300px;
+    width: 100%;
+  }
+}
+
+/* Add Sale Button Styling */
+.add-sale-btn {
+  background-color:#04B4FC;
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: 'Montserrat', sans-serif;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 6px rgba(4, 180, 252, 0.3);
+  /* Remove position: absolute, top: 0px, left: 2 */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  order: 1; /* Added to ensure it comes first */
+  white-space: nowrap;
+}
+
+.add-sale-btn:hover {
+  background: linear-gradient(135deg, #0290c4, #026b8a);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(4, 180, 252, 0.4);
+}
+
+.add-sale-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(4, 180, 252, 0.3);
+}
+
+/* AddSaleModal Styling */
+.add-sale-modal-content {
+  background: white;
+  padding: 30px;
+  border-radius: 15px;
+  max-width: 600px;
+  width: 100%;
+  font-family: 'Montserrat', sans-serif;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  animation: slideIn 0.3s ease-out;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.add-sale-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.form-row {
+  display: flex;
+  gap: 20px;
+}
+
+.form-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 5px;
+}
+
+.form-input {
+  padding: 12px 15px;
+  border: 2px solid #e1e1e1;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: 'Montserrat', sans-serif;
+  color: #333;
+  background-color: #fff;
+  transition: all 0.3s ease;
+  outline: none;
+}
+
+.form-input:focus {
+  border-color: #04B4FC;
+  box-shadow: 0 0 0 3px rgba(4, 180, 252, 0.1);
+  background-color: #fafafa;
+}
+
+.form-input.error {
+  border-color: #dc3545;
+  background-color: #ffeaea;
+}
+
+.form-input.error:focus {
+  border-color: #dc3545;
+  box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1);
+}
+
+.form-input.readonly {
+  background-color: #f8f9fa;
+  border-color: #dee2e6;
+  color: #6c757d;
+  cursor: not-allowed;
+}
+
+.error-message {
+  color: #dc3545;
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+/* Modal Footer for Add Sale */
+.add-sale-modal-content .modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 15px;
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid #e1e1e1;
+}
+
+.add-sale-modal-content .cancel-btn {
+  padding: 12px 24px;
+  border: 2px solid #6c757d;
+  border-radius: 8px;
+  background-color: transparent;
+  color: #6c757d;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  font-family: 'Montserrat', sans-serif;
+  transition: all 0.3s ease;
+}
+
+.add-sale-modal-content .cancel-btn:hover {
+  background-color: #6c757d;
+  color: white;
+  transform: translateY(-1px);
+}
+
+.add-sale-modal-content .save-btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  background: #04B4FC;
+  color: white;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  font-family: 'Montserrat', sans-serif;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3);
+}
+
+.add-sale-modal-content .save-btn:hover {
+  background: #04b6fc7b;
+  transform: translateY(1px);
+}
+
+.add-sale-modal-content .save-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3);
+}
+
+/* Responsive design for Add Sale Modal */
+@media (max-width: 768px) {
+  .add-sale-modal-content {
+    max-width: 95%;
+    padding: 20px;
+    margin: 10px;
+  }
+  
+  .form-row {
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .add-sale-modal-content .modal-footer {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .add-sale-modal-content .cancel-btn,
+  .add-sale-modal-content .save-btn {
+    width: 100%;
+    padding: 14px;
+  }
+}
+
+/* Add these styles to your existing TablePage.css */
+
+/* Global styles update */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+body {
+  background-color: #f6f9ff;
+}
+
+/* Sales Page Layout */
+.sales-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh; 
+}
+
+/* Header Bar */
+.header-bar {
+  height: 60px;
+  background-color: #ffffff;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  border-bottom: 1px solid #e1e4ea;
+}
+
+.header-title {
+  font-size: 20px;
+  font-weight: bold;
+  color: #0084ff;
+}
+
+/* Main Layout */
+.main-section {
+  display: flex;
+  flex: 1;
+  height: calc(100vh - 60px);
+}
+
+/* Sidebar */
+.sidebar {
+  width: 220px;
+  background-color: #f9fbfd;
+  padding: 30px 20px;
+  border-right: 1px solid #e3e9f1;
+}
+
+.nav-header {
+  font-size: 12px;
+  color: #aaa;
+  margin: 20px 0 10px;
+  font-weight: bold;
+}
+
+.sidebar ul {
+  list-style: none;
+}
+
+.sidebar li {
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  border-radius: 10px;
+  color: #333;
+  cursor: pointer;
+}
+
+.sidebar li.active,
+.sidebar li:hover {
+  background-color: #04B4FC;
+  color: white;
+}
+
+/* Main Content Update */
+.main-content {
+  flex: 1;
+  display: flex;
+  padding: 24px;
+  gap: 20px;
+  overflow: hidden;
+  height: calc(100vh - 60px);
+}
+
+/* Sales Panel */
+.sales-panel {
+  flex: 2;
+  background: white;
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Right Panel for User Info */
+.right-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-height: calc(100vh - 60px);
+  overflow-y: auto;
+  padding-right: 10px;
+}
+
+.user-info-card {
+  background: white;
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.user-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-avatar {
+  width: 40px;
+  height: 40px;
+  background-color: #04B4FC;
+  border-radius: 50%;
+}
+
+.user-username {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+
+.logout-button {
+  background-color: #ff6b6b;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+/* User Info Card Inline (replaces UserManagement) */
+.user-info-card-inline {
+  border: 1px solid #ddd;
+  padding: 20px;
+  background-color: #fff;
+  min-height: 100px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logout-button:hover {
+  background-color: #ff5252;
+}
