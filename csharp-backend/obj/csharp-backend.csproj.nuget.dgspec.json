@@ -1,23 +1,23 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\Carlito\\OneDrive\\Documents\\GitHub\\Capstone-BuiswAIz\\csharp-backend\\csharp-backend.csproj": {}
+    "C:\\Users\\Ryan\\Documents\\GitHub\\Capstone-BuiswAIz\\csharp-backend\\csharp-backend.csproj": {}
   },
   "projects": {
-    "C:\\Users\\Carlito\\OneDrive\\Documents\\GitHub\\Capstone-BuiswAIz\\csharp-backend\\csharp-backend.csproj": {
+    "C:\\Users\\Ryan\\Documents\\GitHub\\Capstone-BuiswAIz\\csharp-backend\\csharp-backend.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\Carlito\\OneDrive\\Documents\\GitHub\\Capstone-BuiswAIz\\csharp-backend\\csharp-backend.csproj",
+        "projectUniqueName": "C:\\Users\\Ryan\\Documents\\GitHub\\Capstone-BuiswAIz\\csharp-backend\\csharp-backend.csproj",
         "projectName": "csharp-backend",
-        "projectPath": "C:\\Users\\Carlito\\OneDrive\\Documents\\GitHub\\Capstone-BuiswAIz\\csharp-backend\\csharp-backend.csproj",
-        "packagesPath": "C:\\Users\\Carlito\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\Carlito\\OneDrive\\Documents\\GitHub\\Capstone-BuiswAIz\\csharp-backend\\obj\\",
+        "projectPath": "C:\\Users\\Ryan\\Documents\\GitHub\\Capstone-BuiswAIz\\csharp-backend\\csharp-backend.csproj",
+        "packagesPath": "C:\\Users\\Ryan\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\Ryan\\Documents\\GitHub\\Capstone-BuiswAIz\\csharp-backend\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
         ],
         "configFilePaths": [
-          "C:\\Users\\Carlito\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Users\\Ryan\\AppData\\Roaming\\NuGet\\NuGet.Config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
@@ -44,7 +44,7 @@
           "auditLevel": "low",
           "auditMode": "direct"
         },
-        "SdkAnalysisLevel": "9.0.300"
+        "SdkAnalysisLevel": "9.0.200"
       },
       "frameworks": {
         "net9.0": {
@@ -74,7 +74,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.300/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.203/PortableRuntimeIdentifierGraph.json"
         }
       }
     }
