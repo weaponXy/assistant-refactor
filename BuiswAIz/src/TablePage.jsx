@@ -219,7 +219,7 @@ const TablePage = () => {
           <div className="nav-section">
             <p className="nav-header">GENERAL</p>
             <ul>
-              <li>Dashboard</li>
+              <li onClick={() => navigate("/Dashboard")}>Dashboard</li>
               <li onClick={() => navigate("/inventory")}>Inventory</li>
               <li onClick={() => navigate("/supplier")}>Supplier</li>
               <li className="active">Sales</li>
