@@ -4,6 +4,7 @@ import Inventory from "./inventory/inventory";
 import Supplier from "./supplier/supplier";
 import ForgotPassword from './forgotpassword';
 import ResetPassword from './ResetPassword';
+import Assistant from './Assistant/Assistant'
 import Sales from "./TablePage";
 
 function App() {
@@ -15,7 +16,9 @@ function App() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/inventory" element={<Inventory />} />
         <Route path="/supplier" element={<Supplier />} />
+        <Route path="/assistant" element={<Assistant />}/>
         <Route path="/TablePage" element={<Sales />} />
+
       </Routes>
     </BrowserRouter>
   );

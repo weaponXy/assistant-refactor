@@ -41,7 +41,7 @@ const AddSupplier = ({ onClose, user }) => {
 
   return (
     <div className="modal-overlay">
-      <div className="modal-content slide-up">
+      <div className="AddSmodal-content slide-up">
         {/* Header */}
         <div className="modal-header">
           <button className="back-btn" onClick={onClose}>←</button>

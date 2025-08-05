@@ -68,7 +68,7 @@ const Supplier = () => {
               <li className="active">Supplier</li>
               <li onClick={() => navigate("/TablePage")}>Sales</li>
               <li>Expenses</li>
-              <li>AI Assistant</li>
+              <li onClick={() => navigate("/assistant")}>AI Assistant</li>
             </ul>
             <p className="nav-header">SUPPORT</p>
             <ul>
@@ -90,7 +90,7 @@ const Supplier = () => {
               </div>
             </div>
             
-            <div className="table-container">
+            <div className="supplier-container">
               <table>
                 <thead>
                   <tr>

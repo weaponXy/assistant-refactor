@@ -19,7 +19,7 @@ const AddProduct = ({ onClose, user }) => {
 
   useEffect(() => {
     const fetchSuppliers = async () => {
-      const { data, error } = await supabase.from("suppliers").select("*");
+      const { data, error } = await supabase.from("suppliers").select("*").eq("supplierstatus", "Active")
       if (!error) setSuppliers(data);
     };
     fetchSuppliers();
@@ -114,8 +114,8 @@ const AddProduct = ({ onClose, user }) => {
 
   return (
     <div className="modal-overlay">
-      <div className="modal-content slide-up">
-        {/* Header */}
+      <div className="Addmodal-content slide-up">
+        
         <div className="modal-header">
           <button className="back-btn" onClick={onClose}>←</button>
           <h2>Product</h2>

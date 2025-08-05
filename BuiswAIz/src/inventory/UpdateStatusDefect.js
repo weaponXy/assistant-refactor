@@ -70,8 +70,8 @@ export const updateDefectStatus = async (defectiveItemId, newStatus, user) => {
             console.error("Error deleting returned defect:", deleteError.message);
           }
         }
-      })(); // ✅ <-- This actually runs the async function
-    }, 15000); // 🕒 1-minute delay
+      })(); 
+    }, 15000); 
   } else {
     clearTimeout(deletionTimers[defectiveItemId]);
     delete deletionTimers[defectiveItemId];
