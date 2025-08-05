@@ -1,6 +1,5 @@
 import { supabase } from "../supabase";
 
-// Keep track of timeouts per item
 const deletionTimers = {};
 
 export const updateDefectStatus = async (defectiveItemId, newStatus, user) => {
@@ -13,24 +12,37 @@ export const updateDefectStatus = async (defectiveItemId, newStatus, user) => {
     console.error("Error updating defect status:", updateError.message);
     throw updateError;
   }
-  console.log("Logging action by user:", user);
-  
+
+
+  const { data: defectData, error: defectFetchError } = await supabase
+    .from("defectiveitems")
+    .select("productid, products(productname)")
+    .eq("defectiveitemid", defectiveItemId)
+    .single();
+
+  if (defectFetchError) {
+    console.error("Error fetching defect product:", defectFetchError.message);
+    return;
+  }
+
+  const productName = defectData?.products?.productname || "Unknown Product";
+
+
   if (user) {
     await supabase.from("activitylog").insert([
       {
         action_type: "update_defect_status",
-        action_desc: `updated status of defect ${defectiveItemId} to ${newStatus}`,
+        action_desc: `updated status of ${productName} to ${newStatus}`,
         done_user: user.userid,
       },
     ]);
   }
 
+
   if (newStatus === "Returned") {
     clearTimeout(deletionTimers[defectiveItemId]);
 
-     deletionTimers[defectiveItemId] = setTimeout(() => {
-
-    
+    deletionTimers[defectiveItemId] = setTimeout(() => {
       (async () => {
         const { data, error: fetchError } = await supabase
           .from("defectiveitems")
@@ -50,14 +62,13 @@ export const updateDefectStatus = async (defectiveItemId, newStatus, user) => {
             .eq("defectiveitemid", defectiveItemId);
 
           if (!deleteError) {
-            console.log(`Defect item ${defectiveItemId} deleted after 1 minute.`);
+            console.log(`Defect item ${defectiveItemId} deleted after delay.`);
 
             if (user) {
-              // ✅ Now this should actually run as expected
               const { error: logError } = await supabase.from("activitylog").insert([
                 {
                   action_type: "return_defect",
-                  action_desc: `Successfully returned defective ${defectiveItemId} to the supplier.`,
+                  action_desc: `Successfully returned ${productName} to the supplier.`,
                   done_user: user.userid,
                 },
               ]);
@@ -70,11 +81,10 @@ export const updateDefectStatus = async (defectiveItemId, newStatus, user) => {
             console.error("Error deleting returned defect:", deleteError.message);
           }
         }
-      })(); 
+      })();
     }, 15000); 
   } else {
     clearTimeout(deletionTimers[defectiveItemId]);
     delete deletionTimers[defectiveItemId];
   }
 };
-
