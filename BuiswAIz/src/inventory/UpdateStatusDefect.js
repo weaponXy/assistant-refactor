@@ -13,7 +13,7 @@ export const updateDefectStatus = async (defectiveItemId, newStatus, user) => {
     throw updateError;
   }
 
-
+  //Fetch product name using defectiveItemId → productid → productname
   const { data: defectData, error: defectFetchError } = await supabase
     .from("defectiveitems")
     .select("productid, products(productname)")
@@ -27,7 +27,7 @@ export const updateDefectStatus = async (defectiveItemId, newStatus, user) => {
 
   const productName = defectData?.products?.productname || "Unknown Product";
 
-
+  // Log activity
   if (user) {
     await supabase.from("activitylog").insert([
       {
@@ -38,7 +38,7 @@ export const updateDefectStatus = async (defectiveItemId, newStatus, user) => {
     ]);
   }
 
-
+  // Handle deletion for "Returned"
   if (newStatus === "Returned") {
     clearTimeout(deletionTimers[defectiveItemId]);
 

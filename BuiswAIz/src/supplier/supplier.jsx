@@ -139,6 +139,10 @@ const Supplier = () => {
                 }}
               >Logout</button>
             </div>
+
+            <div className="supply-returned">
+              
+            </div>
           </div>
         </div>
       </div>
