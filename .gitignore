@@ -205,3 +205,15 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Build and cache artifacts
+bin/
+obj/
+*.dll
+*.pdb
+*.exe
+*.cache
+*.tmp
+.vs/
+TestResults/
+
