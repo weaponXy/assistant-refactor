@@ -63,7 +63,7 @@ const Supplier = () => {
           <div className="nav-section">
             <p className="nav-header">GENERAL</p>
             <ul>
-              <li>Dashboard</li>
+              <li onClick={() => navigate("/Dashboard")}>Dashboard</li>
               <li onClick={() => navigate("/inventory")}>Inventory</li>
               <li className="active">Supplier</li>
               <li onClick={() => navigate("/TablePage")}>Sales</li>

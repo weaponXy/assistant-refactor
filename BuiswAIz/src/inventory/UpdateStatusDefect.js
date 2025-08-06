@@ -13,12 +13,16 @@ export const updateDefectStatus = async (defectiveItemId, newStatus, user) => {
     throw updateError;
   }
 
+
   //Fetch product name using defectiveItemId → productid → productname
   const { data: defectData, error: defectFetchError } = await supabase
+
+
     .from("defectiveitems")
     .select("productid, products(productname)")
     .eq("defectiveitemid", defectiveItemId)
     .single();
+
 
   if (defectFetchError) {
     console.error("Error fetching defect product:", defectFetchError.message);
@@ -63,6 +67,7 @@ export const updateDefectStatus = async (defectiveItemId, newStatus, user) => {
 
           if (!deleteError) {
             console.log(`Defect item ${defectiveItemId} deleted after delay.`);
+
 
             if (user) {
               const { error: logError } = await supabase.from("activitylog").insert([
