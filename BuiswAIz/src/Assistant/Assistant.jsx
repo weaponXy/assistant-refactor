@@ -15,9 +15,10 @@ const Assistant = () => {
         const releaseLock = async () => {
             try {
                 if (authUserId) {
-                    await supabase.from('assistant_lock')
-                    .update({ locked_by: null, locked_at: null })
-                    .eq('id', 1);
+                    await supabase.from("assistant_lock")
+                        .update({ locked_by: null, locked_at: null })
+                        .eq("id", 1)
+                        .eq("locked_by", authUserId);
                 }
             } catch (error) {
                 console.error("Error releasing lock:", error);
@@ -30,57 +31,49 @@ const Assistant = () => {
                 // 1️⃣ Get current auth user
                 const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
                 if (authError || !authUser) {
-                    window.location.href = '/';
+                    window.location.href = "/";
                     return;
                 }
-                authUserId = authUser.id; // assign to outer scope
+                authUserId = authUser.id;
 
-                // 2️⃣ Fetch the singleton lock row (use maybeSingle in case row doesn't exist)
-                const { data: lockRow, error: lockError } = await supabase
-                    .from('assistant_lock')
-                    .select('*')
-                    .eq('id', 1)
-                    .maybeSingle();
+                // 2️⃣ Try to acquire lock via RPC
+                const { data: lockAcquired, error: lockError } = await supabase.rpc(
+                    "acquire_assistant_lock",
+                    { p_user_id: authUserId }
+                );
 
                 if (lockError) {
-                    console.error("Error fetching lock:", lockError);
+                    console.error("Error acquiring lock:", lockError);
                     return;
                 }
 
-                const now = new Date();
-                const lockedTime = lockRow?.locked_at ? new Date(lockRow.locked_at) : null;
-                const diffMinutes = lockedTime ? (now - lockedTime) / (1000 * 60) : null;
-
-                // 3️⃣ Check if someone else has the lock
-                if (lockRow?.locked_by && lockRow.locked_by !== authUserId && diffMinutes < 1) {
+                if (!lockAcquired) {
                     alert("Someone is currently accessing the assistant page.");
                     navigate("/inventory");
                     return;
                 }
 
-                // 4️⃣ Acquire the lock (upsert ensures singleton row)
-                await supabase.from('assistant_lock')
-                    .upsert(
-                    { id: 1, locked_by: authUserId, locked_at: new Date().toISOString() },
-                    { onConflict: 'id' }
-                    );
-
-                // 5️⃣ Fetch user profile
+                // 3️⃣ Fetch user profile
                 const { data: profile } = await supabase
-                    .from('systemuser')
-                    .select('*')
-                    .eq('userid', authUserId)
+                    .from("systemuser")
+                    .select("*")
+                    .eq("userid", authUserId)
                     .single();
                 setUser(profile || null);
 
-                // 6️⃣ Start heartbeat every 30 seconds
+                // 4️⃣ Heartbeat every 30 seconds
                 heartbeat = setInterval(async () => {
-                    try {
-                    await supabase.from('assistant_lock')
-                        .update({ locked_at: new Date().toISOString() })
-                        .eq('id', 1);
-                    } catch (err) {
-                    console.error("Error refreshing lock:", err);
+                    const { data: stillHasLock, error: hbError } = await supabase.rpc(
+                        "acquire_assistant_lock",
+                        { p_user_id: authUserId }
+                    );
+                    if (hbError) {
+                        console.error("Error refreshing lock:", hbError);
+                    }
+                    if (!stillHasLock) {
+                        alert("You lost the lock. Redirecting...");
+                        navigate("/inventory");
+                        clearInterval(heartbeat);
                     }
                 }, 30000);
 
@@ -94,7 +87,7 @@ const Assistant = () => {
         // 🔹 Listen for auth/account changes
         const authListener = supabase.auth.onAuthStateChange((_event, session) => {
             if (!session || session.user.id !== authUserId) {
-            releaseLock();
+                releaseLock();
             }
         }).data.subscription;
 
@@ -102,7 +95,8 @@ const Assistant = () => {
             releaseLock();
             authListener?.unsubscribe();
         };
-        }, [navigate]);
+    }, [navigate]);
+
 
     return(
         <div className="assistant-page">
