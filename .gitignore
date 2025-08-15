@@ -207,6 +207,7 @@ marimo/_lsp/
 __marimo__/
 
 # Build and cache artifacts
+# C# / .NET build output
 bin/
 obj/
 *.dll
@@ -214,6 +215,9 @@ obj/
 *.exe
 *.cache
 *.tmp
+*.log
+*.user
+*.suo
 .vs/
 TestResults/
 
