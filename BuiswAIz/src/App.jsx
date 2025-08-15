@@ -13,11 +13,11 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Login />} />
+        <Route path="/Dashboard" element={<Dashboard />} />
         <Route path="/inventory" element={<Inventory />} />
         <Route path="/supplier" element={<Supplier />} />
         <Route path="/assistant" element={<Assistant />}/>
         <Route path="/TablePage" element={<Sales />} />
-        <Route path="/Dashboard" element={<Dashboard />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
       </Routes>

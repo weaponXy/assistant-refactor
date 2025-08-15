@@ -1,11 +1,107 @@
-import React, { useState } from "react";
-import "./stylecss/Dashboard.css"; // Import the CSS file
+import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import "./stylecss/dashboard.css";
+import { supabase } from "./supabase"; 
+import TopSellingProducts from "./Dashboard/TopSellingProducts";
+import SalesSummary from "./Dashboard/SalesSummary";
+import DailyGrossSales from "./Dashboard/DailyGrossSales";
 
 const Dashboard = () => {
-  const navigate = (path) => {
-    console.log(`Navigate to: ${path}`);
+  const navigate = useNavigate(); 
+
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [topSellingProducts, setTopSellingProducts] = useState([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+  const [productsError, setProductsError] = useState(null);
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (error || !user) {
+        window.location.href = '/';
+        return;
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from('systemuser')
+        .select('*')
+        .eq('userid', user.id)
+        .single();
+
+      if (profileError) {
+        console.error("Error fetching user profile:", profileError);
+        setLoading(false);
+        return;
+      }
+
+      setUser(profile);
+      setLoading(false);
+    };
+    
+    getUser();
+  }, []);
+
+  const fetchTopSellingProducts = async () => {
+    try {
+      setProductsLoading(true);
+
+      const { data, error } = await supabase
+        .from('orderitems')
+        .select(`
+          orderid,
+          productid,
+          quantity,
+          unitprice,
+          subtotal,
+          createdat,
+          products (productname, image_url)
+        `);
+
+      if (error) throw error;
+
+      const summary = {};
+      data.forEach(item => {
+        const id = item.productid;
+        const name = item.products?.productname || 'Unknown';
+        const imageUrl = item.products?.image_url || '';
+
+        if (!summary[id]) {
+          summary[id] = {
+            productid: id,
+            productname: name,
+            image_url: imageUrl,
+            totalQuantity: 0,
+            timesBought: new Set(),
+          };
+        }
+
+        summary[id].totalQuantity += item.quantity;
+        summary[id].timesBought.add(item.orderid);
+      });
+
+      const topSellingArray = Object.values(summary).map(item => ({
+        ...item,
+        timesBought: item.timesBought.size,
+      }));
+
+      topSellingArray.sort((a, b) => b.totalQuantity - a.totalQuantity);
+      const sortedProducts = topSellingArray.slice(0, 5);
+
+      setTopSellingProducts(sortedProducts);
+      setProductsError(null);
+    } catch (error) {
+      console.error('Error fetching top selling products:', error);
+      setProductsError('Failed to load top selling products');
+      setTopSellingProducts([]);
+    } finally {
+      setProductsLoading(false);
+    }
   };
-  const [user] = useState({ username: "Admin User" }); // Mock user data
+
+  useEffect(() => {
+    fetchTopSellingProducts();
+  }, []);
 
   return (
     <div className="dashboard-page">
@@ -34,48 +130,53 @@ const Dashboard = () => {
           </div>
         </aside>
 
-        {/* Main Content */}
         <div className="main-content">
-          {/* Left Section - Main Dashboard Content */}
           <div className="dashboard-content">
-            {/* Sales Summary */}
             <div className="dashboard-panel sales-summary">
               <h3>Sales Summary</h3>
               <div className="panel-content">
-                {/* Sales summary content placeholder */}
+                <SalesSummary />
               </div>
             </div>
 
-            {/* Charts Section */}
             <div className="charts-section">
               <div className="dashboard-panel daily-sales">
                 <h3>Daily Gross Sales</h3>
                 <div className="panel-content">
-                  {/* Daily gross sales chart placeholder */}
+                  <DailyGrossSales />
                 </div>
               </div>
 
               <div className="dashboard-panel monthly-expense">
                 <h3>Monthly Expense</h3>
-                <div className="panel-content">
-                  {/* Monthly expense chart placeholder */}
-                </div>
+                <div className="panel-content"></div>
               </div>
             </div>
 
-            {/* Notifications and Top Selling */}
             <div className="bottom-section">
               <div className="dashboard-panel notifications">
                 <h3>Notifications</h3>
-                <div className="panel-content">
-                  {/* Notifications content placeholder */}
-                </div>
+                <div className="panel-content"></div>
               </div>
 
               <div className="dashboard-panel top-selling">
                 <h3>Top Selling Products</h3>
                 <div className="panel-content">
-                  {/* Top selling products content placeholder */}
+                  {productsLoading ? (
+                    <div className="loading-state">
+                      <p>Loading products...</p>
+                    </div>
+                  ) : productsError ? (
+                    <div className="error-state">
+                      <p>{productsError}</p>
+                    </div>
+                  ) : topSellingProducts.length === 0 ? (
+                    <div className="no-data-state">
+                      <p>No top selling products available.</p>
+                    </div>
+                  ) : (
+                    <TopSellingProducts topSellingProducts={topSellingProducts} />
+                  )}
                 </div>
               </div>
             </div>
@@ -83,31 +184,28 @@ const Dashboard = () => {
 
           {/* Right Panel */}
           <div className="right-panel">
-            {/* User Info Card with Logout */}
             <div className="user-info-card">
               <div className="user-left">
                 <div className="user-avatar" />
                 <div className="user-username">
-                  {user ? user.username : "Loading..."}
+                  {loading ? "Loading..." : user?.username || "No username found"}
                 </div>
               </div>
-              <button className="logout-button"
+              <button
+                className="logout-button"
                 onClick={async () => {
-                  // Logout functionality
+                  await supabase.auth.signOut();
                   localStorage.clear();
-                  window.location.href = '/';
+                  window.location.href = "/";
                 }}
               >
                 Logout
               </button>
             </div>
 
-            {/* Transaction History */}
             <div className="dashboard-panel transaction-history">
               <h3>Transaction History</h3>
-              <div className="panel-content">
-                {/* Transaction history content placeholder */}
-              </div>
+              <div className="panel-content"></div>
             </div>
           </div>
         </div>

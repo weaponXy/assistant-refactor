@@ -10,7 +10,6 @@ import { fetchLowStockProducts } from "../inventory/fetchLowStockProduct";
 import { formatDistanceToNow, parseISO } from "date-fns";
 import { fetchDefectiveItems } from "../inventory/fetchdefectitem";
 import { updateDefectStatus } from "../inventory/UpdateStatusDefect"; 
-import TablePage from "../TablePage";
 
 
 const Inventory = () => {
@@ -127,7 +126,8 @@ const Inventory = () => {
           <div className="nav-section">
             <p className="nav-header">GENERAL</p>
             <ul>
-              <li onClick={() => navigate("/dashboard")}>Dashboard</li>
+
+              <li onClick={() => navigate("/Dashboard")}>Dashboard</li>
               <li className="active">Inventory</li>
               <li onClick={() => navigate("/supplier")}>Supplier</li>
               <li onClick={() => navigate("/TablePage")}>Sales</li>
