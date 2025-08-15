@@ -235,10 +235,10 @@ body {
 }
 
 .logout-button {
-  background-color: transparent;
+  background-color: #04B4FC;
+  color: white;
   border: none;
-  color: #2563eb;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   padding: 6px 12px;
@@ -247,7 +247,7 @@ body {
 }
 
 .logout-button:hover {
-  background-color: #f0f4ff;
+  background-color: #5d93c9;
 }
 
 /* Responsive Design */

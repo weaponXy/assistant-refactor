@@ -35,7 +35,6 @@ const Inventory = () => {
   };
   const loadLowStock = async () => {
     const data = await fetchLowStockProducts();
-    console.log("Fetched Low Stock:", data);
     setLowStockProducts(data);
   };
 
@@ -48,15 +47,33 @@ const Inventory = () => {
     const { data, error } = await supabase
       .from("activitylog")
       .select("*, systemuser(username)")
-      .order("created_at", { ascending: false })
-      .limit(50);
+      .order("created_at", { ascending: false });
 
     if (error) {
       console.error("Failed to fetch activity logs:", error);
-    } else {
-      setActivityLogs(data);
+      return;
+    }
+
+    setActivityLogs(data.slice(0, 50)); 
+
+    
+    if (data.length > 50) {
+      const logsToDelete = data.slice(50); 
+      const idsToDelete = logsToDelete.map(log => log.activity_id); 
+
+      const { error: deleteError } = await supabase
+        .from("activitylog")
+        .delete()
+        .in("activity_id", idsToDelete);
+
+      if (deleteError) {
+        console.error("Failed to delete old logs:", deleteError);
+      } else {
+        console.log(`Deleted ${idsToDelete.length} old logs.`);
+      }
     }
   };
+
 
   useEffect(() => {
     const getUser = async () => {
@@ -88,7 +105,7 @@ const Inventory = () => {
       loadLowStock();
       loadActivityLogs();
       loadDefectiveItems();
-    }, 30000);
+    }, 5000);
 
     return () => clearInterval(interval); 
   }, []);
@@ -109,12 +126,13 @@ const Inventory = () => {
           <div className="nav-section">
             <p className="nav-header">GENERAL</p>
             <ul>
+
               <li onClick={() => navigate("/Dashboard")}>Dashboard</li>
               <li className="active">Inventory</li>
               <li onClick={() => navigate("/supplier")}>Supplier</li>
               <li onClick={() => navigate("/TablePage")}>Sales</li>
               <li>Expenses</li>
-              <li>AI Assistant</li>
+              <li onClick={() => navigate("/assistant")}>AI Assistant</li>
             </ul>
             <p className="nav-header">SUPPORT</p>
             <ul>
@@ -125,7 +143,7 @@ const Inventory = () => {
         </aside>
 
         {/* Main Content */}
-        <div className="main-content">
+        <div className="I-main-content">
           <div className="product-panel">
             <div className="panel-header">
               <h2 className="panel-title">Inventory</h2>
@@ -137,7 +155,7 @@ const Inventory = () => {
               </div>
             </div>
 
-            <div className="table-container">
+            <div className="inventory-container">
               <table>
                 <thead>
                   <tr>
@@ -186,11 +204,11 @@ const Inventory = () => {
           </div>
 
           {/* Right Panel */}
-          <div className="right-panel">
-            <div className="user-info-card">
-              <div className="user-left">
-                <div className="user-avatar" />
-                <div className="user-username">
+          <div className="I-right-panel">
+            <div className="I-user-info-card">
+              <div className="I-user-left">
+                <div className="I-user-avatar" />
+                <div className="I-user-username">
                   {user ? user.username : "Loading..."}
                 </div>
               </div>

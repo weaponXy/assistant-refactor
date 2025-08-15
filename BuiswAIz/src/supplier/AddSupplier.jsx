@@ -12,12 +12,16 @@ const AddSupplier = ({ onClose, user }) => {
     supplierstatus: "active",
   });
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     const { error } = await supabase.from("suppliers").insert({
       ...formData,
     });
@@ -41,14 +45,14 @@ const AddSupplier = ({ onClose, user }) => {
 
   return (
     <div className="modal-overlay">
-      <div className="modal-content slide-up">
+      <div className="AddSmodal-content slide-up">
         {/* Header */}
         <div className="modal-header">
           <button className="back-btn" onClick={onClose}>←</button>
           <h2>Supplier</h2>
           <div className="modal-actions">
             <button className="save-btn">Save Draft</button>
-            <button className="create-btn" onClick={handleSubmit}>Create Supplier</button>
+            <button className="create-btn" onClick={handleSubmit} disabled={isSubmitting}>{isSubmitting ? "Creating..." : "Create Supplier"}</button>
           </div>
         </div>
 

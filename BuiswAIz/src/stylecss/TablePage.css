@@ -1203,17 +1203,7 @@ body {
   color: #333;
 }
 
-.logout-button {
-  background-color: #ff6b6b;
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 12px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s ease;
-}
+
 
 /* User Info Card Inline (replaces UserManagement) */
 .user-info-card-inline {
