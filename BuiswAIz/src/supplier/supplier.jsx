@@ -53,6 +53,11 @@ const Supplier = () => {
     supplier.suppliername.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const maxDefects = suppliers.length > 0
+    ? Math.max(...suppliers.map(s => s.defectreturned || 0))
+    : 1;
+
+
   return (
     <div className="supplier-page">
         <header className="header-bar">
@@ -78,7 +83,7 @@ const Supplier = () => {
           </div>
         </aside>
 
-        <div className="main-content">
+        <div className="S-main-content">
           <div className="supplier-panel">
             <div className="panel-header">
               <h2 className="panel-title">Supplier</h2>
@@ -123,11 +128,11 @@ const Supplier = () => {
               </table>
             </div>
           </div>
-          <div className="right-panel">
-            <div className="user-info-card">
-              <div className="user-left">
-                  <div className="user-avatar"/>
-                  <div className="user-username">
+          <div className="S-right-panel">
+            <div className="S-user-info-card">
+              <div className="S-user-left">
+                  <div className="S-user-avatar"/>
+                  <div className="S-user-username">
                     {user ? user.username : "Loading..."}
                   </div>
               </div>
@@ -140,8 +145,26 @@ const Supplier = () => {
               >Logout</button>
             </div>
 
-            <div className="supply-returned">
-              
+            <div className="supply-returned-panel">
+              <h3>Product Returned to Supplier</h3>
+              <div className="returned-container">
+                {suppliers.map((supplier) => (
+                  <div key={supplier.supplierid} className="returned-card">
+                    <div className="supplier-info">
+                      <span className="supplier-name">{supplier.suppliername}</span>
+                      <span className="returned-count">{supplier.defectreturned || 0}</span>
+                    </div>
+                    <div className="progress-bar">
+                      <div
+                        className="progress-fill"
+                        style={{
+                          width: `${((supplier.defectreturned || 0) / maxDefects) * 100}%`
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>

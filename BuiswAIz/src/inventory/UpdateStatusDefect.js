@@ -3,6 +3,7 @@ import { supabase } from "../supabase";
 const deletionTimers = {};
 
 export const updateDefectStatus = async (defectiveItemId, newStatus, user) => {
+  // 1. Update defect status
   const { error: updateError } = await supabase
     .from("defectiveitems")
     .update({ status: newStatus })
@@ -13,16 +14,18 @@ export const updateDefectStatus = async (defectiveItemId, newStatus, user) => {
     throw updateError;
   }
 
-
-  //Fetch product name using defectiveItemId → productid → productname
+  // 2. Fetch product + supplier info
   const { data: defectData, error: defectFetchError } = await supabase
-
-
     .from("defectiveitems")
-    .select("productid, products(productname)")
+    .select(`
+      productid,
+      products (
+        productname,
+        supplierid
+      )
+    `)
     .eq("defectiveitemid", defectiveItemId)
     .single();
-
 
   if (defectFetchError) {
     console.error("Error fetching defect product:", defectFetchError.message);
@@ -30,8 +33,9 @@ export const updateDefectStatus = async (defectiveItemId, newStatus, user) => {
   }
 
   const productName = defectData?.products?.productname || "Unknown Product";
+  const supplierId = defectData?.products?.supplierid;
 
-  // Log activity
+  // 3. Log activity for status change
   if (user) {
     await supabase.from("activitylog").insert([
       {
@@ -42,7 +46,40 @@ export const updateDefectStatus = async (defectiveItemId, newStatus, user) => {
     ]);
   }
 
-  // Handle deletion for "Returned"
+  // 4. If Returned → increment supplier.defectreturned
+  if (newStatus === "Returned" && supplierId) {
+    // Get current defectreturned
+    const { data: supplierData, error: supplierFetchError } = await supabase
+      .from("suppliers")
+      .select("defectreturned")
+      .eq("supplierid", supplierId)
+      .single();
+
+    const { data: defectQtyData, error: defectQtyError } = await supabase
+      .from("defectiveitems")
+      .select("quantity")
+      .eq("defectiveitemid", defectiveItemId)
+      .single();
+
+    if (supplierFetchError || defectQtyError) {
+      console.error("Error fetching supplier or defect quantity:", supplierFetchError?.message || defectQtyError?.message);
+    } else {
+      const currentCount = supplierData?.defectreturned || 0;
+      const qty = defectQtyData?.quantity || 1;
+
+      const { error: supplierUpdateError } = await supabase
+        .from("suppliers")
+        .update({ defectreturned: currentCount + qty })
+        .eq("supplierid", supplierId);
+
+      if (supplierUpdateError) {
+        console.error("Error updating defectreturned:", supplierUpdateError.message);
+      } 
+    }
+  }
+
+
+  // 5. Handle deletion for "Returned"
   if (newStatus === "Returned") {
     clearTimeout(deletionTimers[defectiveItemId]);
 
@@ -68,7 +105,6 @@ export const updateDefectStatus = async (defectiveItemId, newStatus, user) => {
           if (!deleteError) {
             console.log(`Defect item ${defectiveItemId} deleted after delay.`);
 
-
             if (user) {
               const { error: logError } = await supabase.from("activitylog").insert([
                 {
@@ -87,7 +123,7 @@ export const updateDefectStatus = async (defectiveItemId, newStatus, user) => {
           }
         }
       })();
-    }, 15000); 
+    }, 15000);
   } else {
     clearTimeout(deletionTimers[defectiveItemId]);
     delete deletionTimers[defectiveItemId];

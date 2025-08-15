@@ -9,29 +9,100 @@ const Assistant = () => {
     const [user, setUser] = useState(null);
 
     useEffect(() => {
-        const getUser = async () => {
-        const { data: { user }, error } = await supabase.auth.getUser();
-        if (error || !user) {
-          window.location.href = '/'; // redirect to login
-          return;
-        }
-        
-        const { data: profile, error: profileError } = await supabase
-          .from('systemuser')
-          .select('*')
-          .eq('userid', user.id)
-          .single();
-        
-          if (profileError) {
-            console.error("Error fetching user profile:", profileError);
-            return;
-          }
-        
-          setUser(profile);
-        };
-          getUser();
-    }, []);
+        let heartbeat;
+        let authUserId;
 
+        const releaseLock = async () => {
+            try {
+                if (authUserId) {
+                    await supabase.from('assistant_lock')
+                    .update({ locked_by: null, locked_at: null })
+                    .eq('id', 1);
+                }
+            } catch (error) {
+                console.error("Error releasing lock:", error);
+            }
+            if (heartbeat) clearInterval(heartbeat);
+        };
+
+        const getUserAndLock = async () => {
+            try {
+                // 1️⃣ Get current auth user
+                const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+                if (authError || !authUser) {
+                    window.location.href = '/';
+                    return;
+                }
+                authUserId = authUser.id; // assign to outer scope
+
+                // 2️⃣ Fetch the singleton lock row (use maybeSingle in case row doesn't exist)
+                const { data: lockRow, error: lockError } = await supabase
+                    .from('assistant_lock')
+                    .select('*')
+                    .eq('id', 1)
+                    .maybeSingle();
+
+                if (lockError) {
+                    console.error("Error fetching lock:", lockError);
+                    return;
+                }
+
+                const now = new Date();
+                const lockedTime = lockRow?.locked_at ? new Date(lockRow.locked_at) : null;
+                const diffMinutes = lockedTime ? (now - lockedTime) / (1000 * 60) : null;
+
+                // 3️⃣ Check if someone else has the lock
+                if (lockRow?.locked_by && lockRow.locked_by !== authUserId && diffMinutes < 1) {
+                    alert("Someone is currently accessing the assistant page.");
+                    navigate("/inventory");
+                    return;
+                }
+
+                // 4️⃣ Acquire the lock (upsert ensures singleton row)
+                await supabase.from('assistant_lock')
+                    .upsert(
+                    { id: 1, locked_by: authUserId, locked_at: new Date().toISOString() },
+                    { onConflict: 'id' }
+                    );
+
+                // 5️⃣ Fetch user profile
+                const { data: profile } = await supabase
+                    .from('systemuser')
+                    .select('*')
+                    .eq('userid', authUserId)
+                    .single();
+                setUser(profile || null);
+
+                // 6️⃣ Start heartbeat every 30 seconds
+                heartbeat = setInterval(async () => {
+                    try {
+                    await supabase.from('assistant_lock')
+                        .update({ locked_at: new Date().toISOString() })
+                        .eq('id', 1);
+                    } catch (err) {
+                    console.error("Error refreshing lock:", err);
+                    }
+                }, 30000);
+
+            } catch (err) {
+                console.error("Unexpected error in getUserAndLock:", err);
+            }
+        };
+
+        getUserAndLock();
+
+        // 🔹 Listen for auth/account changes
+        const authListener = supabase.auth.onAuthStateChange((_event, session) => {
+            if (!session || session.user.id !== authUserId) {
+            releaseLock();
+            }
+        }).data.subscription;
+
+        return () => {
+            releaseLock();
+            authListener?.unsubscribe();
+        };
+        }, [navigate]);
 
     return(
         <div className="assistant-page">
@@ -43,7 +114,7 @@ const Assistant = () => {
                     <div className="nav-section">
                         <p className="nav-header">GENERAL</p>
                         <ul>
-                            <li>Dashboard</li>
+                            <li onClick={() => navigate("/dashboard")}>Dashboard</li>
                             <li onClick={() => navigate("/inventory")}>Inventory</li>
                             <li onClick={() => navigate("/supplier")}>Supplier</li>
                             <li onClick={() => navigate("/TablePage")}>Sales</li>
@@ -58,7 +129,7 @@ const Assistant = () => {
                     </div>
                 </aside>
 
-                <div className="main-content">
+                <div className="A-main-content">
                     <div className="assistant-panel">
                         <div className="panel-header">
                             <h2 className="panel-title">BuiswAIz Assistant</h2>
@@ -72,11 +143,11 @@ const Assistant = () => {
                             <table></table>
                         </div>
                     </div>
-                    <div className="right-panel">
-                        <div className="user-info-card">
-                            <div className="user-left">
-                                <div className="user-avatar"/>
-                                <div className="user-username">
+                    <div className="A-right-panel">
+                        <div className="A-user-info-card">
+                            <div className="A-user-left">
+                                <div className="A-user-avatar"/>
+                                <div className="A-user-username">
                                     {user ? user.username : "Loading..."}
                                 </div>
                             </div>

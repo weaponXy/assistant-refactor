@@ -71,7 +71,7 @@ body {
   color: white;
 }
 
-.main-content {
+.A-main-content {
   flex: 1;
   display: flex;
   padding: 24px;
@@ -141,7 +141,7 @@ tbody td {
 }
 
 /* Right Panel */
-.right-panel {
+.A-right-panel {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -165,4 +165,35 @@ tbody td {
 
 .print-reports:hover {
   background-color: #91c3d7;
+}
+
+.A-user-info-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #ffffff;
+  border-radius: 16px;
+  padding: 12px 18px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
+  margin-bottom: 0px;
+  height: 64px;
+}
+
+.A-user-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.A-user-avatar {
+  width: 40px;
+  height: 40px;
+  background-color: #dbeafe;
+  border-radius: 50%;
+}
+
+.A-user-username {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2937;
 }

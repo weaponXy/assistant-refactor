@@ -18,7 +18,8 @@ function App() {
         <Route path="/assistant" element={<Assistant />}/>
         <Route path="/TablePage" element={<Sales />} />
         <Route path="/Dashboard" element={<Dashboard />} />
-
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
       </Routes>
     </BrowserRouter>
   );

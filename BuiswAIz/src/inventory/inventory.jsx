@@ -127,7 +127,7 @@ const Inventory = () => {
           <div className="nav-section">
             <p className="nav-header">GENERAL</p>
             <ul>
-              <li>Dashboard</li>
+              <li onClick={() => navigate("/dashboard")}>Dashboard</li>
               <li className="active">Inventory</li>
               <li onClick={() => navigate("/supplier")}>Supplier</li>
               <li onClick={() => navigate("/TablePage")}>Sales</li>
@@ -143,7 +143,7 @@ const Inventory = () => {
         </aside>
 
         {/* Main Content */}
-        <div className="main-content">
+        <div className="I-main-content">
           <div className="product-panel">
             <div className="panel-header">
               <h2 className="panel-title">Inventory</h2>
@@ -204,11 +204,11 @@ const Inventory = () => {
           </div>
 
           {/* Right Panel */}
-          <div className="right-panel">
-            <div className="user-info-card">
-              <div className="user-left">
-                <div className="user-avatar" />
-                <div className="user-username">
+          <div className="I-right-panel">
+            <div className="I-user-info-card">
+              <div className="I-user-left">
+                <div className="I-user-avatar" />
+                <div className="I-user-username">
                   {user ? user.username : "Loading..."}
                 </div>
               </div>
