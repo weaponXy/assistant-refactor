@@ -21,9 +21,29 @@ const OrderSales = ({ orderData, onInvoiceSelect, onAddSale }) => {
 
   const updateFilteredData = (data, timeFilter, search) => {
     const now = new Date();
+    
+    // Helper function to check if two dates are on the same day
+    const isSameDay = (date1, date2) => {
+      return date1.getFullYear() === date2.getFullYear() &&
+             date1.getMonth() === date2.getMonth() &&
+             date1.getDate() === date2.getDate();
+    };
 
     const filtered = data.filter(item => {
-      const date = new Date(item.createdat);
+      // Parse the date - handle different date formats
+      let date;
+      if (item.createdat) {
+        date = new Date(item.createdat);
+        // Check if date is invalid
+        if (isNaN(date.getTime())) {
+          console.warn('Invalid date format for item:', item);
+          return false;
+        }
+      } else {
+        console.warn('No createdat field for item:', item);
+        return false;
+      }
+
       const productName = item.products?.productname || '';
       const matchesSearch =
         productName.toLowerCase().includes(search) ||
@@ -33,21 +53,39 @@ const OrderSales = ({ orderData, onInvoiceSelect, onAddSale }) => {
 
       switch (timeFilter) {
         case 'today':
-          return date.toDateString() === now.toDateString();
+          return isSameDay(date, now);
         case 'week1':
-          return date.getDate() <= 7 && date.getMonth() === now.getMonth();
+          return date.getDate() <= 7 && 
+                 date.getMonth() === now.getMonth() && 
+                 date.getFullYear() === now.getFullYear();
         case 'week2':
-          return date.getDate() > 7 && date.getDate() <= 14 && date.getMonth() === now.getMonth();
+          return date.getDate() > 7 && 
+                 date.getDate() <= 14 && 
+                 date.getMonth() === now.getMonth() && 
+                 date.getFullYear() === now.getFullYear();
         case 'week3':
-          return date.getDate() > 14 && date.getDate() <= 21 && date.getMonth() === now.getMonth();
+          return date.getDate() > 14 && 
+                 date.getDate() <= 21 && 
+                 date.getMonth() === now.getMonth() && 
+                 date.getFullYear() === now.getFullYear();
         case 'month':
-          return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+          return date.getMonth() === now.getMonth() && 
+                 date.getFullYear() === now.getFullYear();
         default:
           return true;
       }
     });
 
     setFilteredData(filtered);
+  };
+
+  const getStatusBadge = (status) => {
+    const statusClass = status === 'completed' ? 'status-completed' : 'status-pending';
+    return (
+      <span className={`status-badge ${statusClass}`}>
+        {status ? status.toUpperCase() : 'UNKNOWN'}
+      </span>
+    );
   };
 
   return (
@@ -76,6 +114,7 @@ const OrderSales = ({ orderData, onInvoiceSelect, onAddSale }) => {
               <th></th>
               <th>Product Name</th>
               <th>Order Code</th>
+              <th>Status</th>
               <th>Quantity</th>
               <th>Price</th>
               <th>Total Amount</th>
@@ -101,6 +140,7 @@ const OrderSales = ({ orderData, onInvoiceSelect, onAddSale }) => {
                 <td><input type="radio" name="selectedRow" /></td>
                 <td>{item.products?.productname || 'N/A'}</td>
                 <td>{item.orderid}</td>
+                <td>{getStatusBadge(item.orders?.orderstatus)}</td>
                 <td>{item.quantity}</td>
                 <td>₱{item.unitprice.toLocaleString()}</td>
                 <td>₱{item.subtotal.toLocaleString()}</td>
@@ -109,7 +149,7 @@ const OrderSales = ({ orderData, onInvoiceSelect, onAddSale }) => {
                     className="invoice-btn"
                     onClick={() => onInvoiceSelect(item)}
                   >
-                    View
+                    View Invoice
                   </button>
                 </td>
               </tr>
