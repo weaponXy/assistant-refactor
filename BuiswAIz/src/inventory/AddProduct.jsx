@@ -42,7 +42,6 @@ const AddProduct = ({ onClose, user }) => {
 
     try {
         const compressedFile = await imageCompression(file, options);
-        // Copy original file name to compressed file
         compressedFile.name = file.name;
         setImageFile(compressedFile);
     } catch (err) {
@@ -84,7 +83,8 @@ const AddProduct = ({ onClose, user }) => {
       return;
     }
 
-    const { error } = await supabase.from("products").insert({
+    // 1️⃣ Insert product
+    const { error: productError } = await supabase.from("products").insert({
       productname: formData.productname,
       description: formData.description,
       cost: parseFloat(formData.cost),
@@ -95,22 +95,42 @@ const AddProduct = ({ onClose, user }) => {
       image_url: imageUrl,
     });
 
-    if (error) {
-      console.error("Insert failed:", error);
+    if (productError) {
+      console.error("Insert failed:", productError);
       alert("Failed to add product.");
-    } else {
-        if (user) {
-          await supabase.from("activitylog").insert([
-            {
-              action_type: "add_product",
-              action_desc: `added ${formData.productname} to the inventory`,
-              done_user: user.userid,
-            },
-          ]);
-        }
-      onClose();
+      return;
     }
+
+    // 2️⃣ Add expense entry
+    const totalExpense = parseFloat(formData.cost) * parseInt(formData.currentstock);
+    const expenseDate = new Date();
+
+    const { error: expenseError } = await supabase.from("expenses").insert({
+      expensedate: expenseDate.toISOString(),
+      amount: totalExpense,
+      description: `Initial stock purchase for ${formData.productname}`,
+      category: "Inventory",
+      createdbyuserid: user?.userid || null
+    });
+
+    if (expenseError) {
+      console.error("Expense insert failed:", expenseError);
+    }
+
+    // 3️⃣ Log activity
+    if (user) {
+      await supabase.from("activitylog").insert([
+        {
+          action_type: "add_product",
+          action_desc: `added ${formData.productname} to the inventory`,
+          done_user: user.userid,
+        },
+      ]);
+    }
+
+    onClose();
   };
+
 
   return (
     <div className="modal-overlay">
