@@ -150,7 +150,7 @@ const Inventory = () => {
             <div className="panel-header">
               <h2 className="panel-title">Inventory</h2>
               <div className="panel-actions">
-                <input className="inventory-search" type="text" placeholder="Search" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                <input id="inventorySearch" className="inventory-search" type="text" placeholder="Search" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                 <button className="restock-storage-button" onClick={() => setrestockStorage(true)}> Restock Storage</button> 
                 <button className="add-product-button" onClick={() => setShowModal(true)}>
                   + Add Product
@@ -348,7 +348,9 @@ const Inventory = () => {
 
       {restockStorage && (
         <div className="restock-container">
-          <RestockStorage onClose={() => setrestockStorage(false)} />
+          <RestockStorage onClose={() => setrestockStorage(false)} 
+            user={user}
+          />
         </div>
       )}
 

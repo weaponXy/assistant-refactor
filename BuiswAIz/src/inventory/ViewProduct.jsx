@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import "../stylecss/ViewProduct.css";
 import { supabase } from "../supabase";
 import imageCompression from "browser-image-compression";
+import ConfirmDeleteModal from "./ConfirmationModals/ConfirmationDelete";
 
 const ViewProduct = ({ product, onClose, onProductUpdated, user}) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -10,6 +11,10 @@ const ViewProduct = ({ product, onClose, onProductUpdated, user}) => {
   const [newImageFile, setNewImageFile] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef(null);
+  const [deleteError, setDeleteError] = useState("");
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [formError, setFormError] = useState("");
+
 
   useEffect(() => {
     const fetchSuppliers = async () => {
@@ -63,7 +68,44 @@ const ViewProduct = ({ product, onClose, onProductUpdated, user}) => {
         setIsEditing(true);
     };
 
+    
+
     const handleSave = async () => {
+        const validateForm = () => {
+            const requiredFields = [
+                "productname",
+                "description",
+                "reorderpoint",
+                "currentstock",
+                "price",
+                "cost",
+                "supplierid",
+            ];
+
+            // Check if any field is empty or invalid
+            const isEmpty = requiredFields.some((field) => {
+                const value = form[field];
+                if (value === undefined || value === null) return true;
+                if (typeof value === "string" && value.trim() === "") return true;
+                if (
+                    ["reorderpoint", "currentstock", "price", "cost"].includes(field) &&
+                    Number(value) <= 0
+                )
+                    return true;
+                return false;
+            });
+
+            if (isEmpty) {
+                setFormError("Please fill in all required fields.");
+                setIsSaving(false);
+                return false;
+            }
+
+            return true;
+        };
+
+        if (!validateForm()) return;
+
         setIsSaving(true);
         try {
         let imageUrl = form.image_url;
@@ -159,34 +201,72 @@ const ViewProduct = ({ product, onClose, onProductUpdated, user}) => {
 
     const handleDelete = async () => {
         try {
-        const { error } = await supabase
-            .from("products")
-            .delete()
-            .eq("productid", product.productid);
-        if (error) throw error;
+            // Check if product is still referenced somewhere
+            const { data: salesData, error: salesError } = await supabase
+                .from("orderitems")
+                .select("orderitemid")
+                .eq("productid", product.productid)
+                .limit(1);
 
-        if (product.image_url) {
-            const filename = product.image_url.split("/").pop();
-            await supabase.storage.from("product-images").remove([filename]);
-        }
+            const { data: defectData, error: defectError } = await supabase
+                .from("defectiveitems")
+                .select("defectiveitemid")
+                .eq("productid", product.productid)
+                .limit(1);
 
-        if (onProductUpdated) onProductUpdated(); 
+            const { data: restockData, error: restockError } = await supabase
+                .from("restockstorage")
+                .select("restockid")
+                .eq("productid", product.productid)
+                .limit(1);
 
-        if (user) {
+            // If any reference found, stop before deletion
+            if (
+                salesError ||
+                defectError ||
+                restockError ||
+                (salesData?.length > 0 ||
+                    defectData?.length > 0 ||
+                    restockData?.length > 0)
+            ) {
+                setDeleteError("This product cannot be deleted since it is used in transactions");
+                return; 
+            }
+
+            // Proceed with delete
+            const { error } = await supabase
+                .from("products")
+                .delete()
+                .eq("productid", product.productid);
+
+            if (error) throw error;
+
+            // Remove image if exists
+            if (product.image_url) {
+                const filename = product.image_url.split("/").pop();
+                await supabase.storage.from("product-images").remove([filename]);
+            }
+
+            // Log activity
+            if (user) {
                 await supabase.from("activitylog").insert([
                     {
-                      action_type: "Delete Product",
-                      action_desc: `deleted ${product.productname} from the inventory`,
-                      done_user: user.userid,
+                    action_type: "Delete Product",
+                    action_desc: `deleted ${product.productname} from the inventory`,
+                    done_user: user.userid,
                     },
-                    ]);
-                }
+                ]);
+            }
 
-        onClose();
+            if (onProductUpdated) onProductUpdated();
+            onClose();
         } catch (err) {
-        console.error("Error deleting product:", err.message);
+            console.error("Error deleting product:", err.message);
+            setDeleteError("Something went wrong while deleting the product.");
         }
     };
+
+
 
     return (
         <div className="view-product-overlay">
@@ -196,7 +276,7 @@ const ViewProduct = ({ product, onClose, onProductUpdated, user}) => {
             <h2>Product</h2>
             <span className="product-id-tag">#{product.productid}</span>
             <div className="header-actions">
-                <button className="delete-button" onClick={handleDelete}>🗑 Delete</button>
+                <button className="delete-button" onClick={() => setShowConfirm(true)}>🗑 Delete</button>
                 <button className="update-button" onClick={handleUpdate} disabled={isEditing}>Update Item</button>
             </div>
             </div>
@@ -313,6 +393,29 @@ const ViewProduct = ({ product, onClose, onProductUpdated, user}) => {
                 <button className="save-button" onClick={handleSave}>{isSaving ? "Saving..." : "Save"}</button>
             </div>
             )}
+
+            {deleteError && (
+            <div className="delete-warning">
+                {deleteError}
+            </div>
+            )}
+
+            {formError && (
+            <div className="form-warning">
+                {formError}
+            </div>
+            )}
+
+            <ConfirmDeleteModal
+                isOpen={showConfirm}
+                onConfirm={async () => {
+                    await handleDelete(); 
+                    setShowConfirm(false); 
+                }}
+                onCancel={() => setShowConfirm(false)}
+                productName={product.productname}
+            />
+
         </div>
         </div>
     );

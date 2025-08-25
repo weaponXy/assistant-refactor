@@ -9,7 +9,7 @@ const AddSupplier = ({ onClose, user }) => {
     phonenumber: "",
     supplieremail: "",
     address: "",
-    supplierstatus: "active",
+    supplierstatus: "Active",
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -51,7 +51,6 @@ const AddSupplier = ({ onClose, user }) => {
           <button className="back-btn" onClick={onClose}>←</button>
           <h2>Supplier</h2>
           <div className="modal-actions">
-            <button className="save-btn">Save Draft</button>
             <button className="create-btn" onClick={handleSubmit} disabled={isSubmitting}>{isSubmitting ? "Creating..." : "Create Supplier"}</button>
           </div>
         </div>
@@ -104,8 +103,8 @@ const AddSupplier = ({ onClose, user }) => {
                 value={formData.supplierstatus}
                 onChange={handleChange}
               >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
               </select>
             </div>
           </div>

@@ -140,7 +140,6 @@ const AddProduct = ({ onClose, user }) => {
           <button className="back-btn" onClick={onClose}>←</button>
           <h2>Product</h2>
           <div className="modal-actions">
-            <button className="save-btn">Save Draft</button>
             <button className="create-btn" onClick={handleSubmit}>Create Item</button>
           </div>
         </div>
@@ -176,6 +175,7 @@ const AddProduct = ({ onClose, user }) => {
               placeholder="Product Name"
               value={formData.productname}
               onChange={handleChange}
+              required
             />
 
             <div className="two-cols">
@@ -184,6 +184,7 @@ const AddProduct = ({ onClose, user }) => {
                 placeholder="Description"
                 value={formData.description}
                 onChange={handleChange}
+                required
               />
               <div className="with-label">
                 <label>₱</label>
@@ -192,6 +193,7 @@ const AddProduct = ({ onClose, user }) => {
                   placeholder="Cost"
                   value={formData.cost}
                   onChange={handleChange}
+                  required
                 />
               </div>
             </div>
@@ -204,6 +206,7 @@ const AddProduct = ({ onClose, user }) => {
                   placeholder="Reorder Point"
                   value={formData.reorderpoint}
                   onChange={handleChange}
+                  required
                 />
               </div>
               <div className="with-label">
@@ -213,6 +216,7 @@ const AddProduct = ({ onClose, user }) => {
                   placeholder="Quantity"
                   value={formData.currentstock}
                   onChange={handleChange}
+                  required
                 />
               </div>
             </div>
@@ -225,12 +229,14 @@ const AddProduct = ({ onClose, user }) => {
                   placeholder="Price"
                   value={formData.price}
                   onChange={handleChange}
+                  required
                 />
               </div>
               <select
                 name="suppliername"
                 value={formData.suppliername}
                 onChange={handleChange}
+                required
               >
                 <option value="">Select Supplier</option>
                 {suppliers.map((s) => (
