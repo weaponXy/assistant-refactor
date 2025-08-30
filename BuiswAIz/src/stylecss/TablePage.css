@@ -437,6 +437,7 @@ table tbody td {
 
 .invoice-btn:hover {
   background-color: #0290c4;
+  box-shadow: 0px 4px 8px #04B4FC;
 }
 
 /* Add Sale Button */
@@ -451,7 +452,6 @@ table tbody td {
   font-family: 'Montserrat', sans-serif;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 2px 6px rgba(4, 180, 252, 0.3);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -460,14 +460,14 @@ table tbody td {
 }
 
 .add-sale-btn:hover {
-  background: linear-gradient(135deg, #0290c4, #026b8a);
+  background: linear-gradient(135deg, #04B4FC);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(4, 180, 252, 0.4);
+  box-shadow: 0 4px 8px #026b8a;
 }
-
+Y
 .add-sale-btn:active {
   transform: translateY(0);
-  box-shadow: 0 2px 6px rgba(4, 180, 252, 0.3);
+  box-shadow: 0 4px 8px #026b8a;
 }
 
 /* Stats container */
@@ -814,7 +814,7 @@ table tbody td {
   color: #333;
   font-size: 16px;
   font-weight: 600;
-  border-bottom: 2px solid #04B4FC;
+  border-bottom: 2px solid #000000;
   padding-bottom: 5px;
 }
 
@@ -843,7 +843,7 @@ table tbody td {
   background-color: #ffffff;
   padding: 15px;
   border-radius: 8px;
-  border: 2px solid #04B4FC;
+  border: 2px solid #000000;
   margin-top: 20px;
   text-align: center;
 }
@@ -857,7 +857,7 @@ table tbody td {
 .invoice-total-section .total-amount {
   font-size: 20px !important;
   font-weight: bold !important;
-  color: #04B4FC !important;
+  color: #000000 !important;
 }
 
 /* Button Styling */
@@ -1400,21 +1400,351 @@ input[type="radio"]:checked {
   }
 }
 .status-badge {
+  color: rgb(0, 47, 0);
   padding: 2px 8px;
+  background-color: #a8ffa8;
+  border: #a8ffa8 1px solid;
   border-radius: 12px;
   font-size: 10px;
   font-weight: bold;
   text-transform: uppercase;
+  cursor: pointer;
+  
 }
         
-.status-completed {
-  background-color: #d4edda;
-  color: #155724;
-  border: 1px solid #c3e6cb;
+.status-badge:hover {
+  background-color: rgba(0, 255, 0, 0.5);
+  box-shadow: 0 2px 5px rgba(0, 255, 0, 0.7);
 }
-        
-.status-pending {
-  background-color: #fff3cd;
-  color: #856404;
-  border: 1px solid #ffeaa7;
+
+/* For sorting css */
+/* Custom Dropdown Wrapper */
+.custom-dropdown-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  order: 2;
+}
+
+/* Custom Dropdown Button */
+.custom-dropdown-button {
+  background-color: #ffffff;
+  border: 1px solid #e1e5e9;
+  border-radius: 8px;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 220px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.custom-dropdown-button:hover {
+  border-color: #04B4FC;
+  box-shadow: 0 2px 8px rgba(4, 180, 252, 0.15);
+}
+
+.dropdown-button-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+
+.dropdown-icon {
+  margin-right: 8px;
+  font-size: 14px;
+  color: #04B4FC;
+}
+
+.dropdown-text {
+  flex: 1;
+  text-align: left;
+}
+
+.dropdown-arrow {
+  margin-left: 8px;
+  font-size: 12px;
+  color: #666;
+  transition: transform 0.2s ease;
+}
+
+.dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+/* Custom Dropdown List with Gap */
+.custom-dropdown-list {
+  position: absolute;
+  top: calc(100% + 8px); /* 8px gap between button and list */
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border: 1px solid #e1e5e9;
+  border-radius: 8px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  overflow: hidden;
+  animation: dropdownSlideDown 0.2s ease-out;
+}
+
+@keyframes dropdownSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Dropdown Items */
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  font-family: 'Segoe UI', 'Montserrat', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.dropdown-item:hover {
+  background-color: #f8f9fa;
+  color: #04B4FC;
+}
+
+.dropdown-item.selected {
+  background-color: #04B4FC;
+  color: #ffffff;
+}
+
+.item-icon {
+  margin-right: 12px;
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+}
+
+.item-text {
+  flex: 1;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .custom-dropdown-button {
+    width: 100%;
+    min-width: auto;
+    margin-bottom: 10px;
+    padding: 14px 16px;
+  }
+
+  .dropdown-button-content {
+    font-size: 15px;
+  }
+
+  .dropdown-item {
+    padding: 14px 16px;
+    font-size: 15px;
+  }
+
+  .item-icon {
+    font-size: 18px;
+    width: 24px;
+  }
+}
+
+/* Modal Custom Dropdown Wrapper */
+.modal-custom-dropdown-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+/* Modal Custom Dropdown Button */
+.modal-custom-dropdown-button {
+  background-color: #ffffff;
+  border: 2px solid #e1e1e1;
+  border-radius: 8px;
+  padding: 12px 15px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: 100%;
+  font-size: 14px;
+  font-family: 'Montserrat', sans-serif;
+  color: #333;
+  outline: none;
+}
+
+.modal-custom-dropdown-button:hover {
+  border-color: #04B4FC;
+}
+
+.modal-custom-dropdown-button:focus {
+  border-color: #04B4FC;
+  box-shadow: 0 0 0 3px rgba(4, 180, 252, 0.1);
+  background-color: #fafafa;
+}
+
+.modal-custom-dropdown-button.error {
+  border-color: #dc3545;
+  background-color: #ffeaea;
+}
+
+.modal-custom-dropdown-button.error:focus {
+  border-color: #dc3545;
+  box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1);
+}
+
+.modal-custom-dropdown-button .dropdown-button-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+
+.modal-custom-dropdown-button .dropdown-text {
+  flex: 1;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.modal-custom-dropdown-button .dropdown-arrow {
+  margin-left: 8px;
+  font-size: 12px;
+  color: #666;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.modal-custom-dropdown-button .dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+/* Modal Custom Dropdown List */
+.modal-custom-dropdown-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border: 1px solid #e1e5e9;
+  border-radius: 8px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  overflow: hidden;
+  animation: modalDropdownSlideDown 0.2s ease-out;
+  max-height: 200px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #04B4FC #f1f1f1;
+}
+
+.modal-custom-dropdown-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.modal-custom-dropdown-list::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.modal-custom-dropdown-list::-webkit-scrollbar-thumb {
+  background: #04B4FC;
+  border-radius: 3px;
+}
+
+.modal-custom-dropdown-list::-webkit-scrollbar-thumb:hover {
+  background: #0290c4;
+}
+
+@keyframes modalDropdownSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Modal Dropdown Items */
+.modal-custom-dropdown-list .dropdown-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.modal-custom-dropdown-list .dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.modal-custom-dropdown-list .dropdown-item:hover {
+  background-color: #f8f9fa;
+  color: #04B4FC;
+}
+
+.modal-custom-dropdown-list .dropdown-item.selected {
+  background-color: #04B4FC;
+  color: #ffffff;
+}
+
+.modal-custom-dropdown-list .item-text {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Help text styling */
+.help-text {
+  font-size: 12px;
+  color: #6c757d;
+  font-style: italic;
+  margin-top: 4px;
+}
+
+/* Mobile responsive for modal dropdown */
+@media (max-width: 768px) {
+  .modal-custom-dropdown-button {
+    padding: 14px 16px;
+    font-size: 15px;
+  }
+
+  .modal-custom-dropdown-button .dropdown-button-content {
+    font-size: 15px;
+  }
+
+  .modal-custom-dropdown-list .dropdown-item {
+    padding: 14px 16px;
+    font-size: 15px;
+  }
+
+  .modal-custom-dropdown-list {
+    max-height: 180px;
+  }
 }

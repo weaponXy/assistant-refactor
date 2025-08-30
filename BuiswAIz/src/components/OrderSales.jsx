@@ -1,25 +1,70 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 const OrderSales = ({ orderData, onInvoiceSelect, onAddSale }) => {
   const [filteredData, setFilteredData] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTime, setFilterTime] = useState('all');
+  const [sortOption, setSortOption] = useState('orderid-desc');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
 
+  const sortOptions = [
+    { value: 'orderid-desc', label: 'Order ID (Descending)' },
+    { value: 'orderid-asc', label: 'Order ID (Ascending)' },
+    { value: 'product-az', label: 'Product Name (A-Z)' },
+    { value: 'product-za', label: 'Product Name (Z-A)' },
+    { value: 'amount-desc', label: 'Total Amount (Descending)'},
+    { value: 'amount-asc', label: 'Total Amount (Ascending)' },
+    { value: 'date-desc', label: 'Date (Lastest)' },
+    { value: 'date-asc', label: 'Date (Newest)' }
+  ];
+
+  // Close dropdown when clicking outside
   useEffect(() => {
-    updateFilteredData(orderData, filterTime, searchTerm);
-  }, [orderData, filterTime, searchTerm]);
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+      }
+    };
 
-  const handleSearch = (e) => {
-    const value = e.target.value.toLowerCase();
-    setSearchTerm(value);
-  };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
-  const handleTimeFilter = (e) => {
-    const value = e.target.value;
-    setFilterTime(value);
-  };
+  const sortData = useCallback((data, sortOption) => {
+    const sortedData = [...data];
+    
+    switch (sortOption) {
+      case 'orderid-asc':
+        return sortedData.sort((a, b) => a.orderid - b.orderid);
+      case 'orderid-desc':
+        return sortedData.sort((a, b) => b.orderid - a.orderid);
+      case 'product-az':
+        return sortedData.sort((a, b) => {
+          const nameA = (a.products?.productname || '').toLowerCase();
+          const nameB = (b.products?.productname || '').toLowerCase();
+          return nameA.localeCompare(nameB);
+        });
+      case 'product-za':
+        return sortedData.sort((a, b) => {
+          const nameA = (a.products?.productname || '').toLowerCase();
+          const nameB = (b.products?.productname || '').toLowerCase();
+          return nameB.localeCompare(nameA);
+        });
+      case 'amount-asc':
+        return sortedData.sort((a, b) => a.subtotal - b.subtotal);
+      case 'amount-desc':
+        return sortedData.sort((a, b) => b.subtotal - a.subtotal);
+      case 'date-asc':
+        return sortedData.sort((a, b) => new Date(a.createdat) - new Date(b.createdat));
+      case 'date-desc':
+        return sortedData.sort((a, b) => new Date(b.createdat) - new Date(a.createdat));
+      default:
+        return sortedData;
+    }
+  }, []);
 
-  const updateFilteredData = (data, timeFilter, search) => {
+  const updateFilteredData = useCallback((data, timeFilter, search, sortOption) => {
     const now = new Date();
     
     // Helper function to check if two dates are on the same day
@@ -76,7 +121,31 @@ const OrderSales = ({ orderData, onInvoiceSelect, onAddSale }) => {
       }
     });
 
-    setFilteredData(filtered);
+    const sortedData = sortData(filtered, sortOption);
+    setFilteredData(sortedData);
+  }, [sortData]);
+
+  useEffect(() => {
+    updateFilteredData(orderData, filterTime, searchTerm, sortOption);
+  }, [orderData, filterTime, searchTerm, sortOption, updateFilteredData]);
+
+  const handleSearch = (e) => {
+    const value = e.target.value.toLowerCase();
+    setSearchTerm(value);
+  };
+
+  const handleTimeFilter = (e) => {
+    const value = e.target.value;
+    setFilterTime(value);
+  };
+
+  const handleSortSelect = (value) => {
+    setSortOption(value);
+    setIsDropdownOpen(false);
+  };
+
+  const getCurrentSortOption = () => {
+    return sortOptions.find(option => option.value === sortOption);
   };
 
   const getStatusBadge = (status) => {
@@ -97,6 +166,34 @@ const OrderSales = ({ orderData, onInvoiceSelect, onAddSale }) => {
         >
           + Add Sale
         </button>
+        
+        <div className="custom-dropdown-wrapper" ref={dropdownRef}>
+          <div 
+            className="custom-dropdown-button"
+            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+          >
+            <div className="dropdown-button-content">
+              <span className="dropdown-text">{getCurrentSortOption()?.label}</span>
+              <span className={`dropdown-arrow ${isDropdownOpen ? 'open' : ''}`}>▼</span>
+            </div>
+          </div>
+          
+          {isDropdownOpen && (
+            <div className="custom-dropdown-list">
+              {sortOptions.map((option) => (
+                <div
+                  key={option.value}
+                  className={`dropdown-item ${sortOption === option.value ? 'selected' : ''}`}
+                  onClick={() => handleSortSelect(option.value)}
+                >
+                  <span className="item-icon">{option.icon}</span>
+                  <span className="item-text">{option.label}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <input
           type="text"
           className="search-input"

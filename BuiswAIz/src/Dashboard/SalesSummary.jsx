@@ -22,82 +22,154 @@ const SalesSummary = () => {
     try {
       setLoading(true);
       
+      // Get current date in local timezone
       const today = new Date();
-      const todayString = today.toISOString().split('T')[0];
+      const localToday = new Date(today.getTime() - (today.getTimezoneOffset() * 60000));
+      const todayString = localToday.toISOString().split('T')[0];
       
-      const tomorrow = new Date(today);
+      const tomorrow = new Date(localToday);
       tomorrow.setDate(tomorrow.getDate() + 1);
       const tomorrowString = tomorrow.toISOString().split('T')[0];
 
-      // Calculate yesterday's date
-      const yesterday = new Date(today);
+      const yesterday = new Date(localToday);
       yesterday.setDate(yesterday.getDate() - 1);
       const yesterdayString = yesterday.toISOString().split('T')[0];
       
-      const currentMonth = today.getMonth() + 1;
-      const currentYear = today.getFullYear();
+      const currentMonth = localToday.getMonth() + 1;
+      const currentYear = localToday.getFullYear();
       const startOfMonth = new Date(currentYear, currentMonth - 1, 1).toISOString().split('T')[0];
       const endOfMonth = new Date(currentYear, currentMonth, 0).toISOString().split('T')[0];
 
-      // Fetch today's sales
-      const { data: todaysOrders, error: todaysError } = await supabase
-        .from('orders')
-        .select('totalamount')
-        .gte('orderdate', todayString)
-        .lt('orderdate', tomorrowString);
 
-      if (todaysError) throw todaysError;
 
-      // Fetch yesterday's sales
-      const { data: yesterdaysOrders, error: yesterdaysError } = await supabase
-        .from('orders')
-        .select('totalamount')
-        .gte('orderdate', yesterdayString)
-        .lt('orderdate', todayString);
+      // Method 1: Try using orderitems table (like your Dashboard does)
+      let todaysSale = 0;
+      let yesterdaysSale = 0;
+      let monthlyTotalSales = 0;
+      let dailyTransactions = 0;
 
-      if (yesterdaysError) throw yesterdaysError;
+      try {
+        // Fetch today's sales from orderitems
+        const { data: todaysOrderItems, error: todaysError } = await supabase
+          .from('orderitems')
+          .select('subtotal, createdat, orderid')
+          .gte('createdat', todayString)
+          .lt('createdat', tomorrowString);
 
-      // Fetch this month's sales
-      const { data: monthlyOrders, error: monthlyError } = await supabase
-        .from('orders')
-        .select('totalamount')
-        .gte('orderdate', startOfMonth)
-        .lte('orderdate', endOfMonth);
+        if (!todaysError && todaysOrderItems) {
+          todaysSale = todaysOrderItems.reduce((sum, item) => sum + (parseFloat(item.subtotal) || 0), 0);
+          // Count unique orders for transactions
+          const uniqueOrders = new Set(todaysOrderItems.map(item => item.orderid));
+          dailyTransactions = uniqueOrders.size;
+        }
 
-      if (monthlyError) throw monthlyError;
+        // Fetch yesterday's sales from orderitems
+        const { data: yesterdaysOrderItems, error: yesterdaysError } = await supabase
+          .from('orderitems')
+          .select('subtotal')
+          .gte('createdat', yesterdayString)
+          .lt('createdat', todayString);
 
-      // Fetch today's transaction count
-      const { data: todaysTransactions, error: transactionsError } = await supabase
-        .from('orders')
-        .select('orderid')
-        .gte('orderdate', todayString)
-        .lt('orderdate', tomorrowString);
+        if (!yesterdaysError && yesterdaysOrderItems) {
+          yesterdaysSale = yesterdaysOrderItems.reduce((sum, item) => sum + (parseFloat(item.subtotal) || 0), 0);
+        }
 
-      if (transactionsError) throw transactionsError;
+        // Fetch this month's sales from orderitems
+        const { data: monthlyOrderItems, error: monthlyError } = await supabase
+          .from('orderitems')
+          .select('subtotal')
+          .gte('createdat', startOfMonth)
+          .lte('createdat', endOfMonth);
+
+        if (!monthlyError && monthlyOrderItems) {
+          monthlyTotalSales = monthlyOrderItems.reduce((sum, item) => sum + (parseFloat(item.subtotal) || 0), 0);
+        }
+
+      } catch (orderitemsError) {
+        console.warn('Failed to fetch from orderitems table:', orderitemsError);
+        
+        // Method 2: Fallback to orders table
+        const { data: todaysOrders, error: todaysOrdersError } = await supabase
+          .from('orders')
+          .select('totalamount, orderdate, orderid')
+          .gte('orderdate', todayString)
+          .lt('orderdate', tomorrowString);
+
+        if (!todaysOrdersError && todaysOrders) {
+          todaysSale = todaysOrders.reduce((sum, order) => sum + (parseFloat(order.totalamount) || 0), 0);
+          dailyTransactions = todaysOrders.length;
+        }
+
+        const { data: yesterdaysOrders, error: yesterdaysOrdersError } = await supabase
+          .from('orders')
+          .select('totalamount')
+          .gte('orderdate', yesterdayString)
+          .lt('orderdate', todayString);
+
+        if (!yesterdaysOrdersError && yesterdaysOrders) {
+          yesterdaysSale = yesterdaysOrders.reduce((sum, order) => sum + (parseFloat(order.totalamount) || 0), 0);
+        }
+
+        const { data: monthlyOrders, error: monthlyOrdersError } = await supabase
+          .from('orders')
+          .select('totalamount')
+          .gte('orderdate', startOfMonth)
+          .lte('orderdate', endOfMonth);
+
+        if (!monthlyOrdersError && monthlyOrders) {
+          monthlyTotalSales = monthlyOrders.reduce((sum, order) => sum + (parseFloat(order.totalamount) || 0), 0);
+        }
+      }
+
+      // Method 3: If both methods give us zero, try a broader query to see if there's any data
+      if (todaysSale === 0 && monthlyTotalSales === 0) {
+        const { data: allRecentData, error: recentError } = await supabase
+          .from('orderitems')
+          .select('subtotal, createdat, orderid')
+          .order('createdat', { ascending: false })
+          .limit(10);
+
+        if (!recentError && allRecentData && allRecentData.length > 0) {
+          // Filter manually for today
+          const todaysData = allRecentData.filter(item => {
+            const itemDate = new Date(item.createdat);
+            const itemDateString = itemDate.toISOString().split('T')[0];
+            return itemDateString === todayString;
+          });
+
+          if (todaysData.length > 0) {
+            todaysSale = todaysData.reduce((sum, item) => sum + (parseFloat(item.subtotal) || 0), 0);
+            const uniqueOrders = new Set(todaysData.map(item => item.orderid));
+            dailyTransactions = uniqueOrders.size;
+          }
+        }
+      }
 
       // Fetch this month's expenses
-      const { data: monthlyExpenses, error: expensesError } = await supabase
-        .from('expenses')
-        .select('amount')
-        .gte('expensedate', startOfMonth)
-        .lte('expensedate', endOfMonth);
+      let monthlyExpensesTotal = 0;
+      try {
+        const { data: monthlyExpenses, error: expensesError } = await supabase
+          .from('expenses')
+          .select('amount')
+          .gte('expensedate', startOfMonth)
+          .lte('expensedate', endOfMonth);
 
-      if (expensesError) throw expensesError;
+        if (!expensesError && monthlyExpenses) {
+          monthlyExpensesTotal = monthlyExpenses.reduce((sum, expense) => sum + (parseFloat(expense.amount) || 0), 0);
+        }
+      } catch (expensesError) {
+        console.warn('Expenses table might not exist:', expensesError);
+        // Expenses table might not exist, continue without it
+      }
 
-      // Calculate values
-      const todaysSale = todaysOrders.reduce((sum, order) => sum + (parseFloat(order.totalamount) || 0), 0);
-      const yesterdaysSale = yesterdaysOrders.reduce((sum, order) => sum + (parseFloat(order.totalamount) || 0), 0);
-      const monthlyTotalSales = monthlyOrders.reduce((sum, order) => sum + (parseFloat(order.totalamount) || 0), 0);
-      const monthlyExpensesTotal = monthlyExpenses.reduce((sum, expense) => sum + (parseFloat(expense.amount) || 0), 0);
       const netIncome = monthlyTotalSales - monthlyExpensesTotal;
-      const dailyTransactions = todaysTransactions.length;
 
       // Calculate percentage change
       let percentageChange = 0;
       if (yesterdaysSale > 0) {
         percentageChange = ((todaysSale - yesterdaysSale) / yesterdaysSale) * 100;
       } else if (todaysSale > 0) {
-        percentageChange = 100; // If yesterday was 0 but today has sales, it's 100% increase
+        percentageChange = 100;
       }
 
       setSalesData({
@@ -112,7 +184,7 @@ const SalesSummary = () => {
       setError(null);
     } catch (error) {
       console.error('Error fetching sales data:', error);
-      setError('Failed to load sales data');
+      setError('Failed to load sales data: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -131,9 +203,9 @@ const SalesSummary = () => {
   };
 
   const getChangeColor = (change) => {
-    if (change > 0) return '#059669'; // Green for positive
-    if (change < 0) return '#dc2626'; // Red for negative
-    return '#6b7280'; // Gray for no change
+    if (change > 0) return '#059669';
+    if (change < 0) return '#dc2626';
+    return '#6b7280';
   };
 
   if (loading) {
@@ -151,6 +223,9 @@ const SalesSummary = () => {
       <div className="sales-summary-container">
         <div className="error-state">
           <p>{error}</p>
+          <button onClick={fetchSalesData} style={{ marginTop: '10px', padding: '5px 10px' }}>
+            Retry
+          </button>
         </div>
       </div>
     );

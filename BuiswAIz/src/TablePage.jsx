@@ -388,13 +388,13 @@ const TablePage = () => {
       await updateInventoryStock(salesDataArray);
 
       // Add activity log
-      if (user) {
+/*      if (user) {
         await supabase.from('activitylog').insert([{
           userid: user.userid,
           action_desc: `added new completed sale order ${uniqueOrderId} with ${salesDataArray.length} item(s)`,
           created_at: new Date().toISOString()
         }]);
-      }
+      } */
 
       // Refresh data
       await fetchOrderData();

@@ -10,11 +10,15 @@ const InvoiceModal = ({ invoice, onClose }) => {
     });
   };
 
+  // Helper function for number formatting without locale issues
+  const formatCurrency = (amount) => {
+    return amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  };
+
   const handleDownloadPDF = () => {
     const doc = new jsPDF();
     const date = formatDate(invoice.createdat);
 
-    // Header
     doc.setFontSize(20);
     doc.text('INVOICE', 20, 20);
     
@@ -22,10 +26,8 @@ const InvoiceModal = ({ invoice, onClose }) => {
     doc.text(`Order Code: ${invoice.orderid}`, 20, 35);
     doc.text(`Date: ${date}`, 20, 45);
     
-    // Line separator
     doc.line(20, 55, 190, 55);
     
-    // Items header
     doc.setFontSize(12);
     doc.text('Product', 20, 70);
     doc.text('Qty', 100, 70);
@@ -36,39 +38,34 @@ const InvoiceModal = ({ invoice, onClose }) => {
     let yPosition = 85;
     let totalAmount = 0;
     
-    // If we have multiple items (complete order), show all items
     if (invoice.orderItems && invoice.orderItems.length > 0) {
       invoice.orderItems.forEach((item) => {
         doc.text(item.products?.productname || 'N/A', 20, yPosition);
         doc.text(item.quantity.toString(), 100, yPosition);
-        doc.text(`₱${item.unitprice.toLocaleString()}`, 130, yPosition);
-        doc.text(`₱${item.subtotal.toLocaleString()}`, 170, yPosition);
+        doc.text(`P${formatCurrency(item.unitprice)}`, 130, yPosition);
+        doc.text(`P${formatCurrency(item.subtotal)}`, 170, yPosition);
         yPosition += 10;
         totalAmount += item.subtotal;
       });
       
-      // Use the total order amount if available
       totalAmount = invoice.totalOrderAmount || totalAmount;
     } else {
-      // Single item invoice (fallback)
       doc.text(invoice.products?.productname || 'N/A', 20, yPosition);
       doc.text(invoice.quantity.toString(), 100, yPosition);
-      doc.text(`₱${invoice.unitprice.toLocaleString()}`, 130, yPosition);
-      doc.text(`₱${invoice.subtotal.toLocaleString()}`, 170, yPosition);
+      doc.text(`P${formatCurrency(invoice.unitprice)}`, 130, yPosition);
+      doc.text(`P${formatCurrency(invoice.subtotal)}`, 170, yPosition);
       yPosition += 10;
       totalAmount = invoice.subtotal;
     }
     
-    // Total line
     doc.line(20, yPosition + 5, 190, yPosition + 5);
     doc.setFontSize(14);
     doc.text('TOTAL:', 130, yPosition + 20);
-    doc.text(`₱${totalAmount.toLocaleString()}`, 170, yPosition + 20);
+    doc.text(`P${formatCurrency(totalAmount)}`, 170, yPosition + 20);
 
     doc.save(`Invoice_${invoice.orderid}.pdf`);
   };
 
-  // Calculate total if we have multiple items
   const calculateTotal = () => {
     if (invoice.orderItems && invoice.orderItems.length > 0) {
       return invoice.totalOrderAmount || invoice.orderItems.reduce((sum, item) => sum + item.subtotal, 0);
@@ -133,7 +130,6 @@ const InvoiceModal = ({ invoice, onClose }) => {
                   </div>
                 ))
               ) : (
-                // Fallback for single item
                 <div className="invoice-item">
                   <div className="invoice-info-row">
                     <div className="invoice-info-item">

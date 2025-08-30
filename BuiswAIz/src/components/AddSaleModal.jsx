@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
   const [orderData, setOrderData] = useState({
-    createdat: new Date().toISOString().split('T')[0]
+    createdat: new Date().toISOString().split('T')[0],
+    createtime: new Date().toTimeString().slice(0, 5) // HH:MM format
   });
 
   const [productRows, setProductRows] = useState([{
@@ -14,10 +15,30 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
     isCustomProduct: false,
     showCustomInput: false,
     availableStock: 0,
-    stockWarning: ''
+    stockWarning: '',
+    isDropdownOpen: false
   }]);
 
   const [errors, setErrors] = useState({});
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const dropdownRefs = useRef({});
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      Object.keys(dropdownRefs.current).forEach(rowId => {
+        const dropdownRef = dropdownRefs.current[rowId];
+        if (dropdownRef && !dropdownRef.contains(event.target)) {
+          setProductRows(prev => prev.map(row => 
+            row.id === parseInt(rowId) ? { ...row, isDropdownOpen: false } : row
+          ));
+        }
+      });
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Generate unique order ID
   const generateOrderId = () => {
@@ -29,8 +50,17 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
   // Reset form when modal opens and update product rows with current stock
   useEffect(() => {
     if (isOpen) {
+      const now = new Date();
+      // Use local timezone for both date and time
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      
       setOrderData({
-        createdat: new Date().toISOString().split('T')[0]
+        createdat: `${year}-${month}-${day}`,
+        createtime: `${hours}:${minutes}`
       });
       
       // Reset product rows and update any existing selections with current stock
@@ -45,11 +75,12 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
                 availableStock: updatedProduct.currentstock,
                 stockWarning: updatedProduct.currentstock === 0 ? 'OUT OF STOCK' : 
                              (parseFloat(row.quantity) > updatedProduct.currentstock ? 
-                              `INSUFFICIENT STOCK (Available: ${updatedProduct.currentstock})` : '')
+                              `INSUFFICIENT STOCK (Available: ${updatedProduct.currentstock})` : ''),
+                isDropdownOpen: false
               };
             }
           }
-          return row;
+          return { ...row, isDropdownOpen: false };
         });
         
         // If this is a fresh open (no existing rows with products), start with clean slate
@@ -64,7 +95,8 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
             isCustomProduct: false,
             showCustomInput: false,
             availableStock: 0,
-            stockWarning: ''
+            stockWarning: '',
+            isDropdownOpen: false
           }];
         }
         
@@ -72,8 +104,9 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
       });
       
       setErrors({});
+      setShowConfirmation(false);
     }
-  }, [isOpen, products]); // Add products as dependency to update when stock changes
+  }, [isOpen, products]);
 
   // Update stock information when products prop changes
   useEffect(() => {
@@ -173,6 +206,13 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
     }
   };
 
+  const toggleDropdown = (rowId) => {
+    setProductRows(prev => prev.map(row => ({
+      ...row,
+      isDropdownOpen: row.id === rowId ? !row.isDropdownOpen : false
+    })));
+  };
+
   const handleProductSelect = (rowId, selectedProductName) => {
     if (selectedProductName === 'custom') {
       setProductRows(prev => prev.map(row => {
@@ -184,7 +224,8 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
             productname: '',
             unitprice: '',
             availableStock: 0,
-            stockWarning: ''
+            stockWarning: '',
+            isDropdownOpen: false
           };
         }
         return row;
@@ -199,7 +240,8 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
             productname: '',
             unitprice: '',
             availableStock: 0,
-            stockWarning: ''
+            stockWarning: '',
+            isDropdownOpen: false
           };
         }
         return row;
@@ -215,7 +257,8 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
             productname: selectedProductName,
             unitprice: selectedProduct ? selectedProduct.price.toString() : '',
             availableStock: selectedProduct ? selectedProduct.currentstock : 0,
-            stockWarning: selectedProduct && selectedProduct.currentstock === 0 ? 'OUT OF STOCK' : ''
+            stockWarning: selectedProduct && selectedProduct.currentstock === 0 ? 'OUT OF STOCK' : '',
+            isDropdownOpen: false
           };
         }
         return row;
@@ -243,7 +286,8 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
       isCustomProduct: false,
       showCustomInput: false,
       availableStock: 0,
-      stockWarning: ''
+      stockWarning: '',
+      isDropdownOpen: false
     }]);
   };
 
@@ -267,9 +311,13 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
     const newErrors = {};
     let hasStockIssues = false;
 
-    // Validate order data - no longer need to validate orderid
+    // Validate order data
     if (!orderData.createdat) {
       newErrors.createdat = 'Date is required';
+    }
+    
+    if (!orderData.createtime) {
+      newErrors.createtime = 'Time is required';
     }
 
     // Validate each product row
@@ -310,31 +358,46 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
     }, 0);
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     
     if (validateForm()) {
-      const generatedOrderId = generateOrderId();
-      
-      const salesData = productRows.map(row => ({
-        orderid: generatedOrderId,
-        productname: row.productname.trim(),
-        quantity: parseInt(row.quantity),
-        unitprice: parseFloat(row.unitprice),
-        subtotal: parseFloat(row.subtotal),
-        createdat: new Date(orderData.createdat).toISOString(),
-        isCustomProduct: row.isCustomProduct
-      }));
-
-      // Call onSave and wait for it to complete
-      await onSave(salesData);
-      
-      // Close the modal after successful save
-      onClose();
+      // Show confirmation dialog instead of directly saving
+      setShowConfirmation(true);
     }
   };
 
+  const handleConfirmSave = async () => {
+    const generatedOrderId = generateOrderId();
+    
+    // Combine date and time into a single datetime string using local timezone
+    const datetimeString = `${orderData.createdat}T${orderData.createtime}:00`;
+    const datetime = new Date(datetimeString).toISOString();
+    
+    const salesData = productRows.map(row => ({
+      orderid: generatedOrderId,
+      productname: row.productname.trim(),
+      quantity: parseInt(row.quantity),
+      unitprice: parseFloat(row.unitprice),
+      subtotal: parseFloat(row.subtotal),
+      createdat: datetime,
+      isCustomProduct: row.isCustomProduct
+    }));
+
+    // Call onSave and wait for it to complete
+    await onSave(salesData);
+    
+    // Close the modal after successful save
+    setShowConfirmation(false);
+    onClose();
+  };
+
+  const handleCancelConfirmation = () => {
+    setShowConfirmation(false);
+  };
+
   const handleCancel = () => {
+    setShowConfirmation(false);
     onClose();
   };
 
@@ -376,6 +439,19 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
                 />
                 {errors.createdat && <span className="error-message">{errors.createdat}</span>}
               </div>
+
+              <div className="form-group">
+                <label htmlFor="createtime">Time *</label>
+                <input
+                  type="time"
+                  id="createtime"
+                  name="createtime"
+                  value={orderData.createtime}
+                  onChange={handleOrderDataChange}
+                  className={`form-input ${errors.createtime ? 'error' : ''}`}
+                />
+                {errors.createtime && <span className="error-message">{errors.createtime}</span>}
+              </div>
             </div>
           </div>
 
@@ -411,19 +487,47 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
                   <div className="form-group">
                     <label>Product *</label>
                     {!row.showCustomInput ? (
-                      <select
-                        value={row.productname}
-                        onChange={(e) => handleProductSelect(row.id, e.target.value)}
-                        className={`form-input ${errors[`${row.id}-productname`] ? 'error' : ''}`}
-                      >
-                        <option value="">Select a product...</option>
-                        {products.map((product, idx) => (
-                          <option key={idx} value={product.productname}>
-                            {product.productname} - ₱{product.price} (Stock: {product.currentstock})
-                          </option>
-                        ))}
-                        <option value="custom">+ Add New Product</option>
-                      </select>
+                      <div className="modal-custom-dropdown-wrapper" ref={el => dropdownRefs.current[row.id] = el}>
+                        <div 
+                          className={`modal-custom-dropdown-button ${errors[`${row.id}-productname`] ? 'error' : ''}`}
+                          onClick={() => toggleDropdown(row.id)}
+                        >
+                          <div className="dropdown-button-content">
+                            <span className="dropdown-text">
+                              {row.productname || 'Select a product...'}
+                            </span>
+                            <span className={`dropdown-arrow ${row.isDropdownOpen ? 'open' : ''}`}>▼</span>
+                          </div>
+                        </div>
+                        
+                        {row.isDropdownOpen && (
+                          <div className="modal-custom-dropdown-list">
+                            <div
+                              className="dropdown-item"
+                              onClick={() => handleProductSelect(row.id, '')}
+                            >
+                              <span className="item-text">Select a product...</span>
+                            </div>
+                            {products.map((product, idx) => (
+                              <div
+                                key={idx}
+                                className={`dropdown-item ${row.productname === product.productname ? 'selected' : ''}`}
+                                onClick={() => handleProductSelect(row.id, product.productname)}
+                              >
+                                <span className="item-text">
+                                  {product.productname} - ₱{product.price} (Stock: {product.currentstock})
+                                </span>
+                              </div>
+                            ))}
+                            <div
+                              className="dropdown-item"
+                              onClick={() => handleProductSelect(row.id, 'custom')}
+                            >
+                              <span className="item-text">+ Add New Product</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     ) : (
                       <div className="custom-product-input">
                         <input
@@ -533,6 +637,36 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
             </button>
           </div>
         </form>
+
+        {/* Confirmation Dialog */}
+        {showConfirmation && (
+          <div className="confirmation-overlay">
+            <div className="confirmation-dialog">
+              <div className="confirmation-header">
+                <h4>Confirm Save</h4>
+              </div>
+              <div className="confirmation-body">
+                <p>Are you sure you want to save all products?</p>
+              </div>
+              <div className="confirmation-footer">
+                <button 
+                  type="button" 
+                  className="confirmation-no-btn" 
+                  onClick={handleCancelConfirmation}
+                >
+                  No
+                </button>
+                <button 
+                  type="button" 
+                  className="confirmation-yes-btn" 
+                  onClick={handleConfirmSave}
+                >
+                  Yes
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
