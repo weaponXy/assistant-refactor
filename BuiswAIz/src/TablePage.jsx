@@ -388,6 +388,7 @@ const TablePage = () => {
       await updateInventoryStock(salesDataArray);
 
 
+
       // Refresh data
       await fetchOrderData();
       if (newProductsCreated) {

@@ -110,10 +110,10 @@ const StatsContainer = ({ totalEarnings, totalCustomers, statsFilter, onStatsFil
   const getPeriodLabel = () => {
     switch (statsFilter) {
       case 'today': return 'vs Yesterday';
-      case 'week1': return 'vs Last Month (Week 1)';
-      case 'week2': return 'vs First Week';
-      case 'week3': return 'vs Second Week';
-      case 'month': return 'vs Last Month';
+      case 'week1': return 'vs Last Month (7 Days)';
+      case 'week2': return 'vs Last 7 Days';
+      case 'week3': return 'vs Last 14 Days';
+      case 'month': return 'vs Last 21 Days';
       case 'all': return 'vs Last Year';
       default: return 'vs Previous Period';
     }
@@ -148,9 +148,9 @@ const StatsContainer = ({ totalEarnings, totalCustomers, statsFilter, onStatsFil
         >
           <option value="all">All Time</option>
           <option value="today">Today</option>
-          <option value="week1">First Week</option>
-          <option value="week2">Second Week</option>
-          <option value="week3">Third Week</option>
+          <option value="week1">7 Days</option>
+          <option value="week2">14 Days</option>
+          <option value="week3">21 Days</option>
           <option value="month">This Month</option>
         </select>
       </div>
