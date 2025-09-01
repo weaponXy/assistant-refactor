@@ -5,6 +5,7 @@ import { supabase } from "../supabase";
 import AddProduct from "../inventory/AddProduct";
 import ViewProduct from "../inventory/ViewProduct";
 import AddDefect from "../inventory/AddDefect";
+import RestockStorage from "../inventory/RestockStorage";
 import { useNavigate } from "react-router-dom";
 import { fetchLowStockProducts } from "../inventory/fetchLowStockProduct";
 import { formatDistanceToNow, parseISO } from "date-fns";
@@ -23,6 +24,7 @@ const Inventory = () => {
   const [user, setUser] = useState(null);
   const [activityLogs, setActivityLogs] = useState([]);
   const navigate = useNavigate();
+  const [restockStorage, setrestockStorage] = useState(false);
 
   const loadProducts = async () => {
     try {
@@ -148,7 +150,8 @@ const Inventory = () => {
             <div className="panel-header">
               <h2 className="panel-title">Inventory</h2>
               <div className="panel-actions">
-                <input className="inventory-search" type="text" placeholder="Search" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                <input id="inventorySearch" className="inventory-search" type="text" placeholder="Search" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                <button className="restock-storage-button" onClick={() => setrestockStorage(true)}> Restock Storage</button> 
                 <button className="add-product-button" onClick={() => setShowModal(true)}>
                   + Add Product
                 </button>
@@ -342,6 +345,14 @@ const Inventory = () => {
           </div>
         </div>
       </div>
+
+      {restockStorage && (
+        <div className="restock-container">
+          <RestockStorage onClose={() => setrestockStorage(false)} 
+            user={user}
+          />
+        </div>
+      )}
 
       {showModal && (
         <AddProduct

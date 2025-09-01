@@ -42,12 +42,12 @@
   border-bottom-right-radius: 4px;
 }
 
-.assistant-msg {
+/*.assistant-msg {
   align-self: flex-start;
   background-color: #e3f8e0;
   color: #1c1c1c;
   border-bottom-left-radius: 4px;
-}
+}  future kinemerut*/
 
 .chat-input-area {
   display: flex;

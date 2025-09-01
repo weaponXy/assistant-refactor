@@ -1,12 +1,14 @@
 import React, { useState } from "react";
 import "../stylecss/ViewSupplier.css";
 import { supabase } from "../supabase";
+import SupplierDeleteModal from "./ConfirmationModal/SupplierConfirmation";
 
 const ViewSupplier = ({ supplier, onClose, onSupplierUpdated }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [form, setForm] = useState({ ...supplier });
   const [isSaving, setIsSaving] = useState(false);
-
+  const [deleteError, setDeleteError] = useState("");
+  const [showConfirm, setShowConfirm] = useState(false);
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
@@ -17,9 +19,7 @@ const ViewSupplier = ({ supplier, onClose, onSupplierUpdated }) => {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const { error } = await supabase
-        .from("suppliers")
-        .update({
+      const { error } = await supabase.from("suppliers").update({
           suppliername: form.suppliername,
           contactperson: form.contactperson,
           supplieremail: form.supplieremail,
@@ -41,19 +41,37 @@ const ViewSupplier = ({ supplier, onClose, onSupplierUpdated }) => {
   };
 
   const handleDelete = async () => {
+    setDeleteError(""); // reset previous error
     try {
+      const { data: productData, error: productError } = await supabase
+        .from("products")
+        .select("productid")
+        .eq("supplierid", supplier.supplierid)
+        .limit(1);
+
+      if (productError) throw productError;
+
+      if (productData?.length > 0) {
+        setDeleteError("This supplier cannot be deleted because a product is referenced to it");
+        return;
+      }
+
+      // If no associated products, delete the supplier
       const { error } = await supabase
         .from("suppliers")
         .delete()
         .eq("supplierid", supplier.supplierid);
+
       if (error) throw error;
 
       if (onSupplierUpdated) onSupplierUpdated();
       onClose();
     } catch (err) {
       console.error("Error deleting supplier:", err.message);
+      setDeleteError("Error deleting supplier. Check console for details.");
     }
   };
+
 
   return (
     <div className="view-supplier-overlay">
@@ -63,7 +81,7 @@ const ViewSupplier = ({ supplier, onClose, onSupplierUpdated }) => {
           <h2>Supplier</h2>
           <span className="supplier-id-tag">#{supplier.supplierid}</span>
           <div className="header-actions">
-            <button className="delete-button" onClick={handleDelete}>🗑 Delete</button>
+            <button className="delete-button" onClick={() => setShowConfirm(true)}>🗑 Delete</button>
             <button className="update-button" onClick={handleUpdate} disabled={isEditing}>Update</button>
           </div>
         </div>
@@ -133,7 +151,24 @@ const ViewSupplier = ({ supplier, onClose, onSupplierUpdated }) => {
             </button>
           </div>
         )}
+
+        {deleteError && 
+          <p className="supplyDelete-warning">
+            {deleteError}
+          </p>
+        }
+        
+         
       </div>
+      <SupplierDeleteModal
+            isOpen={showConfirm}
+            onConfirm={async () => {
+              await handleDelete(); 
+              setShowConfirm(false); 
+          }}
+          onCancel={() => setShowConfirm(false)}
+          suppliername={supplier.suppliername}
+        />
     </div>
   );
 };
