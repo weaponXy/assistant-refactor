@@ -11,8 +11,8 @@ const AddSupplier = ({ onClose, user }) => {
     address: "",
     supplierstatus: "Active",
   });
-
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState("");
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -20,6 +20,43 @@ const AddSupplier = ({ onClose, user }) => {
   };
 
   const handleSubmit = async () => {
+    setFormError("");
+    const validateForm = () => {
+            const requiredFields = [
+                "suppliername",
+                "contactperson",
+                "phonenumber",
+                "supplieremail",
+                "address",
+                "supplierstatus",
+            ];
+
+            // Check if any field is empty or invalid
+            const isEmpty = requiredFields.some((field) => {
+                const value = formData[field];
+                if (value === undefined || value === null) return true;
+                if (typeof value === "string" && value.trim() === "") return true;
+                    return false;
+            });
+
+            if (isEmpty) {
+                setFormError("Please fill in all required fields.");
+                return false;
+            }
+
+            if (!/\S+@\S+\.\S+/.test(formData.supplieremail)) {
+                setFormError("Invalid email format.");
+                return false;
+            }
+
+            if (!/^\d{7,}$/.test(formData.phonenumber)) {
+              setFormError("Phone number must only be contain of number by atleast 7");
+              return false;
+            }
+            return true;
+        };
+
+    if (!validateForm()) return;
     if (isSubmitting) return;
     setIsSubmitting(true);
     const { error } = await supabase.from("suppliers").insert({
@@ -57,7 +94,7 @@ const AddSupplier = ({ onClose, user }) => {
 
         {/* Body */}
         <div className="modal-body">
-          <div className="product-fields">
+          <div className="supplier-fields">
             <label>Supplier Name</label>
             <input
               name="suppliername"
@@ -108,6 +145,11 @@ const AddSupplier = ({ onClose, user }) => {
               </select>
             </div>
           </div>
+          {formError && (
+            <div className="supplyForm-warning">
+                {formError}
+            </div>
+          )}
         </div>
       </div>
     </div>

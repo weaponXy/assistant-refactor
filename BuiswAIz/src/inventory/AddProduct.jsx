@@ -6,6 +6,8 @@ import imageCompression from "browser-image-compression";
 const AddProduct = ({ onClose, user }) => {
   const [suppliers, setSuppliers] = useState([]);
   const [imageFile, setImageFile] = useState(null);
+  const [formError, setFormError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     productname: "",
     description: "",
@@ -72,6 +74,49 @@ const AddProduct = ({ onClose, user }) => {
   };
 
   const handleSubmit = async () => {
+    const addValidate = () => {
+      const requiredFields = [
+          "productname",
+          "description",
+          "cost",
+          "reorderpoint",
+          "currentstock",
+          "price",
+          "suppliername"
+      ];
+
+      const isEmpty = requiredFields.some((field) => {
+        const value = formData[field];
+        if (typeof value === "string" && value.trim() === "") return true;
+        if (["cost", "reorderpoint", "currentstock", "price"].includes(field)) {
+          const numValue = Number(value);     
+          if (isNaN(numValue) || numValue <= 0) return true; 
+        }
+        return false;
+      });
+      
+      if (isEmpty) {
+        setFormError("Please fill in all required fields.");
+        return false;
+      }
+
+      if (parseFloat(formData.price) < parseFloat(formData.cost)) {
+        setFormError("Price cannot be lower than cost.");
+        return false;
+      }
+
+      if (parseInt(formData.currentstock)< parseInt(formData.reorderpoint)) {
+        setFormError("currentstock cannot be lower than the reorderpoint ")
+        return false;
+      }
+        setFormError("");
+        return true;
+    }
+
+    if (!addValidate()) return;
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
     const imageUrl = await uploadImage();
 
     const supplier = suppliers.find(
@@ -101,21 +146,7 @@ const AddProduct = ({ onClose, user }) => {
       return;
     }
 
-    // 2️⃣ Add expense entry
-    const totalExpense = parseFloat(formData.cost) * parseInt(formData.currentstock);
-    const expenseDate = new Date();
-
-    const { error: expenseError } = await supabase.from("expenses").insert({
-      expensedate: expenseDate.toISOString(),
-      amount: totalExpense,
-      description: `Initial stock purchase for ${formData.productname}`,
-      category: "Inventory",
-      createdbyuserid: user?.userid || null
-    });
-
-    if (expenseError) {
-      console.error("Expense insert failed:", expenseError);
-    }
+   
 
     // 3️⃣ Log activity
     if (user) {
@@ -140,7 +171,7 @@ const AddProduct = ({ onClose, user }) => {
           <button className="back-btn" onClick={onClose}>←</button>
           <h2>Product</h2>
           <div className="modal-actions">
-            <button className="create-btn" onClick={handleSubmit}>Create Item</button>
+            <button className="create-btn" onClick={handleSubmit} disabled={isSubmitting}>{isSubmitting ? "Creating..." : "Create Item"}</button>
           </div>
         </div>
 
@@ -175,7 +206,6 @@ const AddProduct = ({ onClose, user }) => {
               placeholder="Product Name"
               value={formData.productname}
               onChange={handleChange}
-              required
             />
 
             <div className="two-cols">
@@ -184,16 +214,15 @@ const AddProduct = ({ onClose, user }) => {
                 placeholder="Description"
                 value={formData.description}
                 onChange={handleChange}
-                required
               />
               <div className="with-label">
                 <label>₱</label>
                 <input
+                  type="number"
                   name="cost"
                   placeholder="Cost"
                   value={formData.cost}
                   onChange={handleChange}
-                  required
                 />
               </div>
             </div>
@@ -202,21 +231,21 @@ const AddProduct = ({ onClose, user }) => {
               <div className="with-label">
                 <label>Pcs</label>
                 <input
+                  type="number"
                   name="reorderpoint"
                   placeholder="Reorder Point"
                   value={formData.reorderpoint}
                   onChange={handleChange}
-                  required
                 />
               </div>
               <div className="with-label">
                 <label>Pcs</label>
                 <input
+                  type="number"
                   name="currentstock"
                   placeholder="Quantity"
                   value={formData.currentstock}
                   onChange={handleChange}
-                  required
                 />
               </div>
             </div>
@@ -225,18 +254,17 @@ const AddProduct = ({ onClose, user }) => {
               <div className="with-icon">
                 <span>₱</span>
                 <input
+                  type="number"
                   name="price"
                   placeholder="Price"
                   value={formData.price}
                   onChange={handleChange}
-                  required
                 />
               </div>
               <select
                 name="suppliername"
                 value={formData.suppliername}
                 onChange={handleChange}
-                required
               >
                 <option value="">Select Supplier</option>
                 {suppliers.map((s) => (
@@ -246,6 +274,11 @@ const AddProduct = ({ onClose, user }) => {
                 ))}
               </select>
             </div>
+            {formError && (
+            <div className="productForm-warning">
+              {formError}
+            </div>
+          )}
           </div>
         </div>
       </div>

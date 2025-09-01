@@ -108,8 +108,8 @@ const ViewProduct = ({ product, onClose, onProductUpdated, user}) => {
 
         setIsSaving(true);
         try {
-        let imageUrl = form.image_url;
-        let activityDesc = "";
+            let imageUrl = form.image_url;
+            let activityDesc = "";
         if (user) {
             const nameChanged = form.productname !== product.productname;
             const restocked =
