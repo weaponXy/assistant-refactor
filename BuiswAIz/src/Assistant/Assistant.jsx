@@ -11,41 +11,44 @@ const Assistant = () => {
     useEffect(() => {
         let heartbeat;
         let authUserId;
+        let subscription;
 
         const releaseLock = async () => {
             try {
                 if (authUserId) {
-                    await supabase.from("assistant_lock")
-                        .update({ locked_by: null, locked_at: null })
-                        .eq("id", 1)
-                        .eq("locked_by", authUserId);
+                await supabase
+                    .from("assistant_lock")
+                    .update({ locked_by: null, locked_at: null })
+                    .eq("id", 1)
+                    .eq("locked_by", authUserId);
                 }
             } catch (error) {
                 console.error("Error releasing lock:", error);
+            } finally {
+                if (heartbeat) clearInterval(heartbeat);
             }
-            if (heartbeat) clearInterval(heartbeat);
         };
 
         const getUserAndLock = async () => {
             try {
-                // 1️⃣ Get current auth user
-                const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-                if (authError || !authUser) {
-                    window.location.href = "/";
-                    return;
-                }
-                authUserId = authUser.id;
+                    // 1️⃣ Get current auth user
+                    const {data: { user: authUser },error: authError,} = await supabase.auth.getUser();
+                    if (authError || !authUser) {
+                        navigate("/");
+                        return;
+                    }
+                    authUserId = authUser.id;
 
-                // 2️⃣ Try to acquire lock via RPC
-                const { data: lockAcquired, error: lockError } = await supabase.rpc(
-                    "acquire_assistant_lock",
-                    { p_user_id: authUserId }
-                );
+                    // 2️⃣ Try to acquire lock via RPC
+                    const { data: lockAcquired, error: lockError } = await supabase.rpc(
+                        "acquire_assistant_lock",
+                        { p_user_id: authUserId }
+                    );
 
-                if (lockError) {
-                    console.error("Error acquiring lock:", lockError);
-                    return;
-                }
+                    if (lockError) {
+                        console.error("Error acquiring lock:", lockError);
+                        return;
+                    }
 
                 if (!lockAcquired) {
                     alert("Someone is currently accessing the assistant page.");
@@ -59,24 +62,21 @@ const Assistant = () => {
                     .select("*")
                     .eq("userid", authUserId)
                     .single();
-                setUser(profile || null);
+                    setUser(profile || null);
 
                 // 4️⃣ Heartbeat every 30 seconds
                 heartbeat = setInterval(async () => {
-                    const { data: stillHasLock, error: hbError } = await supabase.rpc(
-                        "acquire_assistant_lock",
-                        { p_user_id: authUserId }
-                    );
+                    const { data: stillHasLock, error: hbError } = await supabase.rpc("acquire_assistant_lock",{ p_user_id: authUserId });
+
                     if (hbError) {
                         console.error("Error refreshing lock:", hbError);
                     }
                     if (!stillHasLock) {
                         alert("You lost the lock. Redirecting...");
-                        navigate("/inventory");
                         clearInterval(heartbeat);
+                        navigate("/inventory");
                     }
                 }, 30000);
-
             } catch (err) {
                 console.error("Unexpected error in getUserAndLock:", err);
             }
@@ -85,20 +85,26 @@ const Assistant = () => {
         getUserAndLock();
 
         // 🔹 Listen for auth/account changes
-        const authListener = supabase.auth.onAuthStateChange((_event, session) => {
+        const { data } = supabase.auth.onAuthStateChange((_event, session) => {
             if (!session || session.user.id !== authUserId) {
                 releaseLock();
             }
-        }).data.subscription;
+        });
+        subscription = data.subscription;
+
+        const handleBeforeUnload = () => {
+            releaseLock();
+        };
+        window.addEventListener("beforeunload", handleBeforeUnload);
 
         return () => {
             releaseLock();
-            authListener?.unsubscribe();
+            subscription?.unsubscribe();
+            window.removeEventListener("beforeunload", handleBeforeUnload);
         };
     }, [navigate]);
 
-
-    return(
+    return (
         <div className="assistant-page">
             <header className="header-bar">
                 <h1 className="header-title">BuiswAIz</h1>
@@ -128,9 +134,7 @@ const Assistant = () => {
                         <div className="panel-header">
                             <h2 className="panel-title">BuiswAIz Assistant</h2>
                             <div className="panel-action">
-                                <button className="print-reports">
-                                    Print Reports
-                                </button>
+                                <button className="print-reports">Print Reports</button>
                             </div>
                         </div>
                         <div className="table-container">
@@ -140,20 +144,23 @@ const Assistant = () => {
                     <div className="A-right-panel">
                         <div className="A-user-info-card">
                             <div className="A-user-left">
-                                <div className="A-user-avatar"/>
+                                <div className="A-user-avatar" />
                                 <div className="A-user-username">
                                     {user ? user.username : "Loading..."}
                                 </div>
                             </div>
-                            <button className="logout-button"
+                            <button
+                                className="logout-button"
                                 onClick={async () => {
                                     await supabase.auth.signOut();
                                     localStorage.clear();
-                                    window.location.href = '/'; // redirect to login
+                                    navigate("/"); // redirect to login
                                 }}
-                            >Logout</button>
+                            >
+                                Logout
+                            </button>
                         </div>
-                        <AssistantChat/>
+                        <AssistantChat />
                     </div>
                 </div>
             </div>
