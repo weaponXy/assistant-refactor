@@ -88,7 +88,7 @@ const Supplier = () => {
             <div className="panel-header">
               <h2 className="panel-title">Supplier</h2>
               <div className="panel-actions">
-                <input className="supplier-search" type="text" placeholder="Search" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                <input id="supplierSearch"className="supplier-search" type="text" placeholder="Search" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                 <button className="add-supplier-button" onClick={() => setShowModal(true)}>
                   + Add Supplier
                 </button>

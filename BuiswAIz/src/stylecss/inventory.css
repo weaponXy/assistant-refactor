@@ -379,6 +379,22 @@ tbody td {
   background-color: #91c3d7;
 }
 
+.restock-storage-button {
+  background-color: #04B4FC;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.restock-storage-button:hover {
+  background-color: #91c3d7;
+}
+
 .I-user-info-card {
   display: flex;
   align-items: center;
