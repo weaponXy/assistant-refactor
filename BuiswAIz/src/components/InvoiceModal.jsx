@@ -243,7 +243,7 @@ const InvoiceModal = ({ invoice, onClose }) => {
             <button className="download-pdf-btn" onClick={handleDownloadPDF}>
               Download PDF
             </button>
-            <button className="close-btn" onClick={onClose}>
+            <button className="close-btn1" onClick={onClose}>
               Close
             </button>
           </div>

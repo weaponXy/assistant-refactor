@@ -882,7 +882,7 @@ Y
   box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
 }
 
-.close-btn {
+.close-btn1 {
   padding: 12px 24px;
   border: 2px solid #6c757d;
   border-radius: 8px;
@@ -895,7 +895,8 @@ Y
   transition: all 0.3s ease;
 }
 
-.close-btn:hover {
+
+.close-btn1:hover {
   background-color: #6c757d;
   color: white;
   transform: translateY(-1px);
