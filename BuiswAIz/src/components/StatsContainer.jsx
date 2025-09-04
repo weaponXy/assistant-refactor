@@ -171,7 +171,7 @@ const StatsContainer = ({ totalEarnings, totalCustomers, statsFilter, onStatsFil
         <div className="customers-box">
           <div className="stats-box-header">
             <img 
-              src="https://icon-library.com/images/customers-icon/customers-icon-9.jpg" 
+              src="https://www.pikpng.com/pngl/b/75-757195_customer-clipart-end-user-customer-blue-icon-png.png" 
               alt="Customers Icon" 
               className="customers-icon"
             />

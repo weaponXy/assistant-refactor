@@ -2,6 +2,15 @@ import React from 'react';
 import jsPDF from 'jspdf';
 
 const InvoiceModal = ({ invoice, onClose }) => {
+  // Debug logging - remove this after fixing
+  console.log('Invoice data received:', invoice);
+  console.log('Orders data:', invoice?.orders);
+  console.log('Amount paid paths:', {
+    'invoice.orders?.amount_paid': invoice?.orders?.amount_paid,
+    'invoice.amount_paid': invoice?.amount_paid,
+    'invoice.orderItems[0]?.orders?.amount_paid': invoice?.orderItems?.[0]?.orders?.amount_paid
+  });
+
   const formatDate = (timestamp) => {
     return new Date(timestamp).toLocaleDateString(undefined, {
       year: 'numeric',
@@ -63,6 +72,17 @@ const InvoiceModal = ({ invoice, onClose }) => {
     doc.text('TOTAL:', 130, yPosition + 20);
     doc.text(`P${formatCurrency(totalAmount)}`, 170, yPosition + 20);
 
+    // Add payment information if available
+    const amountPaid = getAmountPaid();
+    if (amountPaid !== null && amountPaid !== undefined) {
+      doc.text('AMOUNT PAID:', 130, yPosition + 35);
+      doc.text(`P${formatCurrency(amountPaid)}`, 170, yPosition + 35);
+      
+      const change = getChange();
+      doc.text('CHANGE:', 130, yPosition + 50);
+      doc.text(`P${formatCurrency(change)}`, 170, yPosition + 50);
+    }
+
     doc.save(`Invoice_${invoice.orderid}.pdf`);
   };
 
@@ -71,6 +91,44 @@ const InvoiceModal = ({ invoice, onClose }) => {
       return invoice.totalOrderAmount || invoice.orderItems.reduce((sum, item) => sum + item.subtotal, 0);
     }
     return invoice.subtotal;
+  };
+
+  // Fixed function to get amount paid
+  const getAmountPaid = () => {
+    // Check multiple possible paths for amount_paid
+    if (invoice.orders?.amount_paid !== undefined && invoice.orders?.amount_paid !== null) {
+      return invoice.orders.amount_paid;
+    }
+    if (invoice.amount_paid !== undefined && invoice.amount_paid !== null) {
+      return invoice.amount_paid;
+    }
+    if (invoice.orderItems && invoice.orderItems.length > 0 && invoice.orderItems[0]?.orders?.amount_paid !== undefined) {
+      return invoice.orderItems[0].orders.amount_paid;
+    }
+    return null;
+  };
+
+  // Fixed function to get change
+  const getChange = () => {
+    const amountPaid = getAmountPaid();
+    if (amountPaid === null || amountPaid === undefined) {
+      return 0;
+    }
+
+    // Check multiple possible paths for change
+    if (invoice.orders?.change !== undefined && invoice.orders?.change !== null) {
+      return invoice.orders.change;
+    }
+    if (invoice.change !== undefined && invoice.change !== null) {
+      return invoice.change;
+    }
+    if (invoice.orderItems && invoice.orderItems.length > 0 && invoice.orderItems[0]?.orders?.change !== undefined) {
+      return invoice.orderItems[0].orders.change;
+    }
+
+    // Fallback to calculation if change is not in database
+    const total = calculateTotal();
+    return amountPaid - total;
   };
 
   return (
@@ -156,11 +214,28 @@ const InvoiceModal = ({ invoice, onClose }) => {
             </div>
           </div>
 
-          {/* Total */}
-          <div className="invoice-total-section">
-            <div className="invoice-info-item total-item">
-              <strong>Order Total:</strong>
-              <span className="total-amount">₱{calculateTotal().toLocaleString()}</span>
+          {/* Payment Summary */}
+          <div className="invoice-payment-section">
+            <div className="invoice-payment-summary">
+              <div className="payment-summary-row total-row">
+                <strong>Order Total: </strong>
+                <span className="total-amount">₱{calculateTotal().toLocaleString()}</span>
+              </div>
+              
+              {getAmountPaid() !== null && getAmountPaid() !== undefined && (
+                <>
+                  <div className="payment-summary-row paid-row">
+                    <strong>Amount Paid:</strong>
+                    <span className="paid-amount">₱{getAmountPaid().toLocaleString()}</span>
+                  </div>
+                  
+                  <div className="payment-summary-row change-row">
+                    <strong>Change:</strong>
+                    <span className="change-amount">₱{getChange().toLocaleString()}</span>
+                  </div>
+                </>
+              )}
+              
             </div>
           </div>
 

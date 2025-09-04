@@ -7,6 +7,12 @@ import StatsContainer from './components/StatsContainer';
 import InvoiceModal from './components/InvoiceModal';
 import AddSaleModal from './components/AddSaleModal';
 import './stylecss/TablePage.css';
+/*
+import './stylecss/Sales/OrderSales.css';
+import './stylecss/Sales/Bestseller.css';
+import './stylecss/Sales/StatsContainer.css';
+import './stylecss/Sales/InvoiceModal.css';
+import './stylecss/Sales/AddSaleModal.css';*/
 
 const TablePage = () => {
   const navigate = useNavigate();
@@ -77,7 +83,7 @@ const TablePage = () => {
         subtotal,
         createdat,
         products (productname, image_url),
-        orders (totalamount, orderstatus)
+        orders (totalamount, orderstatus, amount_paid, change)
       `);
 
     if (error) {
@@ -272,8 +278,11 @@ const TablePage = () => {
     }
   };
 
-  const handleSaveSale = async (salesDataArray) => {
+  const handleSaveSale = async (orderWithPayment) => {
     try {
+      // Extract the sales data array from the order object
+      const salesDataArray = orderWithPayment.salesData;
+      
       // First, check stock availability
       const stockErrors = await checkStockAvailability(salesDataArray);
       if (stockErrors.length > 0) {
@@ -292,23 +301,25 @@ const TablePage = () => {
       }
       
       // Update all sales data with the generated order ID
-      salesDataArray = salesDataArray.map(item => ({
+      const updatedSalesData = salesDataArray.map(item => ({
         ...item,
         orderid: uniqueOrderId
       }));
 
       // Calculate total amount for the order
-      const totalAmount = salesDataArray.reduce((sum, item) => sum + item.subtotal, 0);
-      const orderDate = salesDataArray[0].createdat;
+      const totalAmount = updatedSalesData.reduce((sum, item) => sum + item.subtotal, 0);
+      const orderDate = updatedSalesData[0].createdat;
 
-      // Create order in orders table with 'completed' status
+      // Create order in orders table with 'completed' status and payment information
       const { error: orderCreateError } = await supabase
         .from('orders')
         .insert([{
           orderid: uniqueOrderId,
           totalamount: totalAmount,
           orderdate: orderDate,
-          orderstatus: 'completed' // Automatically set to completed
+          orderstatus: 'completed',
+          amount_paid: orderWithPayment.amountPaid,
+          change: orderWithPayment.change
         }]);
 
       if (orderCreateError) {
@@ -321,7 +332,7 @@ const TablePage = () => {
       let newProductsCreated = false;
 
       // Process each product in the array
-      for (const saleData of salesDataArray) {
+      for (const saleData of updatedSalesData) {
         let productId;
 
         if (saleData.isCustomProduct) {
@@ -385,16 +396,7 @@ const TablePage = () => {
       }
 
       // Update inventory stock for existing products
-      await updateInventoryStock(salesDataArray);
-
-      // Add activity log
-/*      if (user) {
-        await supabase.from('activitylog').insert([{
-          userid: user.userid,
-          action_desc: `added new completed sale order ${uniqueOrderId} with ${salesDataArray.length} item(s)`,
-          created_at: new Date().toISOString()
-        }]);
-      } */
+      await updateInventoryStock(updatedSalesData);
 
       // Refresh data
       await fetchOrderData();
@@ -402,7 +404,7 @@ const TablePage = () => {
         await fetchProducts(); // Refresh products list if new products were created
       }
       
-      alert(`Successfully added ${salesDataArray.length} product${salesDataArray.length > 1 ? 's' : ''} to the completed sale!\n\nOrder ID: ${uniqueOrderId}`);
+      alert(`Successfully added ${updatedSalesData.length} product${updatedSalesData.length > 1 ? 's' : ''} to the completed sale!\n\nOrder ID: ${uniqueOrderId}\nTotal Amount: ₱${totalAmount.toFixed(2)}\nAmount Paid: ₱${orderWithPayment.amountPaid.toFixed(2)}\nChange: ₱${orderWithPayment.change.toFixed(2)}`);
     } catch (error) {
       console.error('Unexpected error adding sales:', error);
       alert('Unexpected error occurred. Check console for details.');
@@ -422,7 +424,7 @@ const TablePage = () => {
           subtotal,
           createdat,
           products (productname, image_url),
-          orders (totalamount, orderstatus)
+          orders (totalamount, orderstatus, amount_paid, change)
         `)
         .eq('orderid', selectedItem.orderid);
 
@@ -437,7 +439,16 @@ const TablePage = () => {
         ...selectedItem,
         orderItems: orderItems,
         totalOrderAmount: orderItems[0]?.orders?.totalamount || 0,
-        orderStatus: orderItems[0]?.orders?.orderstatus || 'unknown'
+        orderStatus: orderItems[0]?.orders?.orderstatus || 'unknown',
+        // Make sure payment data is accessible at the root level as well
+        amount_paid: orderItems[0]?.orders?.amount_paid,
+        change: orderItems[0]?.orders?.change,
+        orders: {
+          totalamount: orderItems[0]?.orders?.totalamount,
+          orderstatus: orderItems[0]?.orders?.orderstatus,
+          amount_paid: orderItems[0]?.orders?.amount_paid,
+          change: orderItems[0]?.orders?.change
+        }
       });
     } catch (error) {
       console.error('Error loading invoice:', error);

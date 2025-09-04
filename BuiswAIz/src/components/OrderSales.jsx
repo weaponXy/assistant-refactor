@@ -15,8 +15,8 @@ const OrderSales = ({ orderData, onInvoiceSelect, onAddSale }) => {
     { value: 'product-za', label: 'Product Name (Z-A)' },
     { value: 'amount-desc', label: 'Total Amount (Descending)'},
     { value: 'amount-asc', label: 'Total Amount (Ascending)' },
-    { value: 'date-desc', label: 'Date (Lastest)' },
-    { value: 'date-asc', label: 'Date (Newest)' }
+    { value: 'date-desc', label: 'Date (Newest)' },
+    { value: 'date-asc', label: 'Date (Oldest)' }
   ];
 
   // Close dropdown when clicking outside

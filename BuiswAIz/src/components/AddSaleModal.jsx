@@ -3,7 +3,8 @@ import React, { useState, useEffect, useRef } from 'react';
 const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
   const [orderData, setOrderData] = useState({
     createdat: new Date().toISOString().split('T')[0],
-    createtime: new Date().toTimeString().slice(0, 5) // HH:MM format
+    createtime: new Date().toTimeString().slice(0, 5), // HH:MM format
+    amountPaid: '' // Add amount paid field
   });
 
   const [productRows, setProductRows] = useState([{
@@ -60,7 +61,8 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
       
       setOrderData({
         createdat: `${year}-${month}-${day}`,
-        createtime: `${hours}:${minutes}`
+        createtime: `${hours}:${minutes}`,
+        amountPaid: '' // Reset amount paid
       });
       
       // Reset product rows and update any existing selections with current stock
@@ -320,6 +322,13 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
       newErrors.createtime = 'Time is required';
     }
 
+    // Validate amount paid
+    if (!orderData.amountPaid || parseFloat(orderData.amountPaid) < 0) {
+      newErrors.amountPaid = 'Amount paid must be a positive number';
+    } else if (parseFloat(orderData.amountPaid) < calculateGrandTotal()) {
+      newErrors.amountPaid = 'Amount paid cannot be less than total amount';
+    }
+
     // Validate each product row
     productRows.forEach(row => {
       if (!row.showCustomInput && !row.productname) {
@@ -358,6 +367,23 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
     }, 0);
   };
 
+  const calculateChange = () => {
+    const total = calculateGrandTotal();
+    const paid = parseFloat(orderData.amountPaid) || 0;
+    return paid - total;
+  };
+
+  // Check if we have enough data to show change value
+  const hasCompleteData = () => {
+    const hasValidProducts = productRows.some(row => 
+      row.productname && row.quantity && row.unitprice && row.subtotal
+    );
+    const hasAmountPaid = orderData.amountPaid && parseFloat(orderData.amountPaid) > 0;
+    const totalAmount = calculateGrandTotal();
+    
+    return hasValidProducts && hasAmountPaid && totalAmount > 0;
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     
@@ -384,8 +410,16 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
       isCustomProduct: row.isCustomProduct
     }));
 
+    // Add payment information to the first item (or create order data structure)
+    const orderWithPayment = {
+      salesData,
+      amountPaid: parseFloat(orderData.amountPaid),
+      totalAmount: calculateGrandTotal(),
+      change: calculateChange()
+    };
+
     // Call onSave and wait for it to complete
-    await onSave(salesData);
+    await onSave(orderWithPayment);
     
     // Close the modal after successful save
     setShowConfirmation(false);
@@ -622,9 +656,42 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
             ))}
           </div>
 
-          <div className="grand-total-section">
-            <div className="grand-total">
-              <strong>Total Amount: ₱{calculateGrandTotal().toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong>
+          {/* Payment Section */}
+          <div className="payment-section">
+            <h4>Payment Information</h4>
+            <div className="payment-row">
+              <div className="form-group">
+                <label htmlFor="amountPaid">Amount Paid *</label>
+                <input
+                  type="number"
+                  id="amountPaid"
+                  name="amountPaid"
+                  value={orderData.amountPaid}
+                  onChange={handleOrderDataChange}
+                  className={`form-input ${errors.amountPaid ? 'error' : ''}`}
+                  placeholder="Enter amount paid"
+                  min="0"
+                  step="0.01"
+                />
+                {errors.amountPaid && <span className="error-message">{errors.amountPaid}</span>}
+              </div>
+            </div>
+          </div>
+
+          <div className="payment-summary-section">
+            <div className="payment-summary">
+              <div className="summary-row total-row">
+                <span className="summary-label">Total Amount:</span>
+                <span className="summary-value total-amount">₱{calculateGrandTotal().toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+              </div>
+              <div className="summary-row change-row">
+                <span className="summary-label">Change:</span>
+                <span className="summary-value change-amount">
+                  {hasCompleteData() ? 
+                    `₱${calculateChange().toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : 
+                    ''}
+                </span>
+              </div>
             </div>
           </div>
 
