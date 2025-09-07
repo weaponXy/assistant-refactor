@@ -22,17 +22,6 @@ function App() {
       <ToastContainer position="top-right" autoClose={3000} />
 
       <BrowserRouter>
-        {/* simple nav so you can reach pages easily */}
-        <nav style={{ display: "flex", gap: 12, padding: 12, borderBottom: "1px solid #eee" }}>
-          <Link to="/Dashboard">Dashboard</Link>
-          <Link to="/inventory">Inventory</Link>
-          <Link to="/supplier">Supplier</Link>
-          <Link to="/TablePage">Sales</Link>
-          <Link to="/expenses">Expenses</Link>
-          <Link to="/upload">Upload Sheets</Link>
-          <Link to="/budget">Budget History</Link>
-        </nav>
-
         <Routes>
           {/* home -> login (change if you want a different landing) */}
           <Route path="/" element={<Navigate to="/login" replace />} />
