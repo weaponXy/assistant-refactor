@@ -40,3 +40,56 @@
 .bh-right { text-align: right; }
 .bh-pos { color: #065f46; }
 .bh-neg { color: #b91c1c; }
+
+/* Centered modal wrapper for embedding BudgetHistory inside Expense page */
+.bh-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  backdrop-filter: blur(2px);
+}
+
+.bh-modal-card {
+  width: min(1100px, 96vw);
+  max-height: 90vh;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 30px 80px rgba(2, 6, 23, 0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.bh-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid #eee;
+  background: #fff;
+}
+
+.bh-modal-body {
+  padding: 0;            /* BudgetHistory has its own padding/margins */
+  overflow: auto;
+}
+
+/* Reuse existing .bh-close button style */
+.bh-close {
+  border: none;
+  background: #f3f4f6;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* Tweak BudgetHistory root spacing when embedded in modal */
+.bh-wrap {
+  max-width: 100%;
+  margin: 0;
+  padding: 16px;
+}

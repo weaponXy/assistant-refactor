@@ -1,21 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from "react-router-dom";
 import {
-  LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar, ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer,
 } from 'recharts';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import { supabase } from '../supabase';
 import "../stylecss/ExpenseDashboard.css";
+import BudgetHistory from '../budget/BudgetHistory';
 
+function formatYYYYMM(d) {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+}
+function extractYYYYMM(dateLike) {
+  const s = String(dateLike || '');
+  if (s.length >= 7 && /^\d{4}-\d{2}/.test(s)) return s.slice(0, 7); // "YYYY-MM"
+  const d = new Date(dateLike);
+  if (isNaN(d)) return '';
+  return formatYYYYMM(d);
+}
 
 const ExpenseDashboard = () => {
   const [expenses, setExpenses] = useState([]);
   const navigate = useNavigate();
   const [budget, setBudget] = useState(0);
   const [initialBudget, setInitialBudget] = useState(0);
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAddBudgetModal, setShowAddBudgetModal] = useState(false);
+  const [showBudgetHistory, setShowBudgetHistory] = useState(false);
+
   const [editExpenseId, setEditExpenseId] = useState(null);
   const [newExpense, setNewExpense] = useState({
     description: '', category: '', amount: '', date: '',
@@ -23,21 +39,27 @@ const ExpenseDashboard = () => {
   const [newBudgetAmount, setNewBudgetAmount] = useState('');
   const [calendarDate, setCalendarDate] = useState(new Date());
 
+  const [selectedMonth, setSelectedMonth] = useState(formatYYYYMM(new Date())); // default to current month
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [sortMode, setSortMode] = useState('date_desc'); // date_desc | date_asc | amount_desc | amount_asc
+
   useEffect(() => {
     fetchExpenses();
-    fetchBudget();
   }, []);
+
+  useEffect(() => {
+    // fetch budget for the selected month so "Monthly Budget" & "Remaining Budget" stay consistent
+    fetchBudget(selectedMonth);
+  }, [selectedMonth]);
 
   const fetchExpenses = async () => {
     const { data, error } = await supabase.from('expenses').select('*');
     if (error) console.error('Error fetching expenses:', error);
-    else setExpenses(data);
+    else setExpenses(data || []);
   };
 
-  const fetchBudget = async () => {
-    const now = new Date();
-    const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-
+  const fetchBudget = async (yyyyMM) => {
+    const monthYear = `${yyyyMM}-01`;
     const { data, error } = await supabase
       .from('budget')
       .select('*')
@@ -45,24 +67,21 @@ const ExpenseDashboard = () => {
       .single();
 
     if (error && error.code !== 'PGRST116') {
-    console.error("❌ Failed to fetch budget:", error);
-    return;
-  }
+      console.error("❌ Failed to fetch budget:", error);
+      return;
+    }
 
-  if (data) {
-    setBudget(Number(data.monthly_budget_amount));
-    setInitialBudget(Number(data.monthly_budget_amount));
-  } else {
-    setBudget(0);
-    setInitialBudget(0);
-    console.info("ℹ️ No budget found for this month.");
-  }
-};
+    if (data) {
+      setBudget(Number(data.monthly_budget_amount));
+      setInitialBudget(Number(data.monthly_budget_amount));
+    } else {
+      setBudget(0);
+      setInitialBudget(0);
+    }
+  };
 
   const handleSaveBudget = async () => {
-    const now = new Date();
-    const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-
+    const monthYear = `${selectedMonth}-01`; // save for the currently selected month
     const { error } = await supabase
       .from('budget')
       .upsert({
@@ -73,10 +92,10 @@ const ExpenseDashboard = () => {
     if (error) {
       console.error("Failed to add budget:", error);
     } else {
-      alert("✅ Budget added!");
+      alert("✅ Budget saved!");
       setShowAddBudgetModal(false);
       setNewBudgetAmount('');
-      fetchBudget();
+      fetchBudget(selectedMonth);
     }
   };
 
@@ -115,7 +134,7 @@ const ExpenseDashboard = () => {
         description: newExpense.description,
         category: newExpense.category,
         amount: parseFloat(newExpense.amount),
-        expensedate: newExpense.date,
+        expensedate: newExpense.date, // "YYYY-MM-DD" from input
         createdbyuserid: user.id,
       }]);
 
@@ -137,15 +156,36 @@ const ExpenseDashboard = () => {
     if (!error) await fetchExpenses();
   };
 
+  // === Derived data for current table view ===
+  const categories = Array.from(
+    new Set(expenses.map(e => (e.category || '').trim()).filter(Boolean))
+  ).sort((a, b) => a.localeCompare(b));
+
+  const filteredByMonth = expenses.filter(e => extractYYYYMM(e.expensedate) === selectedMonth);
+  const filteredByCategory = selectedCategory === 'all'
+    ? filteredByMonth
+    : filteredByMonth.filter(e => (e.category || '') === selectedCategory);
+
+  const visibleExpenses = [...filteredByCategory].sort((a, b) => {
+    if (sortMode === 'date_desc') {
+      return new Date(b.expensedate) - new Date(a.expensedate);
+    } else if (sortMode === 'date_asc') {
+      return new Date(a.expensedate) - new Date(b.expensedate);
+    } else if (sortMode === 'amount_desc') {
+      return Number(b.amount) - Number(a.amount);
+    } else if (sortMode === 'amount_asc') {
+      return Number(a.amount) - Number(b.amount);
+    }
+    return 0;
+  });
+
+  // Cards
   const selectedDateStr = calendarDate.toLocaleDateString('en-CA');
-  const dailyTotal = expenses
-  .filter(e => e.expensedate?.startsWith(selectedDateStr))
-  .reduce((acc, curr) => acc + Number(curr.amount), 0);
+  const dailyTotal = filteredByMonth
+    .filter(e => String(e.expensedate || '').startsWith(selectedDateStr))
+    .reduce((acc, curr) => acc + Number(curr.amount), 0);
 
-
-  const currentMonth = new Date().getMonth();
-  const monthlyTotal = expenses
-    .filter(e => new Date(e.expensedate).getMonth() === currentMonth)
+  const monthlyTotal = filteredByMonth
     .reduce((sum, e) => sum + Number(e.amount), 0);
 
   const chartData = Array.from({ length: 12 }, (_, month) => {
@@ -156,41 +196,26 @@ const ExpenseDashboard = () => {
     return { month: monthName, total };
   });
 
-  const weeklyBarData = (() => {
-    const current = new Date();
-    const monday = new Date(current.setDate(current.getDate() - current.getDay() + 1));
-    const days = Array.from({ length: 7 }, (_, i) => {
-      const date = new Date(monday);
-      date.setDate(monday.getDate() + i);
-      const dayLabel = date.toLocaleDateString('default', { weekday: 'short' });
-      const total = expenses
-        .filter(e => new Date(e.expensedate).toDateString() === date.toDateString())
-        .reduce((sum, e) => sum + Number(e.amount), 0);
-      return { day: dayLabel, total };
-    });
-    return days;
-  })();
-
   return (
     <div className="dashboard-container">
       <aside className="sidebar">
-          <div className="nav-section">
-            <p className="nav-header">GENERAL</p>
-            <ul>
-              <li onClick={() => navigate("/Dashboard")}>Dashboard</li>
-              <li onClick={() => navigate("/inventory")}>Inventory</li>
-              <li onClick={() => navigate("/supplier")}>Supplier</li>
-              <li onClick={() => navigate("/TablePage")}>Sales</li>
-              <li className="active">Expenses</li>
-              <li>AI Assistant</li>
-            </ul>
-            <p className="nav-header">SUPPORT</p>
-            <ul>
-              <li>Help</li>
-              <li>Settings</li>
-            </ul>
-          </div>
-        </aside>
+        <div className="nav-section">
+          <p className="nav-header">GENERAL</p>
+          <ul>
+            <li onClick={() => navigate("/Dashboard")}>Dashboard</li>
+            <li onClick={() => navigate("/inventory")}>Inventory</li>
+            <li onClick={() => navigate("/supplier")}>Supplier</li>
+            <li onClick={() => navigate("/TablePage")}>Sales</li>
+            <li className="active">Expenses</li>
+            <li>AI Assistant</li>
+          </ul>
+          <p className="nav-header">SUPPORT</p>
+          <ul>
+            <li>Help</li>
+            <li>Settings</li>
+          </ul>
+        </div>
+      </aside>
 
       <main className="main">
         <div className="top-summary">
@@ -213,8 +238,6 @@ const ExpenseDashboard = () => {
           <div className="summary-card">
             <h3>Monthly Budget</h3>
             <p>₱{budget.toFixed(2)}</p>
-            <button onClick={() => setShowAddBudgetModal(true)}>Edit Budget</button>
-            <button onClick={() => navigate("/budget") }>Budget History</button>
           </div>
         </div>
 
@@ -224,13 +247,70 @@ const ExpenseDashboard = () => {
           </div>
         )}
 
-        <section className="actions">
-          <div className="action-group">
-            <button onClick={() => {
-              setNewExpense({ description: '', category: '', amount: '', date: '' });
-              setEditExpenseId(null);
-              setShowAddModal(true);
-            }}>Add Expense</button>
+        <section className="toolbar">
+          <div className="toolbar-left">
+            <button
+              className="btn primary"
+              onClick={() => {
+                setNewExpense({ description: '', category: '', amount: '', date: '' });
+                setEditExpenseId(null);
+                setShowAddModal(true);
+              }}
+            >
+              + Add Expense
+            </button>
+          </div>
+
+          <div className="toolbar-right">
+            <div className="button-group">
+              <button className="btn ghost" onClick={() => setShowAddBudgetModal(true)}>
+                Edit Budget
+              </button>
+              <button className="btn ghost" onClick={() => setShowBudgetHistory(true)}>
+                Budget History
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* NEW: Table controls (month / category / sort) */}
+        <section className="table-controls">
+          <div className="control">
+            <label>Month</label>
+            <input
+              type="month"
+              className="control-input"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+            />
+          </div>
+
+          <div className="control">
+            <label>Category</label>
+            <select
+              className="control-input"
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+            >
+              <option value="all">All categories</option>
+              {categories.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="control">
+            <label>Sort</label>
+            <select
+              className="control-input"
+              value={sortMode}
+              onChange={(e) => setSortMode(e.target.value)}
+            >
+              <option value="date_desc">Newest first</option>
+              <option value="date_asc">Oldest first</option>
+              <option value="amount_desc">Amount: High → Low</option>
+              <option value="amount_asc">Amount: Low → High</option>
+            </select>
           </div>
         </section>
 
@@ -242,38 +322,52 @@ const ExpenseDashboard = () => {
                 <th>Category</th>
                 <th>Amount</th>
                 <th>Date</th>
-                <th>Actions</th>
+                <th className="col-actions">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {expenses.map((expense) => (
+              {visibleExpenses.map((expense) => (
                 <tr key={expense.expenseid}>
                   <td>{expense.description}</td>
                   <td>{expense.category}</td>
                   <td>₱{Number(expense.amount).toFixed(2)}</td>
                   <td>{expense.expensedate}</td>
-                  <td>
-                    <button
-                      className="table-btn edit"
-                      onClick={() => {
-                        setNewExpense({
-                          description: expense.description,
-                          category: expense.category,
-                          amount: expense.amount,
-                          date: expense.expensedate,
-                        });
-                        setEditExpenseId(expense.expenseid);
-                        setShowAddModal(true);
-                      }}
-                    >
-                      Edit
-                    </button>
-                    <button className="table-btn delete" onClick={() => handleDelete(expense.expenseid)}>
-                      Delete
-                    </button>
+                  <td className="col-actions">
+                    <div className="table-actions">
+                      <button
+                        className="btn xs outline"
+                        onClick={() => {
+                          setNewExpense({
+                            description: expense.description,
+                            category: expense.category,
+                            amount: expense.amount,
+                            date: expense.expensedate,
+                          });
+                          setEditExpenseId(expense.expenseid);
+                          setShowAddModal(true);
+                        }}
+                      >
+                        Edit
+                      </button>
+
+                      <button
+                        className="btn xs danger"
+                        onClick={() => handleDelete(expense.expenseid)}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
+              {visibleExpenses.length === 0 && (
+                <tr>
+                  <td colSpan={5} style={{ padding: '20px', color: '#64748b' }}>
+                    No expenses for {selectedMonth}
+                    {selectedCategory !== 'all' ? ` in “${selectedCategory}”` : ''}.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </section>
@@ -298,40 +392,100 @@ const ExpenseDashboard = () => {
         </div>
       </main>
 
+    
       {showAddModal && (
-        <div className="modal-overlay">
+        <div
+          className="modal-overlay fancy"
+          role="dialog"
+          aria-modal="true"
+          aria-label={editExpenseId ? 'Edit Expense' : 'Add Expense'}
+          tabIndex={-1}
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowAddModal(false);
+              setEditExpenseId(null);
+              setNewExpense({ description: '', category: '', amount: '', date: '' });
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setShowAddModal(false);
+              setEditExpenseId(null);
+              setNewExpense({ description: '', category: '', amount: '', date: '' });
+            }
+          }}
+        >
           <form
-            className="modal"
+            className="modal sheet animate-in"
             onSubmit={(e) => {
               e.preventDefault();
               handleSaveExpense();
             }}
           >
-            <h2>{editExpenseId ? 'Edit Expense' : 'Add Expense'}</h2>
-            <input
-              placeholder="Description"
-              value={newExpense.description}
-              onChange={(e) => setNewExpense({ ...newExpense, description: e.target.value })}
-            />
-            <input
-              placeholder="Category"
-              value={newExpense.category}
-              onChange={(e) => setNewExpense({ ...newExpense, category: e.target.value })}
-            />
-            <input
-              type="number"
-              placeholder="Amount"
-              value={newExpense.amount}
-              onChange={(e) => setNewExpense({ ...newExpense, amount: e.target.value })}
-            />
-            <input
-              type="date"
-              value={newExpense.date}
-              onChange={(e) => setNewExpense({ ...newExpense, date: e.target.value })}
-            />
-            <div className="modal-actions">
+            <div className="modal-header">
+              <h2 className="modal-title">{editExpenseId ? 'Edit Expense' : 'Add Expense'}</h2>
               <button
                 type="button"
+                className="icon-btn"
+                aria-label="Close"
+                onClick={() => {
+                  setShowAddModal(false);
+                  setEditExpenseId(null);
+                  setNewExpense({ description: '', category: '', amount: '', date: '' });
+                }}
+              >✕</button>
+            </div>
+
+            <div className="modal-body">
+              <div className="fields-grid">
+                <div className="field">
+                  <label>Description</label>
+                  <input
+                    placeholder="e.g. Office supplies"
+                    value={newExpense.description}
+                    onChange={(e) => setNewExpense({ ...newExpense, description: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="field">
+                  <label>Category</label>
+                  <input
+                    placeholder="e.g. Utilities"
+                    value={newExpense.category}
+                    onChange={(e) => setNewExpense({ ...newExpense, category: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="fields-grid">
+                <div className="field">
+                  <label>Amount</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={newExpense.amount}
+                    onChange={(e) => setNewExpense({ ...newExpense, amount: e.target.value })}
+                    required
+                  />
+                  <p className="hint">Enter the total in PHP.</p>
+                </div>
+                <div className="field">
+                  <label>Date</label>
+                  <input
+                    type="date"
+                    value={newExpense.date}
+                    onChange={(e) => setNewExpense({ ...newExpense, date: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn secondary"
                 onClick={() => {
                   setShowAddModal(false);
                   setEditExpenseId(null);
@@ -340,33 +494,73 @@ const ExpenseDashboard = () => {
               >
                 Cancel
               </button>
-              <button type="submit">{editExpenseId ? 'Update' : 'Add'}</button>
+              <button type="submit" className="btn primary">
+                {editExpenseId ? 'Update Expense' : 'Add Expense'}
+              </button>
             </div>
           </form>
         </div>
       )}
 
+      {/* ---- Fancy Edit Budget Modal ---- */}
       {showAddBudgetModal && (
-        <div className="modal-overlay">
+        <div
+          className="modal-overlay fancy"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Add Monthly Budget"
+          tabIndex={-1}
+          onMouseDown={(e) => e.target === e.currentTarget && setShowAddBudgetModal(false)}
+          onKeyDown={(e) => e.key === 'Escape' && setShowAddBudgetModal(false)}
+        >
           <form
-            className="modal"
+            className="modal sheet animate-in"
             onSubmit={(e) => {
               e.preventDefault();
               handleSaveBudget();
             }}
           >
-            <h2>Add Monthly Budget</h2>
-            <input
-              type="number"
-              placeholder="Enter budget amount"
-              value={newBudgetAmount}
-              onChange={(e) => setNewBudgetAmount(e.target.value)}
-            />
-            <div className="modal-actions">
-              <button type="button" onClick={() => setShowAddBudgetModal(false)}>Cancel</button>
-              <button type="submit">Save Budget</button>
+            <div className="modal-header">
+              <h2 className="modal-title">Monthly Budget</h2>
+              <button type="button" className="icon-btn" aria-label="Close" onClick={() => setShowAddBudgetModal(false)}>✕</button>
+            </div>
+
+            <div className="modal-body">
+              <div className="field">
+                <label>Amount</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="e.g. 5000"
+                  value={newBudgetAmount}
+                  onChange={(e) => setNewBudgetAmount(e.target.value)}
+                  required
+                />
+                <p className="hint">Applies to {selectedMonth}.</p>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button type="button" className="btn secondary" onClick={() => setShowAddBudgetModal(false)}>Cancel</button>
+              <button type="submit" className="btn primary">Save Budget</button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* ---- Budget History Modal (in-page, no route change) ---- */}
+      {showBudgetHistory && (
+        <div className="bh-modal-overlay" role="dialog" aria-modal="true" aria-label="Budget history">
+          <div className="bh-modal-card">
+            <div className="bh-modal-header">
+              <h2>Budget History</h2>
+              <button className="bh-close" onClick={() => setShowBudgetHistory(false)}>✕</button>
+            </div>
+            <div className="bh-modal-body">
+              <BudgetHistory />
+            </div>
+          </div>
         </div>
       )}
     </div>
