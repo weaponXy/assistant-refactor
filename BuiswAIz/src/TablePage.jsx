@@ -7,12 +7,12 @@ import StatsContainer from './components/StatsContainer';
 import InvoiceModal from './components/InvoiceModal';
 import AddSaleModal from './components/AddSaleModal';
 import './stylecss/TablePage.css';
-/*
+
 import './stylecss/Sales/OrderSales.css';
-import './stylecss/Sales/Bestseller.css';
 import './stylecss/Sales/StatsContainer.css';
 import './stylecss/Sales/InvoiceModal.css';
-import './stylecss/Sales/AddSaleModal.css';*/
+import './stylecss/Sales/AddSaleModal.css';
+import './stylecss/Sales/Bestseller.css';
 
 const TablePage = () => {
   const navigate = useNavigate();

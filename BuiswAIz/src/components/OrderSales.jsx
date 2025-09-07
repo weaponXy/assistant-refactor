@@ -205,7 +205,7 @@ const OrderSales = ({ orderData, onInvoiceSelect, onAddSale }) => {
 
       <h3>Sales Orders</h3>
       <div className="table-scroll-box">
-        <table className="sales-table">
+        <table>
           <thead>
             <tr>
               <th></th>
