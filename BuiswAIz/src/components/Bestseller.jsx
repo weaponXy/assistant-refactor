@@ -4,7 +4,7 @@ const Bestseller = ({ bestsellers }) => {
   return (
     <div className="bestseller-table-wrapper">
       <h3>Bestseller Items</h3>
-      <div className="table-scroll-box">
+      <div className="table-scroll-box1">
         <table className="bestseller-table">
           <thead>
             <tr>
@@ -29,7 +29,7 @@ const Bestseller = ({ bestsellers }) => {
                         }}
                       />
                     ) : (
-                      <span className="no-image-text">None</span>
+                      <span className="no-image-text">Image</span>
                     )}
                   </div>
                 </td>

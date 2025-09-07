@@ -73,7 +73,7 @@ body {
 }
 
 /* Main Content */
-.main-content {
+.I-main-content {
   flex: 1;
   display: flex;
   padding: 24px;
@@ -103,7 +103,7 @@ body {
   flex-shrink: 0;
 }
 
-.table-container {
+.inventory-container {
   flex: 1;
   overflow-y: auto;
   border: 1px solid #ddd;
@@ -155,7 +155,7 @@ tbody td {
 }
 
 /* Right Panel */
-.right-panel {
+.I-right-panel {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -379,7 +379,23 @@ tbody td {
   background-color: #91c3d7;
 }
 
-.user-info-card {
+.restock-storage-button {
+  background-color: #04B4FC;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.restock-storage-button:hover {
+  background-color: #91c3d7;
+}
+
+.I-user-info-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -391,37 +407,23 @@ tbody td {
   height: 64px;
 }
 
-.user-left {
+.I-user-left {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.user-avatar {
+.I-user-avatar {
   width: 40px;
   height: 40px;
   background-color: #dbeafe;
   border-radius: 50%;
 }
 
-.user-username {
+.I-user-username {
   font-size: 15px;
   font-weight: 600;
   color: #1f2937;
 }
 
-.logout-button {
-  background-color: transparent;
-  border: none;
-  color: #2563eb;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  padding: 6px 12px;
-  border-radius: 8px;
-  transition: background-color 0.2s;
-}
 
-.logout-button:hover {
-  background-color: #f0f4ff;
-}

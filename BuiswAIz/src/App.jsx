@@ -7,6 +7,9 @@ import "react-toastify/dist/ReactToastify.css";
 import Login from "./login";
 import Inventory from "./inventory/inventory";
 import Supplier from "./supplier/supplier";
+import ForgotPassword from './forgotpassword';
+import ResetPassword from './ResetPassword';
+import Assistant from './Assistant/Assistant'
 import Sales from "./TablePage";
 import Dashboard from "./Dashboard";
 import ExpenseDashboard from "./expenses/expenses";
@@ -40,8 +43,11 @@ function App() {
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/supplier" element={<Supplier />} />
           <Route path="/TablePage" element={<Sales />} />
+          <Route path="/assistant" element={<Assistant />}/>
           <Route path="/expenses" element={<ExpenseDashboard />} />
           <Route path="/upload" element={<UploadSheets />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />  
 
           {/* budget history (two URLs point to the same component) */}
           <Route path="/budget" element={<BudgetHistory />} />

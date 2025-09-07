@@ -6,6 +6,8 @@ import imageCompression from "browser-image-compression";
 const AddProduct = ({ onClose, user }) => {
   const [suppliers, setSuppliers] = useState([]);
   const [imageFile, setImageFile] = useState(null);
+  const [formError, setFormError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     productname: "",
     description: "",
@@ -19,7 +21,7 @@ const AddProduct = ({ onClose, user }) => {
 
   useEffect(() => {
     const fetchSuppliers = async () => {
-      const { data, error } = await supabase.from("suppliers").select("*");
+      const { data, error } = await supabase.from("suppliers").select("*").eq("supplierstatus", "Active")
       if (!error) setSuppliers(data);
     };
     fetchSuppliers();
@@ -42,7 +44,6 @@ const AddProduct = ({ onClose, user }) => {
 
     try {
         const compressedFile = await imageCompression(file, options);
-        // Copy original file name to compressed file
         compressedFile.name = file.name;
         setImageFile(compressedFile);
     } catch (err) {
@@ -73,6 +74,49 @@ const AddProduct = ({ onClose, user }) => {
   };
 
   const handleSubmit = async () => {
+    const addValidate = () => {
+      const requiredFields = [
+          "productname",
+          "description",
+          "cost",
+          "reorderpoint",
+          "currentstock",
+          "price",
+          "suppliername"
+      ];
+
+      const isEmpty = requiredFields.some((field) => {
+        const value = formData[field];
+        if (typeof value === "string" && value.trim() === "") return true;
+        if (["cost", "reorderpoint", "currentstock", "price"].includes(field)) {
+          const numValue = Number(value);     
+          if (isNaN(numValue) || numValue <= 0) return true; 
+        }
+        return false;
+      });
+      
+      if (isEmpty) {
+        setFormError("Please fill in all required fields.");
+        return false;
+      }
+
+      if (parseFloat(formData.price) < parseFloat(formData.cost)) {
+        setFormError("Price cannot be lower than cost.");
+        return false;
+      }
+
+      if (parseInt(formData.currentstock)< parseInt(formData.reorderpoint)) {
+        setFormError("currentstock cannot be lower than the reorderpoint ")
+        return false;
+      }
+        setFormError("");
+        return true;
+    }
+
+    if (!addValidate()) return;
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
     const imageUrl = await uploadImage();
 
     const supplier = suppliers.find(
@@ -84,7 +128,8 @@ const AddProduct = ({ onClose, user }) => {
       return;
     }
 
-    const { error } = await supabase.from("products").insert({
+    // 1️⃣ Insert product
+    const { error: productError } = await supabase.from("products").insert({
       productname: formData.productname,
       description: formData.description,
       cost: parseFloat(formData.cost),
@@ -95,33 +140,38 @@ const AddProduct = ({ onClose, user }) => {
       image_url: imageUrl,
     });
 
-    if (error) {
-      console.error("Insert failed:", error);
+    if (productError) {
+      console.error("Insert failed:", productError);
       alert("Failed to add product.");
-    } else {
-        if (user) {
-          await supabase.from("activitylog").insert([
-            {
-              action_type: "add_product",
-              action_desc: `added ${formData.productname} to the inventory`,
-              done_user: user.userid,
-            },
-          ]);
-        }
-      onClose();
+      return;
     }
+
+   
+
+    // 3️⃣ Log activity
+    if (user) {
+      await supabase.from("activitylog").insert([
+        {
+          action_type: "add_product",
+          action_desc: `added ${formData.productname} to the inventory`,
+          done_user: user.userid,
+        },
+      ]);
+    }
+
+    onClose();
   };
+
 
   return (
     <div className="modal-overlay">
-      <div className="modal-content slide-up">
-        {/* Header */}
+      <div className="Addmodal-content slide-up">
+        
         <div className="modal-header">
           <button className="back-btn" onClick={onClose}>←</button>
           <h2>Product</h2>
           <div className="modal-actions">
-            <button className="save-btn">Save Draft</button>
-            <button className="create-btn" onClick={handleSubmit}>Create Item</button>
+            <button className="create-btn" onClick={handleSubmit} disabled={isSubmitting}>{isSubmitting ? "Creating..." : "Create Item"}</button>
           </div>
         </div>
 
@@ -168,6 +218,7 @@ const AddProduct = ({ onClose, user }) => {
               <div className="with-label">
                 <label>₱</label>
                 <input
+                  type="number"
                   name="cost"
                   placeholder="Cost"
                   value={formData.cost}
@@ -180,6 +231,7 @@ const AddProduct = ({ onClose, user }) => {
               <div className="with-label">
                 <label>Pcs</label>
                 <input
+                  type="number"
                   name="reorderpoint"
                   placeholder="Reorder Point"
                   value={formData.reorderpoint}
@@ -189,6 +241,7 @@ const AddProduct = ({ onClose, user }) => {
               <div className="with-label">
                 <label>Pcs</label>
                 <input
+                  type="number"
                   name="currentstock"
                   placeholder="Quantity"
                   value={formData.currentstock}
@@ -201,6 +254,7 @@ const AddProduct = ({ onClose, user }) => {
               <div className="with-icon">
                 <span>₱</span>
                 <input
+                  type="number"
                   name="price"
                   placeholder="Price"
                   value={formData.price}
@@ -220,6 +274,11 @@ const AddProduct = ({ onClose, user }) => {
                 ))}
               </select>
             </div>
+            {formError && (
+            <div className="productForm-warning">
+              {formError}
+            </div>
+          )}
           </div>
         </div>
       </div>

@@ -7,7 +7,7 @@ const AddDefect = ({ onClose, user}) => {
   const [form, setForm] = useState({
     productid: "",
     quantity: "",
-    status: "In-Process", // default
+    status: "In-Process", 
     defectdescription: "",
     reporteddate: "",
   });
@@ -83,7 +83,7 @@ const AddDefect = ({ onClose, user}) => {
 
   return (
     <div className="modal-overlay">
-      <div className="modal-content">
+      <div className="AddDefmodal-content">
         <h2>Add Defective Item</h2>
         <form onSubmit={handleSubmit} className="defect-form">
           <div className="form-group">

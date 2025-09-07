@@ -1,0 +1,102 @@
+/* FIXED: Bestseller table with proper scrolling */
+.bestseller-table-wrapper {
+  text-align: left;
+  border: 1px solid #ddd;
+  padding: 20px;
+  background-color: #fff;
+  height: 422px;
+  max-height: 422px;
+  display: flex;
+  flex-direction: column;
+}
+
+.bestseller-table-wrapper h3 {
+  margin: 0 0 15px 0;
+  flex-shrink: 0; /* Prevent header from shrinking */
+}
+
+/* FIXED: Scrollable container for bestseller table */
+.table-scroll-box1 {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border: transparent;
+  background-color: #fff;
+  scrollbar-width: thin;
+  scrollbar-color: #04B4FC #f1f1f1;
+}
+
+/* Webkit scrollbar styling for bestseller */
+.table-scroll-box1::-webkit-scrollbar {
+  width: 6px;
+}
+
+.table-scroll-box1::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.table-scroll-box1::-webkit-scrollbar-thumb {
+  background: #04B4FC;
+  border-radius: 3px;
+}
+
+.table-scroll-box1::-webkit-scrollbar-thumb:hover {
+  background: #0290c4;
+}
+
+/* FIXED: Bestseller table specific styling */
+.bestseller-table {
+  table-layout: fixed;
+  width: 100%;
+  border-collapse: collapse;
+  background-color: rgba(255, 255, 255, 0.5);
+}
+
+.bestseller-table thead th {
+  padding: 15px 10px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background-color: rgb(214, 241, 251);
+}
+
+.bestseller-table tbody td {
+  padding: 12px 10px;
+}
+
+/* Product image styling in bestseller table */
+.product-image-cell {
+  padding: 8px !important;
+  width: 60px;
+  text-align: center;
+  position: relative;
+}
+
+.image-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.product-image {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
+  transition: transform 0.2s ease;
+  display: block;
+  margin: 0 auto;
+}
+
+.product-image:hover {
+  transform: scale(1.05);
+}
+
+.no-image-text {
+  color: #888;
+  font-style: italic;
+  display: inline-block;
+  font-size: 10px;
+}

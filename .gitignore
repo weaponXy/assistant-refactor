@@ -205,3 +205,20 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Build and cache artifacts
+bin/
+obj/
+*.dll
+*.pdb
+*.exe
+*.cache
+*.tmp
+.vs/
+TestResults/
+
+csharp-backend/obj/Debug/net9.0/csharp-backend.AssemblyInfo.cs
+csharp-backend/obj/Debug/net9.0/csharp-backend.AssemblyInfoInputs.cache
+*.cs
+csharp-backend/obj/Debug/net9.0/csharp-backend.AssemblyInfoInputs.cache
+csharp-backend/obj/Debug/net9.0/csharp-backend.AssemblyInfo.cs

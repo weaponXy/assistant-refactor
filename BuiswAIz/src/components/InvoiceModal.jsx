@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
+import React from 'react';
 import jsPDF from 'jspdf';
 
-const InvoiceModal = ({ invoice, onClose, onSave }) => {
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [editData, setEditData] = useState({
-    quantity: invoice.quantity,
-    unitprice: invoice.unitprice,
-    productname: invoice.products?.productname || ''
+const InvoiceModal = ({ invoice, onClose }) => {
+  // Debug logging - remove this after fixing
+  console.log('Invoice data received:', invoice);
+  console.log('Orders data:', invoice?.orders);
+  console.log('Amount paid paths:', {
+    'invoice.orders?.amount_paid': invoice?.orders?.amount_paid,
+    'invoice.amount_paid': invoice?.amount_paid,
+    'invoice.orderItems[0]?.orders?.amount_paid': invoice?.orderItems?.[0]?.orders?.amount_paid
   });
-  const [errors, setErrors] = useState({});
 
   const formatDate = (timestamp) => {
     return new Date(timestamp).toLocaleDateString(undefined, {
@@ -18,260 +19,235 @@ const InvoiceModal = ({ invoice, onClose, onSave }) => {
     });
   };
 
-  const handleDownloadPDF = (item) => {
+  // Helper function for number formatting without locale issues
+  const formatCurrency = (amount) => {
+    return amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  };
+
+  const handleDownloadPDF = () => {
     const doc = new jsPDF();
-    const date = formatDate(item.createdat);
+    const date = formatDate(invoice.createdat);
 
-    doc.setFontSize(16);
-    doc.text('Invoice Details', 20, 20);
-    doc.setFontSize(12);
-    doc.text(`Product: ${item.products?.productname}`, 20, 40);
-    doc.text(`Order Code: ${item.orderid}`, 20, 50);
-    doc.text(`Quantity: ${item.quantity}`, 20, 60);
-    doc.text(`Unit Price: ₱${item.unitprice.toLocaleString()}`, 20, 70);
-    doc.text(`Total: ₱${item.subtotal.toLocaleString()}`, 20, 80);
-    doc.text(`Date: ${date}`, 20, 90);
-
-    doc.save(`Invoice_${item.orderid}.pdf`);
-  };
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setEditData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-
-    // Clear error for this field when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
-    }
-  };
-
-  const validateForm = () => {
-    const newErrors = {};
-
-    if (!editData.productname.trim()) {
-      newErrors.productname = 'Product name is required';
-    }
-
-    if (!editData.quantity || parseFloat(editData.quantity) <= 0) {
-      newErrors.quantity = 'Quantity must be greater than 0';
-    }
-
-    if (!editData.unitprice || parseFloat(editData.unitprice) <= 0) {
-      newErrors.unitprice = 'Price must be greater than 0';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSave = async (e) => {
-    e.preventDefault();
+    doc.setFontSize(20);
+    doc.text('INVOICE', 20, 20);
     
-    if (validateForm()) {
-      const updatedInvoice = {
-        ...invoice,
-        quantity: parseInt(editData.quantity),
-        unitprice: parseFloat(editData.unitprice),
-        subtotal: parseInt(editData.quantity) * parseFloat(editData.unitprice),
-        products: {
-          ...invoice.products,
-          productname: editData.productname
-        }
-      };
-
-      if (onSave) {
-        await onSave(updatedInvoice);
-      }
+    doc.setFontSize(14);
+    doc.text(`Order Code: ${invoice.orderid}`, 20, 35);
+    doc.text(`Date: ${date}`, 20, 45);
+    
+    doc.line(20, 55, 190, 55);
+    
+    doc.setFontSize(12);
+    doc.text('Product', 20, 70);
+    doc.text('Qty', 100, 70);
+    doc.text('Unit Price', 130, 70);
+    doc.text('Amount', 170, 70);
+    doc.line(20, 75, 190, 75);
+    
+    let yPosition = 85;
+    let totalAmount = 0;
+    
+    if (invoice.orderItems && invoice.orderItems.length > 0) {
+      invoice.orderItems.forEach((item) => {
+        doc.text(item.products?.productname || 'N/A', 20, yPosition);
+        doc.text(item.quantity.toString(), 100, yPosition);
+        doc.text(`P${formatCurrency(item.unitprice)}`, 130, yPosition);
+        doc.text(`P${formatCurrency(item.subtotal)}`, 170, yPosition);
+        yPosition += 10;
+        totalAmount += item.subtotal;
+      });
       
-      setIsEditMode(false);
-      setErrors({});
+      totalAmount = invoice.totalOrderAmount || totalAmount;
+    } else {
+      doc.text(invoice.products?.productname || 'N/A', 20, yPosition);
+      doc.text(invoice.quantity.toString(), 100, yPosition);
+      doc.text(`P${formatCurrency(invoice.unitprice)}`, 130, yPosition);
+      doc.text(`P${formatCurrency(invoice.subtotal)}`, 170, yPosition);
+      yPosition += 10;
+      totalAmount = invoice.subtotal;
     }
+    
+    doc.line(20, yPosition + 5, 190, yPosition + 5);
+    doc.setFontSize(14);
+    doc.text('TOTAL:', 130, yPosition + 20);
+    doc.text(`P${formatCurrency(totalAmount)}`, 170, yPosition + 20);
+
+    // Add payment information if available
+    const amountPaid = getAmountPaid();
+    if (amountPaid !== null && amountPaid !== undefined) {
+      doc.text('AMOUNT PAID:', 130, yPosition + 35);
+      doc.text(`P${formatCurrency(amountPaid)}`, 170, yPosition + 35);
+      
+      const change = getChange();
+      doc.text('CHANGE:', 130, yPosition + 50);
+      doc.text(`P${formatCurrency(change)}`, 170, yPosition + 50);
+    }
+
+    doc.save(`Invoice_${invoice.orderid}.pdf`);
   };
 
-  const handleCancel = () => {
-    setEditData({
-      quantity: invoice.quantity,
-      unitprice: invoice.unitprice,
-      productname: invoice.products?.productname || ''
-    });
-    setErrors({});
-    setIsEditMode(false);
+  const calculateTotal = () => {
+    if (invoice.orderItems && invoice.orderItems.length > 0) {
+      return invoice.totalOrderAmount || invoice.orderItems.reduce((sum, item) => sum + item.subtotal, 0);
+    }
+    return invoice.subtotal;
   };
 
-  const handleEditMode = () => {
-    setIsEditMode(true);
+  // Fixed function to get amount paid
+  const getAmountPaid = () => {
+    // Check multiple possible paths for amount_paid
+    if (invoice.orders?.amount_paid !== undefined && invoice.orders?.amount_paid !== null) {
+      return invoice.orders.amount_paid;
+    }
+    if (invoice.amount_paid !== undefined && invoice.amount_paid !== null) {
+      return invoice.amount_paid;
+    }
+    if (invoice.orderItems && invoice.orderItems.length > 0 && invoice.orderItems[0]?.orders?.amount_paid !== undefined) {
+      return invoice.orderItems[0].orders.amount_paid;
+    }
+    return null;
   };
 
-  const currentTotal = isEditMode 
-    ? (parseInt(editData.quantity) || 0) * (parseFloat(editData.unitprice) || 0)
-    : invoice.subtotal;
+  // Fixed function to get change
+  const getChange = () => {
+    const amountPaid = getAmountPaid();
+    if (amountPaid === null || amountPaid === undefined) {
+      return 0;
+    }
+
+    // Check multiple possible paths for change
+    if (invoice.orders?.change !== undefined && invoice.orders?.change !== null) {
+      return invoice.orders.change;
+    }
+    if (invoice.change !== undefined && invoice.change !== null) {
+      return invoice.change;
+    }
+    if (invoice.orderItems && invoice.orderItems.length > 0 && invoice.orderItems[0]?.orders?.change !== undefined) {
+      return invoice.orderItems[0].orders.change;
+    }
+
+    // Fallback to calculation if change is not in database
+    const total = calculateTotal();
+    return amountPaid - total;
+  };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="invoice-modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3>{isEditMode ? 'Edit Invoice' : 'Invoice Details'}</h3>
-          {!isEditMode && (
-            <button 
-              className="edit-btn"
-              onClick={handleEditMode}
-            >
-              Edit
-            </button>
-          )}
+          <h3>Invoice Details - Order {invoice.orderid}</h3>
         </div>
         
-        {isEditMode ? (
-          <form onSubmit={handleSave} className="invoice-form">
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="productname">Product Name *</label>
-                <input
-                  type="text"
-                  id="productname"
-                  name="productname"
-                  value={editData.productname}
-                  onChange={handleInputChange}
-                  className={`form-input ${errors.productname ? 'error' : ''}`}
-                  placeholder="Enter product name"
-                />
-                {errors.productname && <span className="error-message">{errors.productname}</span>}
+        <div className="invoice-details">
+          <br />
+          
+          {/* Order Information */}
+          <div className="invoice-info-grid">
+            <div className="invoice-info-row">
+              <div className="invoice-info-item">
+                <strong>Order Code:</strong>
+                <span>{invoice.orderid}</span>
               </div>
-
-              <div className="form-group">
-                <label htmlFor="orderid">Order Code</label>
-                <input
-                  type="text"
-                  id="orderid"
-                  value={invoice.orderid}
-                  className="form-input readonly"
-                  readOnly
-                />
+              <div className="invoice-info-item">
+                <strong>Date:</strong>
+                <span>{formatDate(invoice.createdat)}</span>
               </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="quantity">Quantity *</label>
-                <input
-                  type="number"
-                  id="quantity"
-                  name="quantity"
-                  value={editData.quantity}
-                  onChange={handleInputChange}
-                  className={`form-input ${errors.quantity ? 'error' : ''}`}
-                  placeholder="Enter quantity"
-                  min="1"
-                  step="1"
-                />
-                {errors.quantity && <span className="error-message">{errors.quantity}</span>}
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="unitprice">Unit Price *</label>
-                <input
-                  type="number"
-                  id="unitprice"
-                  name="unitprice"
-                  value={editData.unitprice}
-                  onChange={handleInputChange}
-                  className={`form-input ${errors.unitprice ? 'error' : ''}`}
-                  placeholder="Enter unit price"
-                  min="0"
-                  step="0.01"
-                />
-                {errors.unitprice && <span className="error-message">{errors.unitprice}</span>}
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="subtotal">Total Amount</label>
-                <input
-                  type="number"
-                  id="subtotal"
-                  value={currentTotal.toFixed(2)}
-                  className="form-input readonly"
-                  placeholder="Auto-calculated"
-                  readOnly
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="createdat">Date</label>
-                <input
-                  type="text"
-                  id="createdat"
-                  value={formatDate(invoice.createdat)}
-                  className="form-input readonly"
-                  readOnly
-                />
-              </div>
-            </div>
-
-            <div className="modal-footer">
-              <button type="button" className="cancel-btn" onClick={handleCancel}>
-                Cancel
-              </button>
-              <button type="submit" className="save-btn">
-                Save Changes
-              </button>
-            </div>
-          </form>
-        ) : (
-          <div className="invoice-details">
-            <br></br>
-            <div className="invoice-info-grid">
-              <div className="invoice-info-row">
-                <div className="invoice-info-item">
-                  <strong>Product:</strong>
-                  <span>{invoice.products?.productname}</span>
-                </div>
-                <div className="invoice-info-item">
-                  <strong>Order Code:</strong>
-                  <span>{invoice.orderid}</span>
-                </div>
-              </div>
-
-              <div className="invoice-info-row">
-                <div className="invoice-info-item">
-                  <strong>Quantity:</strong>
-                  <span>{invoice.quantity}</span>
-                </div>
-                <div className="invoice-info-item">
-                  <strong>Unit Price:</strong>
-                  <span>₱{invoice.unitprice.toLocaleString()}</span>
-                </div>
-              </div>
-
-              <div className="invoice-info-row">
-                <div className="invoice-info-item">
-                  <strong>Date:</strong>
-                  <span>{formatDate(invoice.createdat)}</span>
-                </div>
-                <div className="invoice-info-item total-item">
-                  <strong>Total:</strong>
-                  <span className="total-amount">₱{currentTotal.toLocaleString()}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="modal-footer">
-              <button className="download-pdf-btn" onClick={() => handleDownloadPDF(invoice)}>
-                Download PDF
-              </button>
-              <button className="close-btn" onClick={onClose}>
-                Close
-              </button>
             </div>
           </div>
-        )}
+
+          {/* Items List */}
+          <div className="invoice-items-section">
+            <h4>Order Items:</h4>
+            <div className="invoice-items-list">
+              {invoice.orderItems && invoice.orderItems.length > 0 ? (
+                invoice.orderItems.map((item, index) => (
+                  <div key={index} className="invoice-item">
+                    <div className="invoice-info-row">
+                      <div className="invoice-info-item">
+                        <strong>Product:</strong>
+                        <span>{item.products?.productname || 'N/A'}</span>
+                      </div>
+                      <div className="invoice-info-item">
+                        <strong>Quantity:</strong>
+                        <span>{item.quantity}</span>
+                      </div>
+                    </div>
+                    <div className="invoice-info-row">
+                      <div className="invoice-info-item">
+                        <strong>Unit Price:</strong>
+                        <span>₱{item.unitprice.toLocaleString()}</span>
+                      </div>
+                      <div className="invoice-info-item">
+                        <strong>Subtotal:</strong>
+                        <span>₱{item.subtotal.toLocaleString()}</span>
+                      </div>
+                    </div>
+                    {index < invoice.orderItems.length - 1 && (
+                      <hr className="item-separator" />
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="invoice-item">
+                  <div className="invoice-info-row">
+                    <div className="invoice-info-item">
+                      <strong>Product:</strong>
+                      <span>{invoice.products?.productname || 'N/A'}</span>
+                    </div>
+                    <div className="invoice-info-item">
+                      <strong>Quantity:</strong>
+                      <span>{invoice.quantity}</span>
+                    </div>
+                  </div>
+                  <div className="invoice-info-row">
+                    <div className="invoice-info-item">
+                      <strong>Unit Price:</strong>
+                      <span>₱{invoice.unitprice.toLocaleString()}</span>
+                    </div>
+                    <div className="invoice-info-item">
+                      <strong>Subtotal:</strong>
+                      <span>₱{invoice.subtotal.toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Payment Summary */}
+          <div className="invoice-payment-section">
+            <div className="invoice-payment-summary">
+              <div className="payment-summary-row total-row">
+                <strong>Order Total: </strong>
+                <span className="total-amount">₱{calculateTotal().toLocaleString()}</span>
+              </div>
+              
+              {getAmountPaid() !== null && getAmountPaid() !== undefined && (
+                <>
+                  <div className="payment-summary-row paid-row">
+                    <strong>Amount Paid:</strong>
+                    <span className="paid-amount">₱{getAmountPaid().toLocaleString()}</span>
+                  </div>
+                  
+                  <div className="payment-summary-row change-row">
+                    <strong>Change:</strong>
+                    <span className="change-amount">₱{getChange().toLocaleString()}</span>
+                  </div>
+                </>
+              )}
+              
+            </div>
+          </div>
+
+          <div className="modal-footer">
+            <button className="download-pdf-btn" onClick={handleDownloadPDF}>
+              Download PDF
+            </button>
+            <button className="close-btn1" onClick={onClose}>
+              Close
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

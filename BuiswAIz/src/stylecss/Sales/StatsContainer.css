@@ -1,0 +1,206 @@
+/* Stats container */
+.stats-container {
+  background-color: #ffffff;
+  border: 1px solid #ddd;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  font-family: 'Montserrat', sans-serif;
+  width: 1212px;
+  max-width: 1212px;
+}
+
+.stats-container-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.stats-container-header h3 {
+  margin: 0;
+  color: #333;
+  font-size: 1.2rem;
+}
+
+.stats-container-filter {
+  color: #333;
+  border: 1px solid #ddd;
+  background-color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-family: 'Montserrat', sans-serif;
+  transition: all 0.2s ease;
+  text-align: center;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 14px;
+  padding-right: 32px;
+  min-width: 120px;
+}
+
+.stats-container-filter:focus {
+  border-color: #04B4FC;
+  box-shadow: 0 0 4px rgba(4, 180, 252, 0.3);
+}
+
+.stats-container-filter:hover {
+  border-color: #04B4FC;
+  background-color: rgba(4, 180, 252, 0.05);
+}
+
+.stats-container-filter option {
+  background-color: #ffffff;
+  color: #333;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 12px;
+  padding: 8px 12px;
+}
+
+/* Stats boxes container */
+.stats-boxes {
+  display: flex;
+  gap: 150px;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+/* Individual stats boxes */
+.earnings-box {
+  background-color: #f8f9fa;
+  border: 3px solid green;
+  color: rgba(0, 0, 0, 0.8);
+  padding: 20px;
+  border-radius: 15px;
+  flex: 1;
+  max-width: 200px;
+  text-align: center;
+  font-family: 'Montserrat', sans-serif;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Icons */
+.earnings-icon,
+.customers-icon,
+.trend-icon {
+  width: 24px;
+  height: 24px;
+  filter: brightness(0) saturate(100%) invert(20%) sepia(100%) saturate(2500%) hue-rotate(200deg) brightness(98%) contrast(95%);
+  transition: transform 0.2s ease;
+}
+
+.earnings-box:hover .earnings-icon,
+.customers-box:hover .customers-icon,
+.sales-comparison-box:hover .trend-icon {
+  transform: scale(1.1);
+}
+
+/* Stats box headers and content */
+.stats-box-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.sales-comparison-box {
+  background-color: #f8f9fa;
+  border: 3px solid #ffc107;
+  color: rgba(0, 0, 0, 0.8);
+  padding: 20px;
+  border-radius: 15px;
+  flex: 1;
+  max-width: 200px;
+  text-align: center;
+  font-family: 'Montserrat', sans-serif;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sales-comparison-box:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Trend content */
+.trend-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.comparison-period {
+  background-color: rgba(255, 193, 7, 0.1);
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-style: italic;
+  border: 1px solid rgba(255, 193, 7, 0.3);
+}
+
+.customers-box {
+  background-color: #f8f9fa;
+  border: 3px solid #04B4FC;
+  color: rgba(0, 0, 0, 0.8);
+  padding: 20px;
+  border-radius: 15px;
+  flex: 1;
+  max-width: 200px;
+  text-align: center;
+  font-family: 'Montserrat', sans-serif;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.earnings-box h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: green;
+}
+
+.customers-box h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #04B4FC;
+}
+
+.sales-comparison-box h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #ffc107;
+}
+
+.earnings-box p {
+  font-size: 1.8rem;
+  font-weight: bold;
+  margin: 0;
+  color: green;
+}
+
+.customers-box p {
+  font-size: 1.8rem;
+  font-weight: bold;
+  margin: 0;
+  color: #04B4FC;
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+  .stats-boxes {
+    gap: 100px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .stats-boxes {
+    gap: 50px;
+    justify-content: center;
+  }
+}
