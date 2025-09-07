@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from "react-router-dom";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar, ResponsiveContainer,
 } from 'recharts';
@@ -10,6 +11,7 @@ import "../stylecss/ExpenseDashboard.css";
 
 const ExpenseDashboard = () => {
   const [expenses, setExpenses] = useState([]);
+  const navigate = useNavigate();
   const [budget, setBudget] = useState(0);
   const [initialBudget, setInitialBudget] = useState(0);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -172,17 +174,23 @@ const ExpenseDashboard = () => {
   return (
     <div className="dashboard-container">
       <aside className="sidebar">
-        <h1 className="logo">BuisWaiz</h1>
-        <nav className="nav">
-          <ul>
-            <li><a href="#">Dashboard</a></li>
-            <li><a href="#">Inventory</a></li>
-            <li><a href="#">Sales</a></li>
-            <li><a className="active" href="#">Expenses</a></li>
-            <li><a href="#">AI Assistant</a></li>
-          </ul>
-        </nav>
-      </aside>
+          <div className="nav-section">
+            <p className="nav-header">GENERAL</p>
+            <ul>
+              <li onClick={() => navigate("/Dashboard")}>Dashboard</li>
+              <li onClick={() => navigate("/inventory")}>Inventory</li>
+              <li onClick={() => navigate("/supplier")}>Supplier</li>
+              <li onClick={() => navigate("/TablePage")}>Sales</li>
+              <li className="active">Expenses</li>
+              <li>AI Assistant</li>
+            </ul>
+            <p className="nav-header">SUPPORT</p>
+            <ul>
+              <li>Help</li>
+              <li>Settings</li>
+            </ul>
+          </div>
+        </aside>
 
       <main className="main">
         <div className="top-summary">
@@ -206,6 +214,7 @@ const ExpenseDashboard = () => {
             <h3>Monthly Budget</h3>
             <p>₱{budget.toFixed(2)}</p>
             <button onClick={() => setShowAddBudgetModal(true)}>Edit Budget</button>
+            <button onClick={() => navigate("/budget") }>Budget History</button>
           </div>
         </div>
 

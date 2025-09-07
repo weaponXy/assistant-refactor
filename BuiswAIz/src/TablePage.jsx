@@ -223,7 +223,7 @@ const TablePage = () => {
               <li onClick={() => navigate("/inventory")}>Inventory</li>
               <li onClick={() => navigate("/supplier")}>Supplier</li>
               <li className="active">Sales</li>
-              <li>Expenses</li>
+              <li onClick={() => navigate("/expenses")}>Expenses</li>
               <li>AI Assistant</li>
             </ul>
             <p className="nav-header">SUPPORT</p>
