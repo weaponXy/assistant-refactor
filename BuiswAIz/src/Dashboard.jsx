@@ -1,6 +1,5 @@
 import { useNavigate } from "react-router-dom";
 import React, { useState, useEffect } from "react";
-import "./stylecss/dashboard.css";
 import { supabase } from "./supabase"; 
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar, ResponsiveContainer,
@@ -9,6 +8,8 @@ import TopSellingProducts from "./Dashboard/TopSellingProducts";
 import SalesSummary from "./Dashboard/SalesSummary";
 import DailyGrossSales from "./Dashboard/DailyGrossSales";
 import UploadSheets from "./components/UploadSheets";
+
+import "./stylecss/Dashboard/dashboard.css";
 
 const Dashboard = () => {
   const navigate = useNavigate(); 
