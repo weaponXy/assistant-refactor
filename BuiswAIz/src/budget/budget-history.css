@@ -1,0 +1,95 @@
+/* src/budget/budget-history.css */
+.bh-wrap { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
+.bh-header h1 { margin: 0 0 4px; }
+.bh-sub { color: #555; margin: 0 0 16px; }
+
+.bh-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.bh-card { background: #fff; border: 1px solid #eee; border-radius: 12px; padding: 14px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+.bh-item { text-align: left; transition: transform .05s ease; }
+.bh-item:hover { transform: translateY(-1px); }
+.bh-row { display: flex; justify-content: space-between; gap: 12px; }
+.bh-col .bh-label { font-size: 12px; color: #777; }
+.bh-strong { font-weight: 700; font-size: 16px; }
+.bh-foot { margin-top: 10px; font-size: 12px; color: #3b82f6; }
+
+.bh-error { color: #b91c1c; background: #fef2f2; border: 1px solid #fee2e2; padding: 10px 12px; border-radius: 8px; }
+
+.bh-drawer { position: fixed; inset: 0 0 0 auto; width: 720px; max-width: 100vw; background: #fafafa; border-left: 1px solid #eee; box-shadow: -8px 0 24px rgba(0,0,0,.08); display: flex; flex-direction: column; }
+.bh-drawer-header { display: flex; align-items: center; justify-content: space-between; padding: 16px; border-bottom: 1px solid #eee; background: #fff; }
+.bh-kicker { text-transform: uppercase; letter-spacing: .06em; color: #6b7280; font-size: 11px; }
+.bh-close { border: none; background: #f3f4f6; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+
+.bh-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 12px 16px; }
+.bh-stat .bh-label { font-size: 12px; color: #6b7280; }
+.bh-stat.bh-danger .bh-strong { color: #b91c1c; }
+
+.bh-progress { height: 10px; background: #e5e7eb; border-radius: 999px; margin: 0 16px; overflow: hidden; }
+.bh-progress-bar { height: 100%; width: 0; background: #3b82f6; transition: width .3s ease; }
+.bh-progress-caption { font-size: 12px; color: #6b7280; margin: 6px 16px 0; }
+
+.bh-tabs { display: flex; gap: 8px; padding: 12px 16px 0; }
+.bh-tabs button { border: 1px solid #e5e7eb; background: #fff; padding: 8px 12px; border-radius: 10px; cursor: pointer; }
+.bh-tabs button.active { background: #111827; color: #fff; border-color: #111827; }
+
+.bh-body { padding: 12px 16px 20px; overflow: auto; }
+
+.bh-table-wrap { background: #fff; border-radius: 12px; border: 1px solid #eee; }
+.bh-table { width: 100%; border-collapse: collapse; }
+.bh-table th, .bh-table td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; }
+.bh-table th { text-align: left; font-size: 12px; color: #6b7280; font-weight: 600; }
+.bh-right { text-align: right; }
+.bh-pos { color: #065f46; }
+.bh-neg { color: #b91c1c; }
+
+/* Centered modal wrapper for embedding BudgetHistory inside Expense page */
+.bh-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  backdrop-filter: blur(2px);
+}
+
+.bh-modal-card {
+  width: min(1100px, 96vw);
+  max-height: 90vh;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 30px 80px rgba(2, 6, 23, 0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.bh-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid #eee;
+  background: #fff;
+}
+
+.bh-modal-body {
+  padding: 0;            /* BudgetHistory has its own padding/margins */
+  overflow: auto;
+}
+
+/* Reuse existing .bh-close button style */
+.bh-close {
+  border: none;
+  background: #f3f4f6;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* Tweak BudgetHistory root spacing when embedded in modal */
+.bh-wrap {
+  max-width: 100%;
+  margin: 0;
+  padding: 16px;
+}
