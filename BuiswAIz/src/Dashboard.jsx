@@ -2,18 +2,60 @@ import { useNavigate } from "react-router-dom";
 import React, { useState, useEffect } from "react";
 import "./stylecss/dashboard.css";
 import { supabase } from "./supabase"; 
+import {
+  LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar, ResponsiveContainer,
+} from 'recharts';
 import TopSellingProducts from "./Dashboard/TopSellingProducts";
 import SalesSummary from "./Dashboard/SalesSummary";
 import DailyGrossSales from "./Dashboard/DailyGrossSales";
+import UploadSheets from "./components/UploadSheets";
 
 const Dashboard = () => {
   const navigate = useNavigate(); 
 
   const [user, setUser] = useState(null);
+  const [showUploadModal, setShowUploadModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [topSellingProducts, setTopSellingProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(true);
   const [productsError, setProductsError] = useState(null);
+  const [expenseChartData, setExpenseChartData] = useState([]);
+
+useEffect(() => {
+  const loadChartData = async () => {
+    const { data, error } = await supabase
+      .from("expenses")
+      .select("amount, expensedate");
+
+    if (error) {
+      console.error("Failed to fetch expenses for chart:", error);
+      setExpenseChartData([]); // show empty state if needed
+      return;
+    }
+
+    // Sum totals per month (0–11)
+    const totals = new Array(12).fill(0);
+    data.forEach(({ amount, expensedate }) => {
+      if (!expensedate) return;
+      const m = new Date(expensedate).getMonth();
+      totals[m] += Number(amount) || 0;
+    });
+
+    const months = Array.from({ length: 12 }, (_, m) =>
+      new Date(0, m).toLocaleString("default", { month: "short" })
+    );
+
+    const chart = months.map((label, m) => ({
+      month: label,
+      total: Number(totals[m].toFixed(2)),
+    }));
+
+    setExpenseChartData(chart);
+  };
+
+  loadChartData();
+}, []);
+
 
   useEffect(() => {
     const getUser = async () => {
@@ -119,7 +161,7 @@ const Dashboard = () => {
               <li onClick={() => navigate("/inventory")}>Inventory</li>
               <li onClick={() => navigate("/supplier")}>Supplier</li>
               <li onClick={() => navigate("/TablePage")}>Sales</li>
-              <li>Expenses</li>
+              <li onClick={() => navigate("/expenses")}>Expenses</li>
               <li onClick={() => navigate("/assistant")}>AI Assistant</li>
             </ul>
             <p className="nav-header">SUPPORT</p>
@@ -142,15 +184,41 @@ const Dashboard = () => {
             <div className="charts-section">
               <div className="dashboard-panel daily-sales">
                 <h3>Daily Gross Sales</h3>
+
                 <div className="panel-content">
                   <DailyGrossSales />
                 </div>
+                <button className="add-product-button" onClick={() => setShowUploadModal(true)}>Upload Sheets
+                </button>
+
               </div>
 
               <div className="dashboard-panel monthly-expense">
-                <h3>Monthly Expense</h3>
-                <div className="panel-content"></div>
+              <h3>Monthly Expense</h3>
+
+                <div className="panel-content" style={{ minWidth: 0 }}>
+                  {expenseChartData.length === 0 ? (
+                  <p style={{ padding: 12 }}>No expense data yet.</p>
+                    ) : (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={expenseChartData}>
+                        <XAxis dataKey="month" />
+                        <YAxis />
+                        <Tooltip />
+                        <CartesianGrid strokeDasharray="5 5" />
+                        <Line
+                          type="monotone"
+                          dataKey="total"
+                          stroke="#3b82f6"
+                          strokeWidth={2}
+                          dot={false}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
               </div>
+
             </div>
 
             <div className="bottom-section">
@@ -210,6 +278,30 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+      {showUploadModal && (
+  <div className="modal-overlay">
+    <div className="modal">
+      <div className="modal-header">
+        <h2>Upload Sales Spreadsheet</h2>
+        <button
+          className="close-btn"
+          onClick={() => setShowUploadModal(false)}
+          aria-label="Close"
+        >
+          ✕
+        </button>
+      </div>
+
+      {/* The uploader */}
+      <UploadSheets />
+
+      <div className="modal-actions">
+        <button onClick={() => setShowUploadModal(false)}>Close</button>
+      </div>
+    </div>
+  </div>
+)}
+
     </div>
   );
 };
