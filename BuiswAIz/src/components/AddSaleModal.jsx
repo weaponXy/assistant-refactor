@@ -4,7 +4,7 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
   const [orderData, setOrderData] = useState({
     createdat: new Date().toISOString().split('T')[0],
     createtime: new Date().toTimeString().slice(0, 5), // HH:MM format
-    amountPaid: '' // Add amount paid field
+    amountPaid: '', // Add amount paid field
   });
 
   const [productRows, setProductRows] = useState([{
@@ -62,7 +62,7 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
       setOrderData({
         createdat: `${year}-${month}-${day}`,
         createtime: `${hours}:${minutes}`,
-        amountPaid: '' // Reset amount paid
+        amountPaid: '', // Reset amount paid
       });
       
       // Reset product rows and update any existing selections with current stock
@@ -309,6 +309,21 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
     }
   };
 
+  // Function to calculate grand total
+  const calculateGrandTotal = () => {
+    return productRows.reduce((total, row) => {
+      return total + (parseFloat(row.subtotal) || 0);
+    }, 0);
+  };
+
+  // Function to automatically determine order status
+  const getOrderStatus = () => {
+    const totalAmount = calculateGrandTotal();
+    const amountPaid = parseFloat(orderData.amountPaid) || 0;
+    
+    return amountPaid >= totalAmount ? 'Complete' : 'Incomplete';
+  };
+
   const validateForm = () => {
     const newErrors = {};
     let hasStockIssues = false;
@@ -325,8 +340,6 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
     // Validate amount paid
     if (!orderData.amountPaid || parseFloat(orderData.amountPaid) < 0) {
       newErrors.amountPaid = 'Amount paid must be a positive number';
-    } else if (parseFloat(orderData.amountPaid) < calculateGrandTotal()) {
-      newErrors.amountPaid = 'Amount paid cannot be less than total amount';
     }
 
     // Validate each product row
@@ -359,12 +372,6 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
     }
     
     return Object.keys(newErrors).length === 0;
-  };
-
-  const calculateGrandTotal = () => {
-    return productRows.reduce((total, row) => {
-      return total + (parseFloat(row.subtotal) || 0);
-    }, 0);
   };
 
   const calculateChange = () => {
@@ -410,12 +417,16 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
       isCustomProduct: row.isCustomProduct
     }));
 
-    // Add payment information to the first item (or create order data structure)
+    // Automatically determine order status based on amount paid vs total
+    const orderStatus = getOrderStatus();
+
+    // Add payment and order status information
     const orderWithPayment = {
       salesData,
       amountPaid: parseFloat(orderData.amountPaid),
       totalAmount: calculateGrandTotal(),
-      change: calculateChange()
+      change: calculateChange(),
+      orderStatus: orderStatus // Automatically determined status
     };
 
     // Call onSave and wait for it to complete
@@ -487,6 +498,8 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
                 {errors.createtime && <span className="error-message">{errors.createtime}</span>}
               </div>
             </div>
+
+            {/* Show current order status based on payment */}
           </div>
 
           {/* Products Section */}
@@ -674,6 +687,9 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
                   step="0.01"
                 />
                 {errors.amountPaid && <span className="error-message">{errors.amountPaid}</span>}
+                <small className="help-text">
+                  Amount paid determines order status automatically
+                </small>
               </div>
             </div>
           </div>
@@ -714,6 +730,17 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
               </div>
               <div className="confirmation-body">
                 <p>Are you sure you want to save all products?</p>
+                <p><strong>Order Status:</strong> {getOrderStatus()}</p>
+                {getOrderStatus() === 'Incomplete' && (
+                  <p style={{color: '#dc3545', fontSize: '14px', marginTop: '10px'}}>
+                    This order will be marked as incomplete because the amount paid is less than the total amount.
+                  </p>
+                )}
+                {getOrderStatus() === 'Complete' && (
+                  <p style={{color: '#28a745', fontSize: '14px', marginTop: '10px'}}>
+                    This order will be marked as complete because the amount paid meets or exceeds the total amount.
+                  </p>
+                )}
               </div>
               <div className="confirmation-footer">
                 <button 

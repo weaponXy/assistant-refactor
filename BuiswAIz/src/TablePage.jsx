@@ -7,7 +7,6 @@ import StatsContainer from './components/StatsContainer';
 import InvoiceModal from './components/InvoiceModal';
 import AddSaleModal from './components/AddSaleModal';
 import './stylecss/TablePage.css';
-
 import './stylecss/Sales/OrderSales.css';
 import './stylecss/Sales/StatsContainer.css';
 import './stylecss/Sales/InvoiceModal.css';
@@ -310,14 +309,17 @@ const TablePage = () => {
       const totalAmount = updatedSalesData.reduce((sum, item) => sum + item.subtotal, 0);
       const orderDate = updatedSalesData[0].createdat;
 
-      // Create order in orders table with 'completed' status and payment information
+      // Normalize order status to uppercase for database consistency
+      const normalizedStatus = orderWithPayment.orderStatus.toUpperCase();
+
+      // Create order in orders table with payment information
       const { error: orderCreateError } = await supabase
         .from('orders')
         .insert([{
           orderid: uniqueOrderId,
           totalamount: totalAmount,
           orderdate: orderDate,
-          orderstatus: 'completed',
+          orderstatus: normalizedStatus, // Use normalized status
           amount_paid: orderWithPayment.amountPaid,
           change: orderWithPayment.change
         }]);
@@ -398,18 +400,50 @@ const TablePage = () => {
       // Update inventory stock for existing products
       await updateInventoryStock(salesDataArray);
 
-
-
       // Refresh data
       await fetchOrderData();
       if (newProductsCreated) {
         await fetchProducts(); // Refresh products list if new products were created
       }
       
-      alert(`Successfully added ${updatedSalesData.length} product${updatedSalesData.length > 1 ? 's' : ''} to the completed sale!\n\nOrder ID: ${uniqueOrderId}\nTotal Amount: ₱${totalAmount.toFixed(2)}\nAmount Paid: ₱${orderWithPayment.amountPaid.toFixed(2)}\nChange: ₱${orderWithPayment.change.toFixed(2)}`);
+      alert(`Successfully added ${updatedSalesData.length} product${updatedSalesData.length > 1 ? 's' : ''} to the ${normalizedStatus.toLowerCase()} sale!\n\nOrder ID: ${uniqueOrderId}\nTotal Amount: ₱${totalAmount.toFixed(2)}\nAmount Paid: ₱${orderWithPayment.amountPaid.toFixed(2)}\nChange: ₱${orderWithPayment.change.toFixed(2)}\nStatus: ${normalizedStatus}`);
     } catch (error) {
       console.error('Unexpected error adding sales:', error);
       alert('Unexpected error occurred. Check console for details.');
+    }
+  };
+
+  // Handle updating incomplete orders to complete
+  const handleUpdateOrder = async (updateOrderData) => {
+    try {
+      console.log('Updating order with data:', updateOrderData);
+      
+      // Normalize order status to uppercase
+      const normalizedStatus = updateOrderData.orderStatus.toUpperCase();
+      
+      // Update the order with new payment information and status
+      const { error: orderUpdateError } = await supabase
+        .from('orders')
+        .update({
+          amount_paid: updateOrderData.amountPaid,
+          change: updateOrderData.change,
+          orderstatus: normalizedStatus // Use normalized status
+        })
+        .eq('orderid', updateOrderData.orderid);
+
+      if (orderUpdateError) {
+        console.error('Database update error:', orderUpdateError);
+        throw new Error(`Failed to update order: ${orderUpdateError.message}`);
+      }
+
+      // Refresh the order data to show updated information
+      await fetchOrderData();
+      
+      console.log(`Order ${updateOrderData.orderid} updated successfully to ${normalizedStatus}`);
+      
+    } catch (error) {
+      console.error('Error updating order:', error);
+      throw error; // Re-throw so the modal can handle the error
     }
   };
 
@@ -441,7 +475,7 @@ const TablePage = () => {
         ...selectedItem,
         orderItems: orderItems,
         totalOrderAmount: orderItems[0]?.orders?.totalamount || 0,
-        orderStatus: orderItems[0]?.orders?.orderstatus || 'unknown',
+        orderStatus: orderItems[0]?.orders?.orderstatus || 'INCOMPLETE',
         // Make sure payment data is accessible at the root level as well
         amount_paid: orderItems[0]?.orders?.amount_paid,
         change: orderItems[0]?.orders?.change,
@@ -536,6 +570,7 @@ const TablePage = () => {
         <InvoiceModal 
           invoice={selectedInvoice}
           onClose={() => setSelectedInvoice(null)}
+          onUpdateOrder={handleUpdateOrder}
         />
       )}
 

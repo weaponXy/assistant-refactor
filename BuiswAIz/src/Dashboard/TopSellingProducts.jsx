@@ -1,5 +1,5 @@
 import React from 'react';
-import "../stylecss/TopSellingProducts.css";
+import "../stylecss/Dashboard/TopSellingProducts.css";
 
 const TopSellingProducts = ({ topSellingProducts }) => {
   return (

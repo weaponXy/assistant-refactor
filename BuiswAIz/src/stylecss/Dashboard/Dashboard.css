@@ -215,6 +215,11 @@ body {
   height: 64px;
 }
 
+.user-info-card, .transaction-history {
+  float: right;
+  
+}
+
 .user-left {
   display: flex;
   align-items: center;
