@@ -6,7 +6,7 @@ import {
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import { supabase } from '../supabase';
-import "../stylecss/ExpenseDashboard.css";
+import "../expenses/ExpenseDashboard.css";
 import BudgetHistory from '../budget/BudgetHistory';
 
 function formatYYYYMM(d) {
