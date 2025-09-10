@@ -33,6 +33,12 @@ body {
   text-align: center;
 }
 
+.react-calendar__tile:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+
 .nav ul { list-style: none; }
 .nav li {
   padding: 10px 12px;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from "react-router-dom";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer,
@@ -22,6 +22,14 @@ function extractYYYYMM(dateLike) {
   return formatYYYYMM(d);
 }
 
+function monthBounds(yyyyMM) {
+  const [y, m] = yyyyMM.split('-').map(Number);
+  const start = new Date(y, m - 1, 1);        // first day of month
+  const end = new Date(y, m, 0);              // last day of month
+  return { start, end };
+}
+
+
 const ExpenseDashboard = () => {
   const [expenses, setExpenses] = useState([]);
   const navigate = useNavigate();
@@ -40,6 +48,11 @@ const ExpenseDashboard = () => {
   const [calendarDate, setCalendarDate] = useState(new Date());
 
   const [selectedMonth, setSelectedMonth] = useState(formatYYYYMM(new Date())); // default to current month
+  const { start: monthStart, end: monthEnd } = useMemo(
+    () => monthBounds(selectedMonth),
+    [selectedMonth]
+  );
+
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [sortMode, setSortMode] = useState('date_desc'); // date_desc | date_asc | amount_desc | amount_asc
 
@@ -47,10 +60,26 @@ const ExpenseDashboard = () => {
     fetchExpenses();
   }, []);
 
+  
   useEffect(() => {
-    // fetch budget for the selected month so "Monthly Budget" & "Remaining Budget" stay consistent
-    fetchBudget(selectedMonth);
+    let isMounted = true;
+    (async () => {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (!isMounted) return;
+      if (error || !user) {
+        // Redirect to login if no session
+        window.location.href = '/login';
+      }
+    })();
+    return () => { isMounted = false; };
+  }, []);
+
+
+  useEffect(() => {
+  // Jump calendar to the start of the newly selected month
+  setCalendarDate(new Date(`${selectedMonth}-01`));
   }, [selectedMonth]);
+
 
   const fetchExpenses = async () => {
     const { data, error } = await supabase.from('expenses').select('*');
@@ -81,23 +110,60 @@ const ExpenseDashboard = () => {
   };
 
   const handleSaveBudget = async () => {
-    const monthYear = `${selectedMonth}-01`; // save for the currently selected month
-    const { error } = await supabase
-      .from('budget')
-      .upsert({
-        month_year: monthYear,
-        monthly_budget_amount: Number(newBudgetAmount),
-      }, { onConflict: ['month_year'] });
+    const monthYear = `${selectedMonth}-01`;
+    const newAmt = Number(newBudgetAmount);
 
-    if (error) {
-      console.error("Failed to add budget:", error);
-    } else {
-      alert("✅ Budget saved!");
-      setShowAddBudgetModal(false);
-      setNewBudgetAmount('');
-      fetchBudget(selectedMonth);
+    // 1) Read current budget row (if any) for this month
+    const { data: existing, error: readErr } = await supabase
+      .from('budget')
+      .select('id, monthly_budget_amount')
+      .eq('month_year', monthYear)
+      .maybeSingle();
+
+    if (readErr && readErr.code !== 'PGRST116') {
+      console.error('Failed to read existing budget:', readErr);
+      alert('⚠️ Failed saving budget. Try again.');
+      return;
     }
+
+    // 2) Upsert the budget row
+    const { data: upserted, error: upsertErr } = await supabase
+      .from('budget')
+      .upsert({ month_year: monthYear, monthly_budget_amount: newAmt }, { onConflict: ['month_year'] })
+      .select('id, monthly_budget_amount')
+      .single();
+
+    if (upsertErr) {
+      console.error('Failed to add budget:', upsertErr);
+      alert('⚠️ Failed saving budget. Try again.');
+      return;
+    }
+
+    // 3) If amount changed, write a history row
+    const prevAmt = existing ? Number(existing.monthly_budget_amount) : null;
+    const changed = prevAmt === null ? true : prevAmt !== newAmt;
+
+    if (changed && upserted?.id) {
+      const { error: histErr } = await supabase
+        .from('budgethistory')
+        .insert({
+          budget_id: upserted.id,
+          old_amount: prevAmt,
+          new_amount: newAmt,
+        });
+
+      if (histErr) {
+        console.error('Failed to insert budget history:', histErr);
+        // Do not block UX; continue
+      }
+    }
+
+    alert('✅ Budget saved!');
+    setShowAddBudgetModal(false);
+    setNewBudgetAmount('');
+    fetchBudget(selectedMonth);
   };
+
 
   const handleSaveExpense = async () => {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -387,7 +453,29 @@ const ExpenseDashboard = () => {
           </div>
           <div className="calendar-container">
             <h3>Calendar</h3>
-            <Calendar value={calendarDate} onChange={setCalendarDate} />
+            <Calendar
+              value={calendarDate}
+              onChange={setCalendarDate}
+              /* keep the view locked to days */
+              minDetail="month"
+              maxDetail="month"
+              /* open on the selected month */
+              activeStartDate={monthStart}
+              onActiveStartDateChange={({ activeStartDate, view }) => {
+                if (view === 'month') {
+                  // keep input[type="month"] in sync when user clicks ←/→ in the calendar
+                  setSelectedMonth(formatYYYYMM(activeStartDate));
+                }
+              }}
+              /* prevent selecting days outside the selected month */
+              minDate={monthStart}
+              maxDate={monthEnd}
+              tileDisabled={({ date, view }) =>
+                view === 'month' &&
+                (date.getMonth() !== monthStart.getMonth() ||
+                  date.getFullYear() !== monthStart.getFullYear())
+              }
+            />
           </div>
         </div>
       </main>
