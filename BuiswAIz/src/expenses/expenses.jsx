@@ -80,6 +80,13 @@ const ExpenseDashboard = () => {
   setCalendarDate(new Date(`${selectedMonth}-01`));
   }, [selectedMonth]);
 
+  useEffect(() => {
+    setBudget(0);
+    setInitialBudget(0);
+    fetchBudget(selectedMonth);
+  }, [selectedMonth]);
+
+
 
   const fetchExpenses = async () => {
     const { data, error } = await supabase.from('expenses').select('*');
@@ -88,26 +95,29 @@ const ExpenseDashboard = () => {
   };
 
   const fetchBudget = async (yyyyMM) => {
-    const monthYear = `${yyyyMM}-01`;
-    const { data, error } = await supabase
-      .from('budget')
-      .select('*')
-      .eq('month_year', monthYear)
-      .single();
+  const monthYear = `${yyyyMM}-01`;
 
-    if (error && error.code !== 'PGRST116') {
+  const { data, error } = await supabase
+      .from('budget')
+      .select('id, monthly_budget_amount')
+      .eq('month_year', monthYear)
+      .maybeSingle();
+
+    if (error) {
       console.error("❌ Failed to fetch budget:", error);
       return;
     }
 
     if (data) {
-      setBudget(Number(data.monthly_budget_amount));
-      setInitialBudget(Number(data.monthly_budget_amount));
+      const amt = Number(data.monthly_budget_amount) || 0;
+      setBudget(amt);
+      setInitialBudget(amt);
     } else {
       setBudget(0);
       setInitialBudget(0);
     }
   };
+
 
   const handleSaveBudget = async () => {
     const monthYear = `${selectedMonth}-01`;
@@ -329,9 +339,18 @@ const ExpenseDashboard = () => {
 
           <div className="toolbar-right">
             <div className="button-group">
-              <button className="btn ghost" onClick={() => setShowAddBudgetModal(true)}>
+              <button
+                className="btn ghost"
+                onClick={() => {
+                  setNewBudgetAmount(
+                    Number.isFinite(budget) ? String(budget) : ''
+                  );
+                  setShowAddBudgetModal(true);
+                }}
+              >
                 Edit Budget
               </button>
+
               <button className="btn ghost" onClick={() => setShowBudgetHistory(true)}>
                 Budget History
               </button>
