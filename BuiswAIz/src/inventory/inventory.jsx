@@ -163,11 +163,7 @@ const Inventory = () => {
                 <thead>
                   <tr>
                     <th>Name</th>
-                    <th>Code</th>
                     <th>Description</th>
-                    <th>Price</th>
-                    <th>Cost</th>
-                    <th>Quantity</th>
                     <th>Supplier</th>
                     <th>Image</th>
                   </tr>
@@ -180,11 +176,7 @@ const Inventory = () => {
                       style={{ cursor: "pointer" }}
                     >
                       <td>{product.productname}</td>
-                      <td>{product.productid}</td>
                       <td>{product.description}</td>
-                      <td>{product.price}</td>
-                      <td>{product.cost}</td>
-                      <td>{product.currentstock}</td>
                       <td>{product.suppliers?.suppliername || "Unknown"}</td>
                       <td>
                         <div className="image-cell">
@@ -314,32 +306,6 @@ const Inventory = () => {
                     </div>
                   ))
                 )}
-              </div>
-            </div>
-
-            
-            <div className="activity-panel">
-              <h3>Recent Activity</h3>
-              <div className="activity-container">
-                <ul>
-                  {activityLogs.length === 0 ? (
-                    <li className="activity-item">No recent activity</li>
-                  ) : (
-                    activityLogs.map((log, i) => (
-                      <li key={i} className="activity-item">
-                        <span>
-                          <span className="log-username">
-                            {log.systemuser?.username ? log.systemuser.username : "Someone"}
-                          </span>{" "}
-                          {log.action_desc}
-                        </span>
-                        <span className="time">
-                          {formatDistanceToNow(new Date(log.created_at), { addSuffix: true })}
-                        </span>
-                      </li>
-                    ))
-                  )}
-                </ul>
               </div>
             </div>
           </div>
