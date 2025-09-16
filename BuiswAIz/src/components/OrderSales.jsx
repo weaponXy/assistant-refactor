@@ -247,7 +247,6 @@ const OrderSales = ({ orderData, onInvoiceSelect, onAddSale }) => {
         <table>
           <thead>
             <tr>
-              <th></th>
               <th>Product Name</th>
               <th>Order Code</th>
               <th>Status</th>
@@ -273,7 +272,6 @@ const OrderSales = ({ orderData, onInvoiceSelect, onAddSale }) => {
           <tbody>
             {filteredData.map((item, index) => (
               <tr key={index}>
-                <td><input type="radio" name="selectedRow" /></td>
                 <td>{item.products?.productname || 'N/A'}</td>
                 <td>{item.orderid}</td>
                 <td>{getStatusBadge(item)}</td>

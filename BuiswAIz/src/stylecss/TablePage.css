@@ -265,28 +265,6 @@ table tbody td {
   100% { transform: rotate(360deg); }
 }
 
-/* Custom radio buttons */
-input[type="radio"] {
-  appearance: none;
-  width: 16px;
-  height: 16px;
-  border: 2px solid #ccc;
-  border-radius: 50%;
-  background-color: white;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-input[type="radio"]:hover {
-  opacity: .5;
-}
-
-input[type="radio"]:checked {
-  border: 3px solid #ccc;
-  background-color: #04B4FC;
-  border-color: #f1f1f1;
-}
-
 @media (max-width: 768px) {
   .invoice-modal-content {
     max-width: 95%;
@@ -413,3 +391,5 @@ input[type="radio"]:checked {
     transform: translateY(0) scale(1);
   }
 }
+
+

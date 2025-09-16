@@ -21,7 +21,6 @@
   width: 100%;
   font-family: 'Montserrat', sans-serif;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-  animation: slideIn 0.3s ease-out;
   max-height: 90vh;
   overflow-y: auto;
 }
@@ -338,37 +337,9 @@
   max-height: 200px;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: #04B4FC #f1f1f1;
+  scrollbar-color: #f1f1f1 #ffffff;
 }
 
-.modal-custom-dropdown-list::-webkit-scrollbar {
-  width: 6px;
-}
-
-.modal-custom-dropdown-list::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 3px;
-}
-
-.modal-custom-dropdown-list::-webkit-scrollbar-thumb {
-  background: #04B4FC;
-  border-radius: 3px;
-}
-
-.modal-custom-dropdown-list::-webkit-scrollbar-thumb:hover {
-  background: #0290c4;
-}
-
-@keyframes modalDropdownSlideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
 
 /* Modal Dropdown Items */
 .modal-custom-dropdown-list .dropdown-item {
@@ -808,7 +779,6 @@
   font-weight: 600;
   font-size: 14px;
   font-family: 'Montserrat', sans-serif;
-  transition: all 0.3s ease;
 }
 
 .add-sale-modal-content .cancel-btn:hover {
