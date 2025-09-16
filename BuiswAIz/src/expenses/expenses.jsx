@@ -198,6 +198,10 @@ const ExpenseDashboard = () => {
 
   return (
     <div className="dashboard-container">
+      <header className="header-bar">
+        <h1 className="header-title">BuiswAIz</h1>
+      </header>
+      <div className="main-section">
       <aside className="sidebar">
         <div className="nav-section">
           <p className="nav-header">GENERAL</p>
@@ -207,7 +211,7 @@ const ExpenseDashboard = () => {
             <li onClick={() => navigate("/supplier")}>Supplier</li>
             <li onClick={() => navigate("/TablePage")}>Sales</li>
             <li className="active">Expenses</li>
-            <li>AI Assistant</li>
+            <li onClick={() => navigate("/assistant")}>AI Assistant</li>
           </ul>
           <p className="nav-header">SUPPORT</p>
           <ul>
@@ -391,6 +395,7 @@ const ExpenseDashboard = () => {
           </div>
         </div>
       </main>
+      </div>
 
     
       {showAddModal && (

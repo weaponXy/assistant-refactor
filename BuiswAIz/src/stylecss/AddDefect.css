@@ -81,6 +81,21 @@
   cursor: pointer;
 }
 
+.category-card {
+  border: 1px solid #ccc;
+  padding: 10px;
+  margin: 5px;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.category-card.selected {
+  border-color: #8bd8f1;
+  background-color: #e8f3f5;
+}
+
+
 .btn-save {
   background-color: black;
   color: white;

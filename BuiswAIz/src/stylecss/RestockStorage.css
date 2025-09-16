@@ -12,7 +12,7 @@
   background: white;
   padding: 20px;
   border-radius: 12px;
-  width: 600px;
+  width: 1000px;
   max-height: 70vh;
   overflow-y: auto;
   box-shadow: 0 4px 20px rgba(0,0,0,0.3);
@@ -38,13 +38,13 @@
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
   display: flex;
   flex-direction: column;
-  height: calc(40vh - 30px);
+  height: calc(50vh - 30px);
 }
 
 .restock-table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 15px;
+  margin-top: -8px;
 }
 
 .restock-table th, .restock-table td {
