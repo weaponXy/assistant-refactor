@@ -233,6 +233,168 @@ app.post("/api/delete-product", async (req, res) => {
   }
 });
 
+app.get("/api/categories/:productid", async (req, res) => {
+  try {
+    const productid = parseInt(req.params.productid);
+    if (isNaN(productid)) return res.status(400).json({ error: "Invalid product ID" });
+
+    const { data, error } = await supabase
+      .from("productcategory")
+      .select("productcategoryid, price, cost, color, agesize, currentstock, reorderpoint")
+      .eq("productid", productid);
+
+    if (error) {
+      console.error("Supabase error fetching categories:", error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.json(data || []);
+  } catch (err) {
+    console.error("Server exception:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+
+
+// Get all products
+app.get("/api/products", async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("products")
+      .select("productid, productname")
+      .order("productname");
+
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Add defective item
+app.post("/api/add-defective-item", async (req, res) => {
+  try {
+    const { productid, productcategoryid, quantity, status, defectdescription, reporteddate, userid } = req.body;
+
+    if (!productid || !productcategoryid || !quantity || !status || !reporteddate) {
+      return res.status(400).json({ error: "Missing required fields." });
+    }
+
+    // Fetch category stock
+    const { data: category, error: catErr } = await supabase
+      .from("productcategory")
+      .select("currentstock")
+      .eq("productcategoryid", productcategoryid)
+      .single();
+
+    if (catErr || !category) return res.status(400).json({ error: "Category not found." });
+
+    if (parseInt(quantity) > category.currentstock) {
+      return res.status(400).json({ error: "Quantity exceeds current stock." });
+    }
+
+    // Insert defective item
+    const { error: insertErr } = await supabase
+      .from("defectiveitems")
+      .insert([{
+        productid,
+        productcategoryid, // use correct column name
+        quantity,
+        status,
+        defectdescription,
+        reporteddate
+      }]);
+
+    if (insertErr) return res.status(500).json({ error: insertErr.message || JSON.stringify(insertErr) });
+
+    // Update stock
+    const { error: updateErr } = await supabase
+      .from("productcategory")
+      .update({ currentstock: category.currentstock - quantity })
+      .eq("productcategoryid", productcategoryid);
+
+    if (updateErr) return res.status(500).json({ error: updateErr.message || JSON.stringify(updateErr) });
+
+    // Log activity
+    if (userid) {
+      await supabase.from("activitylog").insert([{
+        action_type: "add_defect",
+        action_desc: `added ${quantity} defective item(s) for product ${productid}, category ${productcategoryid}`,
+        done_user: userid
+      }]);
+    }
+
+    res.status(200).json({ message: "Defective item added successfully." });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message || "Server error." });
+  }
+});
+
+// POST /api/restock
+app.post("/api/restock", async (req, res) => {
+  const {
+    productid,
+    productcategoryid,
+    supplierid,
+    new_stock,
+    new_cost,
+    new_price,
+    batchCode,
+    datereceived,
+    user,
+  } = req.body;
+
+  try {
+    // Insert restockstorage
+    const { error: restockError } = await supabase.from("restockstorage").insert([
+      {
+        productid,
+        productcategoryid,
+        supplierid,
+        new_stock,
+        new_cost,
+        new_price,
+        batchCode,
+        datereceived,
+      },
+    ]);
+
+    if (restockError) throw restockError;
+
+    // Add expense
+    const totalExpense = parseInt(new_stock, 10) * parseFloat(new_cost);
+    const expenseDate = new Date();
+
+    await supabase.from("expenses").insert([
+      {
+        expensedate: expenseDate.toISOString(),
+        amount: totalExpense,
+        description: `Restock of productid ${productid}`,
+        category: "Inventory",
+        createdbyuserid: user?.userid || null,
+      },
+    ]);
+
+    // Add log
+    await supabase.from("activitylog").insert([
+      {
+        action_desc: `Stored productid ${productid} to the storage`,
+        done_user: user?.userid || null,
+      },
+    ]);
+
+    res.status(200).json({ success: true, message: "Restock added successfully" });
+  } catch (err) {
+    console.error("Restock API error:", err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+
 
 
 app.listen(PORT, () => {

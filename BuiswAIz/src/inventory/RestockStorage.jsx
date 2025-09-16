@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { fetchActiveBatches } from "../inventory/fetchRestockStorage";
 import { supabase } from "../supabase";
 import "../stylecss/RestockStorage.css";
 import RestockProduct from "./RestockProduct";
@@ -8,33 +9,25 @@ const RestockStorage = ({ onClose, user }) => {
     const [showAdd, setShowAdd] = useState(false);
     
     useEffect(() => {
-        fetchStorage();
+        loadActiveBatches();
     }, []);
 
-    const fetchStorage = async () => {
-        const { data, error } = await supabase
-        .from("restockstorage")
-        .select(`
-            restockid,
-            new_stock,
-            new_cost,
-            new_price,
-            created_at,
-            products ( productid, productname, currentstock, reorderpoint),
-            suppliers ( suppliername )
-        `);
-
-        if (error) console.error(error);
-        else setStorageData(data);
+    const loadActiveBatches = async () => {
+        try {
+            const data = await fetchActiveBatches();
+            setStorageData(data);
+        } catch (error) {
+            console.error("Failed to fetch active batches:", error);
+        }
     };
 
     const handleConsumeRestock = async (restock) => {
-        const productId = restock.products?.productid;
-        const productName = restock.products?.productname || "Unknown";
-        const currentStock = restock.products?.currentstock ?? 0;
+        const productCategoryId = restock.productcategory?.productcategoryid;
+        const currentStock = restock.productcategory?.currentstock ?? 0;
+        const variantName = `${restock.productcategory?.color || ""}, ${restock.productcategory?.agesize || ""}`.trim();
 
-        if (!productId) {
-            alert("Cannot inherit: Product ID not found");
+        if (!productCategoryId) {
+            alert("Cannot inherit: Variant not found");
             return;
         }
 
@@ -44,27 +37,43 @@ const RestockStorage = ({ onClose, user }) => {
         }
 
         try {
-            const { error } = await supabase.rpc("consume_restock_manual", { 
-                p_productid: productId,  
+            // Update productcategory stock
+            const { error: updateError } = await supabase
+                .from("productcategory")
+                .update({
+                    currentstock: restock.new_stock,
+                    updatedstock: new Date(),
+                    supplierid: restock.suppliers?.supplierid,
+                    cost: restock.new_cost,
+                    price: restock.new_price
+                })
+                .eq("productcategoryid", productCategoryId);
+
+            if (updateError) {
+                console.error("Error updating stock:", updateError);
+                return alert("Failed to inherit batch");
+            }
+
+            // Mark batch as inherited
+            const { error: batchError } = await supabase
+                .from("restockstorage")
+                .update({ dateInherited: new Date() })
+                .eq("restockid", restock.restockid);
+
+            if (batchError) console.error(batchError);
+
+            // Log activity
+            await supabase.from("activitylog").insert({
+                action_desc: `Inherited batch for ${restock.products?.productname} (${variantName})`,
+                done_user: user?.userid || null
             });
 
-            if (error) {
-                console.error("Error consuming restock:", error);
-                alert("Failed to consume restock.");
-            } else {
-                await supabase.from("activitylog").insert({
-                    action_desc: `Succesfully restocked ${productName}`,
-                    done_user: user?.userid || null
-                });
-
-                fetchStorage(); 
-            }
+            // Reload active batches
+            loadActiveBatches(); 
         } catch (err) {
             console.error("Unexpected error:", err);
         }
     };
-
-
 
     return (
         <div className="modal-overlay">
@@ -75,56 +84,66 @@ const RestockStorage = ({ onClose, user }) => {
                     <button onClick={() => setShowAdd(true)} className="restock-btn">Restock+</button>
                     <button onClick={onClose} className="close-btn">X</button>
                     <div className="restock-panel">
+                        <div className="restock-container">
                         <table className="restock-table">
                             <thead>
                                 <tr>
-                                <th>Product</th>
-                                <th>Quantity</th>
-                                <th>Cost</th>
-                                <th>Price</th>
-                                <th>Supplier</th>
-                                <th>Date</th>
-                                <th>Stock</th>
-                                <th> </th>
+                                    <th>BatchCode</th>
+                                    <th>Product</th>
+                                    <th>Variant</th>
+                                    <th>Quantity</th>
+                                    <th>Cost</th>
+                                    <th>Price</th>
+                                    <th>Supplier</th>
+                                    <th>Date Received</th>
+                                    <th>Stock</th>
+                                    <th>Reorder Point</th>
+                                    <th>Action</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {storageData.map((restock) => {
-                                    const current = restock.products?.currentstock ?? 0;
-                                    const reorder = restock.products?.reorderpoint ?? 0;
+                                    const current = restock.productcategory?.currentstock ?? 0;
+                                    const reorder = restock.productcategory?.reorderpoint ?? 0;
                                     const isLow = current < reorder;
+                                    const variantName = `${restock.productcategory?.color || ""} ${restock.productcategory?.agesize || ""}`.trim();
 
                                     return (
                                         <tr key={restock.restockid}>
+                                            <td>{restock.batchCode || "N/A"}</td>
                                             <td>{restock.products?.productname || "Unknown"}</td>
+                                            <td>{variantName}</td>
                                             <td>{restock.new_stock}</td>
                                             <td>{restock.new_cost}</td>
                                             <td>{restock.new_price}</td>
                                             <td>{restock.suppliers?.suppliername || "Unknown"}</td>
-                                            <td>{new Date(restock.created_at).toLocaleDateString()}</td>
-                                            <td>    
+                                            <td>{restock.datereceived ? new Date(restock.datereceived).toLocaleDateString() : "-"}</td>
+                                            <td>
                                                 <span className={isLow ? "stock-low" : "stock-ok"}>{current}</span>
                                             </td>
-                                             <td>
+                                            <td>{reorder}</td>
+                                            <td>
                                                 <button
                                                     className="restock-btn"
-                                                    onClick={() => handleConsumeRestock(restock)}>
+                                                    onClick={() => handleConsumeRestock(restock)}
+                                                    disabled={current > 0}>
                                                     Inherit
                                                 </button>
                                             </td>
                                         </tr>
-                                        );
-                                    })}
-                                </tbody>
+                                    );
+                                })}
+                            </tbody>
                         </table>
+                        </div>
                     </div>
                 </>
                 ) : (
                 <RestockProduct
                     onClose={() => setShowAdd(false)}
                     onSuccess={() => {
-                    setShowAdd(false);
-                    fetchStorage();
+                        setShowAdd(false);
+                        loadActiveBatches();
                     }}
                     user={user}
                 />

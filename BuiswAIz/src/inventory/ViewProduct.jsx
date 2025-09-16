@@ -270,7 +270,6 @@ const ViewProduct = ({ product, onClose, onProductUpdated, user }) => {
                   {!isEditing ? (
                     <div className="supplier-display">
                       <span className="supplier-name">{getCurrentSupplierName()}</span>
-                      {form.supplierid && <span className="supplier-id">(ID: {form.supplierid})</span>}
                     </div>
                   ) : (
                     <div className="supplier-edit-container">
