@@ -1,26 +1,21 @@
 import { supabase } from "../supabase";
 
 export const fetchLowStockProducts = async () => {
-  const { data, error } = await supabase
-    .from("products")
-    .select("*");
+  try {
+    const { data, error } = await supabase.rpc("get_low_stock_categories");
 
-  if (error) {
-    console.error("Fetch error:", error);
+    if (error) throw error;
+
+    // Optional: sort by stock deficit
+    const lowStock = data.sort(
+      (a, b) =>
+        (Number(a.currentstock) - Number(a.reorderpoint)) -
+        (Number(b.currentstock) - Number(b.reorderpoint))
+    );
+
+    return lowStock;
+  } catch (err) {
+    console.error("Fetch error:", err);
     return [];
   }
-
-  const lowStock = data
-  .filter(p =>
-    p.currentstock !== null &&
-    p.reorderpoint !== null &&
-    Number(p.currentstock) < Number(p.reorderpoint)
-  )
-  .sort((a, b) =>
-    (Number(a.currentstock) - Number(a.reorderpoint)) -
-    (Number(b.currentstock) - Number(b.reorderpoint))
-  ); 
-
-  return lowStock;
 };
-

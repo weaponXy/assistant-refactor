@@ -1,0 +1,141 @@
+/* Availability Panel */
+.availability-panel {
+  background: #fff;
+  padding: 16px;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  height: 400px;   /* 🔹 fixed panel height */
+}
+
+/* Panel title */
+.availability-panel h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: #333;
+  flex-shrink: 0;  /* prevent header from shrinking */
+}
+
+/* Scroll only inside container */
+.availability-container {
+  overflow-y: auto;
+  padding-right: 6px; /* space so scrollbar doesn’t overlap content */
+}
+
+/* Scrollbar styling */
+.availability-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.availability-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.availability-container::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 3px;
+}
+
+
+/* Each Product Item */
+.availability-item {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  background: #fafafa;
+  transition: transform 0.2s;
+}
+
+.availability-item:hover {
+  transform: translateY(-1px);
+}
+
+/* Thumbnail */
+.product-thumbnail,
+.img-placeholder {
+  width: 52px;
+  height: 52px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Product Details */
+.availability-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.availability-details .name {
+  font-weight: 600;
+  color: #222;
+  font-size: 14px;
+}
+
+.availability-details .category-label {
+  font-size: 12px;
+  color: #777;
+}
+
+/* Stock Meter (progress bar) */
+.stock-meter {
+  position: relative;
+  height: 8px;
+  background: #e5e5e5;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.stock-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+/* Severity colors */
+.stock-fill.severity-ok {
+  background: #4caf50; /* green */
+}
+
+.stock-fill.severity-warning {
+  background: #ff9800; /* orange */
+}
+
+.stock-fill.severity-urgent {
+  background: #f44336; /* red */
+}
+
+.stock-fill.severity-critical {
+  background: #b71c1c; /* dark red */
+}
+
+/* Stock summary */
+.stock-summary {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #555;
+}
+
+.extra-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #888;
+}
+
+.no-low-stock {
+  font-size: 13px;
+  color: #4caf50;
+  text-align: center;
+  padding: 10px 0;
+}

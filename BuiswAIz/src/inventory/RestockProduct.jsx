@@ -1,136 +1,135 @@
 import React, { useEffect, useState } from "react";
-import { supabase } from "../supabase";
 import ConfirmStockModal from "./ConfirmationModals/ConfirmationStock";
 import "../stylecss/RestockProduct.css";
 
 const RestockProduct = ({ onClose, onSuccess, user }) => {
   const [suppliers, setSuppliers] = useState([]);
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+
   const [showConfirm, setShowConfirm] = useState(false);
   const [formError, setFormError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [formData, setFormData] = useState({
     productid: "",
+    productcategoryid: "",
     supplierid: "",
     new_stock: "",
     new_cost: "",
     new_price: "",
+    batchCode: "",
+    datereceived: "",
   });
 
+  // fetch products + suppliers
   useEffect(() => {
     const fetchSuppliers = async () => {
-      const { data, error } = await supabase
-        .from("suppliers")
-        .select("*")
-        .eq("supplierstatus", "Active");
-      if (!error) setSuppliers(data);
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/get-suppliers`);
+      const data = await res.json();
+      setSuppliers(data || []);
     };
 
     const fetchProducts = async () => {
-      const { data, error } = await supabase.from("products").select("*");
-      if (!error) setProducts(data);
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/products`);
+      const data = await res.json();
+      setProducts(data || []);
     };
 
     fetchSuppliers();
     fetchProducts();
   }, []);
 
+  // when product is chosen → fetch its categories
+  useEffect(() => {
+    if (!formData.productid) {
+      setCategories([]);
+      setSelectedCategory(null);
+      return;
+    }
+
+    const fetchCategories = async () => {
+      const res = await fetch(
+        `${import.meta.env.VITE_BACKEND_URL}/api/categories/${formData.productid}`
+      );
+      const data = await res.json();
+      setCategories(data || []);
+    };
+
+    fetchCategories();
+  }, [formData.productid]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
-  const formValidate = () => {
-      const requiredFields = [
-          "productid",
-          "supplierid",
-          "new_stock",
-          "new_cost",
-          "new_price",
-      ];
 
-      const isEmpty = requiredFields.some((field) => {
-        const value = formData[field];
-        if (typeof value === "string" && value.trim() === "") return true;
-        if (["new_stock", "new_cost", "new_price"].includes(field)) {
-          const numValue = Number(value);     
-          if (isNaN(numValue) || numValue <= 0) return true; 
-        }
-        return false;
-      });
-      if (isEmpty) {
-        setFormError("Please fill in all required fields.");
-        return false;
+  const formValidate = () => {
+    const requiredFields = [
+      "productid",
+      "productcategoryid",
+      "supplierid",
+      "new_stock",
+      "new_cost",
+      "new_price",
+      "batchCode",
+      "datereceived",
+    ];
+
+    const isEmpty = requiredFields.some((field) => {
+      const value = formData[field];
+      if (typeof value === "string" && value.trim() === "") return true;
+      if (["new_stock", "new_cost", "new_price"].includes(field)) {
+        const numValue = Number(value);
+        if (isNaN(numValue) || numValue <= 0) return true;
+      }
+      return false;
+    });
+
+    if (isEmpty) {
+      setFormError("⚠️ Please fill in all required fields.");
+      return false;
     }
-      setFormError("");
-      return true;
-  }
+    setFormError("");
+    return true;
+  };
 
   const handleAddRestock = async () => {
     if (!formValidate()) return;
+
     try {
       setIsSubmitting(true);
 
-      const { error: restockError } = await supabase.from("restockstorage").insert([
-        {
-          productid: formData.productid,
-          supplierid: formData.supplierid,
-          new_stock: parseInt(formData.new_stock, 10),
-          new_cost: parseFloat(formData.new_cost),
-          new_price: parseFloat(formData.new_price),
-        },
-      ]);
+      const payload = { ...formData, user };
 
-      if (restockError) {
-        console.error("Error adding restock:", restockError.message);
-        return;
-      }
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/restock`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-      const totalExpense =
-        parseInt(formData.new_stock, 10) * parseFloat(formData.new_cost);
-      const expenseDate = new Date();
+      const result = await res.json();
 
-      const product = products.find((p) => p.productid === parseInt(formData.productid, 10));
-
-      const { error: expenseError } = await supabase.from("expenses").insert([
-        {
-          expensedate: expenseDate.toISOString(),
-          amount: totalExpense,
-          description: `Restock of ${product?.productname || "product"}`,
-          category: "Inventory",
-          createdbyuserid: user?.userid || null,
-        },
-      ]);
-
-      if (expenseError) {
-        console.error("Error adding expense:", expenseError.message);
-        return;
-      }
-
-      const { error: logError } = await supabase.from("activitylog").insert([
-      {
-        action_desc: `Stored ${product?.productname || "product"} to the storage`,
-        done_user: user?.userid || null,
-      },
-    ]);
-
-      if (logError) {
-        console.error("Error adding log:", logError.message);
+      if (!result.success) {
+        setFormError("❌ " + result.error);
         return;
       }
 
       onSuccess();
     } catch (err) {
-      console.error("Transaction failed:", err.message);
+      console.error("Frontend restock error:", err);
+      setFormError("❌ Something went wrong.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-
   return (
     <div className="restock-form-container">
       <h3>Add Restock Item</h3>
       <form className="restock-form">
+        {/* Product */}
         <select
           name="productid"
           value={formData.productid}
@@ -144,6 +143,37 @@ const RestockProduct = ({ onClose, onSuccess, user }) => {
           ))}
         </select>
 
+        {/* Category Cards */}
+        {categories.length > 0 && (
+          <div className="category-card-list">
+            {categories.map((c) => {
+              const isLow = c.currentstock <= c.reorderpoint;
+              const isSelected = selectedCategory === c.productcategoryid;
+              return (
+                <div
+                  key={c.productcategoryid}
+                  className={`category-card ${isLow ? "low-stock" : ""} ${isSelected ? "selected" : ""}`}
+                  onClick={() => {
+                    setSelectedCategory(c.productcategoryid);
+                    setFormData((prev) => ({
+                      ...prev,
+                      productcategoryid: c.productcategoryid,
+                    }));
+                  }}
+                >
+                  <h4>
+                    {c.color} / {c.agesize}
+                  </h4>
+                  <p>
+                    Stock: {c.currentstock} / Reorder: {c.reorderpoint}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Supplier */}
         <select
           name="supplierid"
           value={formData.supplierid}
@@ -157,10 +187,11 @@ const RestockProduct = ({ onClose, onSuccess, user }) => {
           ))}
         </select>
 
+        {/* Stock + Cost + Price */}
         <input
           type="number"
           name="new_stock"
-          min = "1"
+          min="1"
           placeholder="Quantity"
           value={formData.new_stock}
           onChange={handleChange}
@@ -168,7 +199,7 @@ const RestockProduct = ({ onClose, onSuccess, user }) => {
         <input
           type="number"
           name="new_cost"
-          min = "1"
+          min="1"
           placeholder="Cost"
           value={formData.new_cost}
           onChange={handleChange}
@@ -176,25 +207,43 @@ const RestockProduct = ({ onClose, onSuccess, user }) => {
         <input
           type="number"
           name="new_price"
-          min = "1"
+          min="1"
           placeholder="Price"
           value={formData.new_price}
           onChange={handleChange}
         />
 
+        {/* Batch + Date */}
+        <input
+          type="text"
+          name="batchCode"
+          placeholder="Batch Code"
+          value={formData.batchCode}
+          onChange={handleChange}
+        />
+        <input
+          type="date"
+          name="datereceived"
+          value={formData.datereceived}
+          onChange={handleChange}
+        />
+
+        {/* Buttons */}
         <div className="form-buttons">
-          <button type="button" onClick={() => {
-            if (formValidate()) {
-              setShowConfirm(true); 
-            }
-          }}
-          disabled={isSubmitting}>
+          <button
+            type="button"
+            onClick={() => {
+              if (formValidate()) setShowConfirm(true);
+            }}
+            disabled={isSubmitting}
+          >
             {isSubmitting ? "Saving..." : "Save"}
           </button>
           <button type="button" onClick={onClose}>
             Cancel
           </button>
         </div>
+
         <ConfirmStockModal
           isOpen={showConfirm}
           onConfirm={async () => {
@@ -202,14 +251,14 @@ const RestockProduct = ({ onClose, onSuccess, user }) => {
             setShowConfirm(false);
           }}
           onCancel={() => setShowConfirm(false)}
-          productName={products.find(p => p.productid === parseInt(formData.productid))?.productname}
+          productName={
+            products.find(
+              (p) => p.productid === parseInt(formData.productid)
+            )?.productname
+          }
         />
-        
-        {formError && (
-          <div className="form-warning">
-            {formError}
-          </div>
-        )}
+
+        {formError && <div className="form-warning">{formError}</div>}
       </form>
     </div>
   );
