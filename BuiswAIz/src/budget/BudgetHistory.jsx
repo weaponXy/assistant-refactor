@@ -1,7 +1,7 @@
 // src/budget/BudgetHistory.jsx
 import { useEffect, useMemo, useState } from "react";
 import { listBudgets, getExpensesForBudgetMonth, getBudgetHistory } from "../services/budgetService";
-import "./budget-history.css"; // optional styles (see minimal CSS below)
+import "./budget-history.css";
 
 function currency(n) {
   if (n === null || n === undefined || Number.isNaN(n)) return "₱0.00";
@@ -23,7 +23,7 @@ function BudgetHistory() {
   const [expenses, setExpenses] = useState([]);
   const [history, setHistory] = useState([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
-  const [activeTab, setActiveTab] = useState("expenses"); // "expenses" | "history"
+  const [activeTab, setActiveTab] = useState("expenses");
 
   useEffect(() => {
     async function run() {
@@ -130,7 +130,6 @@ function BudgetHistory() {
             </div>
           </div>
 
-          {/* Progress bar */}
           <div className="bh-progress">
             <div className="bh-progress-bar" style={{ width: `${totals?.pct ?? 0}%` }} />
           </div>
@@ -138,7 +137,6 @@ function BudgetHistory() {
             {totals ? `${(totals.pct).toFixed(0)}% of budget used` : "—"}
           </div>
 
-          {/* Tabs */}
           <div className="bh-tabs">
             <button className={activeTab === "expenses" ? "active" : ""} onClick={() => setActiveTab("expenses")}>
               Expenses
@@ -167,10 +165,10 @@ function BudgetHistory() {
                     </thead>
                     <tbody>
                       {expenses.map((e) => (
-                        <tr key={e.expenseid}>
-                          <td>{new Date(e.expensedate).toLocaleDateString()}</td>
-                          <td>{e.category}</td>
-                          <td>{e.description}</td>
+                        <tr key={e.id}>
+                          <td>{new Date(e.occurred_on).toLocaleDateString()}</td>
+                          <td>{e.category_path ?? '—'}</td>
+                          <td>{e.notes ?? ''}</td>
                           <td className="bh-right">{currency(e.amount)}</td>
                         </tr>
                       ))}

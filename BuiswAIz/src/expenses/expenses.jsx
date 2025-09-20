@@ -12,7 +12,9 @@ import { fetchMainCategories, fetchSubcategories, getCategoryById } from '../api
 import { listLabels, createLabel } from '../api/labels';
 import { listContacts, createContact } from '../api/contacts';
 import { listExpensesByMonth, createExpense, updateExpense } from '../api/expenses';
-import { AttachmentsPanel } from "../components/AttachmentsPanel"
+import { AttachmentsPanel } from '../components/AttachmentsPanel';
+import { uploadAttachments } from '../api/attachments';
+
 
 function formatYYYYMM(d) {
   const year = d.getFullYear();
@@ -43,7 +45,9 @@ const ExpenseDashboard = () => {
   const [showBudgetHistory, setShowBudgetHistory] = useState(false);
   const [newBudgetAmount, setNewBudgetAmount] = useState('');
   const [showEditModal, setShowEditModal] = useState(false);
+  
   const [editId, setEditId] = useState(null);
+  const [editFiles, setEditFiles] = useState([]); // files chosen in Edit modal
   const [calendarDate, setCalendarDate] = useState(new Date());
   const [selectedMonth, setSelectedMonth] = useState(formatYYYYMM(new Date()));
   const { start: monthStart, end: monthEnd } = useMemo(
@@ -63,9 +67,11 @@ const ExpenseDashboard = () => {
   const [subCatId, setSubCatId] = useState('');
   const [expanded, setExpanded] = useState(false);
   const [status, setStatus] = useState('uncleared');
+  const [editAttachmentCount, setEditAttachmentCount] = useState(0);
   const [contactId, setContactId] = useState('');
   const [notes, setNotes] = useState('');
   const [labelIds, setLabelIds] = useState([]);
+  const [newFiles, setNewFiles] = useState([]); // <— files chosen in the add modal
 
   // pickers
   const [mains, setMains] = useState([]);
@@ -229,93 +235,111 @@ const ExpenseDashboard = () => {
   // ======== Create expense (Phase 1) ========
   const category_id = subCatId || mainCatId || null;
 
-    async function handleSaveExpense(e) {
-    e.preventDefault();
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { alert('🚫 Not logged in'); return; }
+        async function handleSaveExpense(e) {
+      e.preventDefault();
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { alert('🚫 Not logged in'); return; }
 
-      // Parse amount safely from string
-      const amountNum = Number.parseFloat(String(amount).trim());
+        // Parse & validate inputs
+        const amountNum = Number.parseFloat(String(amount).trim());
+        const chosenCategoryId = subCatId || mainCatId || null;
+        if (!Number.isFinite(amountNum) || amountNum <= 0 || !occurredOn || !chosenCategoryId) {
+          alert('⚠️ Amount, date, and category are required');
+          return;
+        }
 
-      // Require valid amount, date, and a category (main or sub)
-      const chosenCategoryId = subCatId || mainCatId || null;
-      if (!Number.isFinite(amountNum) || amountNum <= 0 || !occurredOn || !chosenCategoryId) {
-        alert('⚠️ Amount, date, and category are required');
-        return;
+        // 1) Create the expense
+        const exp = await createExpense({
+          occurred_on: occurredOn,
+          amount: amountNum,
+          category_id: chosenCategoryId,
+          notes: expanded ? (notes || null) : null,
+          status: expanded ? status : 'uncleared',
+          contact_id: expanded && contactId ? contactId : null,
+          label_ids: expanded ? labelIds : [],
+        });
+
+        // 2) Upload attachments (if any)
+        if (newFiles.length) {
+          await uploadAttachments(exp.id, newFiles);
+        }
+
+        // Optionally open attachments panel after save
+        // setSelectedId(exp.id);
+
+        // Close modal + reset form
+        setShowAddModal(false);
+        setAmount('');
+        setMainCatId('');
+        setSubCatId('');
+        setNotes('');
+        setLabelIds([]);
+        setContactId('');
+        setStatus('uncleared');
+        setNewFiles([]); // <— clear selected files
+
+        await refresh();
+      } catch (err) {
+        console.error(err);
+        alert(`❌ Failed to add expense: ${err?.message || 'Unknown error'}`);
       }
-
-      const exp = await createExpense({
-        occurred_on: occurredOn,
-        amount: amountNum,
-        category_id: chosenCategoryId, // ✅ must be set
-        notes: expanded ? (notes || null) : null,
-        status: expanded ? status : 'uncleared',
-        contact_id: expanded && contactId ? contactId : null,
-        label_ids: expanded ? labelIds : [],
-      });
-
-      setSelectedId(exp.id);
-      setShowAddModal(false);
-
-      // reset fields
-      setAmount('');
-      setMainCatId('');
-      setSubCatId('');
-      setNotes('');
-      setLabelIds([]);
-      setContactId('');
-      setStatus('uncleared');
-
-      await refresh();
-    } catch (err) {
-      console.error(err);
-      alert(`❌ Failed to add expense: ${err?.message || 'Unknown error'}`);
     }
-  }
+
+ 
+
+
+
 
     async function handleUpdateExpense(e) {
-    e.preventDefault();
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { alert('🚫 Not logged in'); return; }
+      e.preventDefault();
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { alert('🚫 Not logged in'); return; }
 
-      const amountNum = Number.parseFloat(String(amount).trim());
-      const chosenCategoryId = subCatId || mainCatId || null;
-      if (!editId) { alert('Missing expense id'); return; }
-      if (!Number.isFinite(amountNum) || amountNum <= 0 || !occurredOn || !chosenCategoryId) {
-        alert('⚠️ Amount, date, and category are required');
-        return;
+        const amountNum = Number.parseFloat(String(amount).trim());
+        const chosenCategoryId = subCatId || mainCatId || null;
+        if (!editId) { alert('Missing expense id'); return; }
+        if (!Number.isFinite(amountNum) || amountNum <= 0 || !occurredOn || !chosenCategoryId) {
+          alert('⚠️ Amount, date, and category are required');
+          return;
+        }
+
+        await updateExpense(editId, {
+          occurred_on: occurredOn,
+          amount: amountNum,
+          category_id: chosenCategoryId,
+          notes: notes || null,
+          status,
+          contact_id: contactId || null,
+          label_ids: labelIds, // replace existing set
+        });
+
+        // ⬇️ Upload any newly picked files
+        if (editFiles.length) {
+          await uploadAttachments(editId, editFiles);
+        }
+
+        setShowEditModal(false);
+        setEditId(null);
+
+        // clear edit form state
+        setAmount('');
+        setMainCatId('');
+        setSubCatId('');
+        setNotes('');
+        setLabelIds([]);
+        setContactId('');
+        setStatus('uncleared');
+        setEditFiles([]); // clear files
+
+        await refresh();
+      } catch (err) {
+        console.error(err);
+        alert(`❌ Failed to update expense: ${err?.message || 'Unknown error'}`);
       }
-
-      await updateExpense(editId, {
-        occurred_on: occurredOn,
-        amount: amountNum,
-        category_id: chosenCategoryId,
-        notes: notes || null,
-        status,
-        contact_id: contactId || null,
-        label_ids: labelIds, // replace existing set
-      });
-
-      setShowEditModal(false);
-      setEditId(null);
-
-      // Clean up form state (optional)
-      setAmount('');
-      setMainCatId('');
-      setSubCatId('');
-      setNotes('');
-      setLabelIds([]);
-      setContactId('');
-      setStatus('uncleared');
-
-      await refresh();
-    } catch (err) {
-      console.error(err);
-      alert(`❌ Failed to update expense: ${err?.message || 'Unknown error'}`);
     }
-  }
+
 
 
     async function openEdit(row) {
@@ -327,6 +351,8 @@ const ExpenseDashboard = () => {
       setStatus(row.status || 'uncleared');
       setContactId(row.contact_id || '');
       setNotes(row.notes || '');
+      setEditAttachmentCount(row.attachments_count ?? 0);
+      setShowEditModal(true);
 
       // Labels from row.label_badges to ids
       const ids = (row.label_badges || []).map(b => b.id);
@@ -510,48 +536,55 @@ const ExpenseDashboard = () => {
               </tr>
             </thead>
             <tbody>
-              {visibleExpenses.map((r) => (
-                <tr key={r.id}>
-                  <td>{r.occurred_on}</td>
-                  <td>{r.category_path ?? '—'}</td>
-                  <td>{r.notes ?? ''}</td>
-                  <td>
-                    <div style={{display:'flex', gap:6, flexWrap:'wrap', justifyContent:'center'}}>
-                      {(r.label_badges ?? []).map((b) => (
-                        <span key={b.id} className="px-2 py-0.5 rounded-full" style={{ border: '1px solid '+b.color }}>
-                          <span style={{ display:'inline-block', width:8, height:8, borderRadius:999, background:b.color, marginRight:6 }} />
-                          {b.name}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td>₱{Number(r.amount).toFixed(2)}</td>
-                  <td className="capitalize">{r.status}</td>
-                  <td>📎 {r.attachments_count ?? 0}</td>
-                  <td className="col-actions">
-                    <div className="table-actions">
-                      <button className="btn xs outline" onClick={() => setSelectedId(r.id)}>
-                        Attachments
-                      </button>
-                      <button className="btn xs outline" onClick={() => openEdit(r)}>
-                        Edit
-                      </button>
+                {visibleExpenses.map((r) => (
+                  <tr
+                    key={r.id}
+                    className="clickable-row"
+                    onClick={() => openEdit(r)}               // ← open editor
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter') openEdit(r); }}  // a11y: Enter to edit
+                    role="button"
+                    aria-label="Edit expense"
+                  >
+                    <td>{r.occurred_on}</td>
+                    <td>{r.category_path ?? '—'}</td>
+                    <td>{r.notes ?? ''}</td>
+                    <td>
+                      <div style={{display:'flex', gap:6, flexWrap:'wrap', justifyContent:'center'}}>
+                        {(r.label_badges ?? []).map((b) => (
+                          <span key={b.id} className="px-2 py-0.5 rounded-full" style={{ border: '1px solid '+b.color }}>
+                            <span style={{ display:'inline-block', width:8, height:8, borderRadius:999, background:b.color, marginRight:6 }} />
+                            {b.name}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td>₱{Number(r.amount).toFixed(2)}</td>
+                    <td className="capitalize">{r.status}</td>
+                    <td>📎 {r.attachments_count ?? 0}</td>
+                    <td className="col-actions">
+                      <div className="table-actions">
+                        {/* prevent row click when pressing the button */}
+                        <button
+                          className="btn xs outline"
+                          onClick={(e) => { e.stopPropagation(); setSelectedId(r.id); }}
+                        >
+                          Attachments
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {visibleExpenses.length === 0 && (
+                  <tr>
+                    <td colSpan={8} style={{ padding: '20px', color: '#64748b' }}>
+                      No expenses for {selectedMonth}
+                      {selectedCategory !== 'all' ? ` in “${selectedCategory}”` : ''}.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
 
-                      {/* (Optional) Add edit/delete later */}
-                    </div>
-                  </td>
-                  
-                </tr>
-              ))}
-              {visibleExpenses.length === 0 && (
-                <tr>
-                  <td colSpan={8} style={{ padding: '20px', color: '#64748b' }}>
-                    No expenses for {selectedMonth}
-                    {selectedCategory !== 'all' ? ` in “${selectedCategory}”` : ''}.
-                  </td>
-                </tr>
-              )}
-            </tbody>
           </table>
         </section>
 
@@ -703,6 +736,45 @@ const ExpenseDashboard = () => {
                       }}
                     />
                   </div>
+
+                  <div className="field" style={{ gridColumn:'1 / -1' }}>
+                    <label>Attachments (JPEG/PNG)</label>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png"
+                      multiple
+                      onChange={(e) => setNewFiles(Array.from(e.target.files || []))}
+                    />
+                    {!!newFiles.length && (
+                      <div style={{ display:'flex', gap:12, flexWrap:'wrap', marginTop:8 }}>
+                        {newFiles.map((f, i) => (
+                          <div key={i} className="border rounded-xl p-2" style={{ width: 140 }}>
+                            <div
+                              style={{
+                                width: '100%', height: 90, overflow: 'hidden',
+                                borderRadius: 12, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                              }}
+                            >
+                              {/* lightweight preview */}
+                              <img
+                                src={URL.createObjectURL(f)}
+                                alt={f.name}
+                                style={{ maxWidth:'100%', maxHeight:'100%', objectFit:'cover' }}
+                                onLoad={(e) => URL.revokeObjectURL(e.currentTarget.src)}
+                              />
+                            </div>
+                            <div style={{ fontSize: 12, marginTop: 6, color: '#475569' }}>
+                              {f.name.length > 20 ? f.name.slice(0, 17) + '…' : f.name}
+                            </div>
+                            <div style={{ fontSize: 11, color: '#64748b' }}>
+                              {(f.size/1024).toFixed(1)} KB
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                 </div>
 
 
@@ -736,8 +808,12 @@ const ExpenseDashboard = () => {
         <form className="modal sheet animate-in" onSubmit={handleUpdateExpense}>
           <div className="modal-header">
             <h2 className="modal-title">Edit Expense</h2>
+            <span style={{ fontSize: 12, color: '#64748b' }}>📎 {editAttachmentCount}</span>
             <button type="button" className="icon-btn" aria-label="Close" onClick={() => setShowEditModal(false)}>✕</button>
           </div>
+
+
+
 
           <div className="modal-body">
             <div className="fields-grid">
@@ -821,6 +897,44 @@ const ExpenseDashboard = () => {
                   })}
                 </div>
               </div>
+              <div className="field" style={{ gridColumn:'1 / -1' }}>
+              <label>Attachments (JPEG/PNG)</label>
+              <input
+                type="file"
+                accept="image/jpeg,image/png"
+                multiple
+                onChange={(e) => setEditFiles(Array.from(e.target.files || []))}
+              />
+              {!!editFiles.length && (
+                <div style={{ display:'flex', gap:12, flexWrap:'wrap', marginTop:8 }}>
+                  {editFiles.map((f, i) => (
+                    <div key={i} className="border rounded-xl p-2" style={{ width: 140 }}>
+                      <div
+                        style={{
+                          width: '100%', height: 90, overflow: 'hidden',
+                          borderRadius: 12, background: '#f1f5f9', display: 'flex',
+                          alignItems: 'center', justifyContent: 'center'
+                        }}
+                      >
+                        <img
+                          src={URL.createObjectURL(f)}
+                          alt={f.name}
+                          style={{ maxWidth:'100%', maxHeight:'100%', objectFit:'cover' }}
+                          onLoad={(e) => URL.revokeObjectURL(e.currentTarget.src)}
+                        />
+                      </div>
+                      <div style={{ fontSize: 12, marginTop: 6, color: '#475569' }}>
+                        {f.name.length > 20 ? f.name.slice(0, 17) + '…' : f.name}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#64748b' }}>
+                        {(f.size/1024).toFixed(1)} KB
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             </div>
           </div>
 
