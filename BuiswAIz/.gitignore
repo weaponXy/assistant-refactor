@@ -39,3 +39,9 @@ csharp-backend/bin/
 echo -e "\n# .NET build output\ncsharp-backend/obj/\ncsharp-backend/bin/\n" >> .gitignore
 git add .gitignore
 git commit -m "chore: ignore .NET build output"
+
+
+
+# .gitignore
+.env.local
+.env.*.local

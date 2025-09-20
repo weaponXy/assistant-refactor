@@ -2,12 +2,9 @@
 import { supabase } from '../supabase';
 
 export async function listLabels() {
-  const { data: u } = await supabase.auth.getUser();
-  if (!u?.user) return [];
   const { data, error } = await supabase
     .from('labels')
     .select('*')
-    .eq('user_id', u.user.id)   // only my labels
     .order('name');
   if (error) throw error;
   return data ?? [];
