@@ -15,7 +15,6 @@ import Dashboard from "./Dashboard";
 import ExpenseDashboard from "./expenses/expenses";
 import UploadSheets from "./components/UploadSheets";
 import BudgetHistory from "./budget/BudgetHistory";
-import HelpPage from "./support/HelpPage"
 
 function App() {
   return (
@@ -38,7 +37,7 @@ function App() {
           <Route path="/upload" element={<UploadSheets />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />  
-          <Route path="/HelpPage" element={<HelpPage />} />
+
           {/* budget history (two URLs point to the same component) */}
           <Route path="/budget" element={<BudgetHistory />} />
           <Route path="/budget-history" element={<BudgetHistory />} />
