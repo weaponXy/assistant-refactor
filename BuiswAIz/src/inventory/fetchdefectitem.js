@@ -7,6 +7,7 @@ export const fetchDefectiveItems = async () => {
     .select(`
       defectiveitemid,
       productid,
+      productcategoryid,
       defectdescription,
       status,
       reporteddate,
@@ -14,6 +15,14 @@ export const fetchDefectiveItems = async () => {
       products (
         productname,
         image_url
+      ),
+      productcategory (
+        price,
+        cost,
+        color,
+        agesize,
+        currentstock,
+        reorderpoint
       )
     `)
     .order("updatedat", { ascending: false });
@@ -25,3 +34,4 @@ export const fetchDefectiveItems = async () => {
 
   return data;
 };
+

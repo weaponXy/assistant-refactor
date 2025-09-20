@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import "../stylecss/AddProduct.css";
-import { supabase } from "../supabase";
 import imageCompression from "browser-image-compression";
 
 const AddProduct = ({ onClose, user }) => {
@@ -8,21 +7,35 @@ const AddProduct = ({ onClose, user }) => {
   const [imageFile, setImageFile] = useState(null);
   const [formError, setFormError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Product-level state
   const [formData, setFormData] = useState({
     productname: "",
     description: "",
-    cost: "",
-    reorderpoint: "",
-    currentstock: "",
-    price: "",
     suppliername: "",
-    image_url: "",
   });
+
+  // Dynamic category state
+  const [categories, setCategories] = useState([
+    {
+      color: "",
+      agesize: "",
+      cost: "",
+      price: "",
+      currentstock: "",
+      reorderpoint: "",
+    },
+  ]);
 
   useEffect(() => {
     const fetchSuppliers = async () => {
-      const { data, error } = await supabase.from("suppliers").select("*").eq("supplierstatus", "Active")
-      if (!error) setSuppliers(data);
+      try {
+        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/get-suppliers`);
+        const data = await response.json();
+        setSuppliers(data);
+      } catch (err) {
+        console.error(err);
+      }
     };
     fetchSuppliers();
   }, []);
@@ -32,255 +45,177 @@ const AddProduct = ({ onClose, user }) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleCategoryChange = (index, e) => {
+    const { name, value } = e.target;
+    const updated = [...categories];
+    updated[index][name] = value;
+    setCategories(updated);
+  };
+
+  const addCategoryRow = () => {
+    setCategories([
+      ...categories,
+      { color: "", agesize: "", cost: "", price: "", currentstock: "", reorderpoint: "" },
+    ]);
+  };
+
+  const removeCategoryRow = (index) => {
+    const updated = [...categories];
+    updated.splice(index, 1);
+    setCategories(updated);
+  };
+
   const handleImageSelect = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    const options = {
-        maxSizeMB: 0.1,
-        maxWidthOrHeight: 500,
-        useWebWorker: true,
-    };
-
+    const options = { maxSizeMB: 0.1, maxWidthOrHeight: 500, useWebWorker: true };
     try {
-        const compressedFile = await imageCompression(file, options);
-        compressedFile.name = file.name;
-        setImageFile(compressedFile);
+      const compressedFile = await imageCompression(file, options);
+      compressedFile.name = file.name;
+      setImageFile(compressedFile);
     } catch (err) {
-        console.error("Image compression failed:", err);
+      console.error("Image compression failed:", err);
     }
   };
 
-
-  const uploadImage = async () => {
-    if (!imageFile) return "";
-
-    const fileExt = imageFile.name.split(".").pop();
-    const fileName = `${Date.now()}.${fileExt}`;
-    const { data, error } = await supabase.storage
-      .from("product-images")
-      .upload(fileName, imageFile);
-
-    if (error) {
-      console.error("Upload error:", error);
-      return "";
-    }
-
-    const { data: publicData } = supabase.storage
-      .from("product-images")
-      .getPublicUrl(fileName);
-
-    return publicData.publicUrl;
-  };
-
-  const handleSubmit = async () => {
-    const addValidate = () => {
-      const requiredFields = [
-          "productname",
-          "description",
-          "cost",
-          "reorderpoint",
-          "currentstock",
-          "price",
-          "suppliername"
-      ];
-
-      const isEmpty = requiredFields.some((field) => {
-        const value = formData[field];
-        if (typeof value === "string" && value.trim() === "") return true;
-        if (["cost", "reorderpoint", "currentstock", "price"].includes(field)) {
-          const numValue = Number(value);     
-          if (isNaN(numValue) || numValue <= 0) return true; 
-        }
-        return false;
-      });
-      
-      if (isEmpty) {
-        setFormError("Please fill in all required fields.");
-        return false;
-      }
-
-      if (parseFloat(formData.price) < parseFloat(formData.cost)) {
-        setFormError("Price cannot be lower than cost.");
-        return false;
-      }
-
-      if (parseInt(formData.currentstock)< parseInt(formData.reorderpoint)) {
-        setFormError("currentstock cannot be lower than the reorderpoint ")
-        return false;
-      }
-        setFormError("");
-        return true;
-    }
-
-    if (!addValidate()) return;
-    if (isSubmitting) return;
-    setIsSubmitting(true);
-
-    const imageUrl = await uploadImage();
-
-    const supplier = suppliers.find(
-      (s) => s.suppliername === formData.suppliername
-    );
-
-    if (!supplier) {
-      alert("Supplier not found.");
-      return;
-    }
-
-    // 1️⃣ Insert product
-    const { error: productError } = await supabase.from("products").insert({
-      productname: formData.productname,
-      description: formData.description,
-      cost: parseFloat(formData.cost),
-      reorderpoint: parseInt(formData.reorderpoint),
-      currentstock: parseInt(formData.currentstock),
-      price: parseFloat(formData.price),
-      supplierid: supplier.supplierid,
-      image_url: imageUrl,
+  // Convert file to Base64
+  const convertToBase64 = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result.split(",")[1]);
+      reader.onerror = (err) => reject(err);
     });
 
-    if (productError) {
-      console.error("Insert failed:", productError);
-      alert("Failed to add product.");
+  const handleSubmit = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    setFormError("");
+
+    if (!formData.productname || !formData.description || !formData.suppliername) {
+      setFormError("Please fill in all product fields.");
+      setIsSubmitting(false);
       return;
     }
 
-   
-
-    // 3️⃣ Log activity
-    if (user) {
-      await supabase.from("activitylog").insert([
-        {
-          action_type: "add_product",
-          action_desc: `added ${formData.productname} to the inventory`,
-          done_user: user.userid,
-        },
-      ]);
+    if (categories.length === 0) {
+      setFormError("Please add at least one category.");
+      setIsSubmitting(false);
+      return;
     }
 
-    onClose();
-  };
+    try {
+      let imageBase64 = null;
+      let imageName = null;
+      if (imageFile) {
+        imageBase64 = await convertToBase64(imageFile);
+        imageName = imageFile.name;
+      }
 
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/add-product`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productname: formData.productname,
+          description: formData.description,
+          suppliername: formData.suppliername,
+          categories,
+          userid: user.userid,
+          imageBase64,
+          imageName,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        setFormError(data.error || "Failed to add product");
+      } else {
+        onClose();
+      }
+    } catch (err) {
+      console.error(err);
+      setFormError("Server error");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="modal-overlay">
       <div className="Addmodal-content slide-up">
-        
         <div className="modal-header">
-          <button className="back-btn" onClick={onClose}>←</button>
-          <h2>Product</h2>
+          <button className="back-btn" onClick={onClose}>
+            ←
+          </button>
+          <h2>New Product</h2>
           <div className="modal-actions">
-            <button className="create-btn" onClick={handleSubmit} disabled={isSubmitting}>{isSubmitting ? "Creating..." : "Create Item"}</button>
+            <button className="create-btn" onClick={handleSubmit} disabled={isSubmitting}>
+              {isSubmitting ? "Creating..." : "Create Item"}
+            </button>
           </div>
         </div>
 
-        {/* Body */}
         <div className="modal-body">
-            <div className="image-upload">
-                <label className="upload-box">
-                    {imageFile ? (
-                    <img
-                        src={URL.createObjectURL(imageFile)}
-                        alt="Preview"
-                        className="preview-image"
-                    />
-                    ) : (
-                    "Click to upload image"
-                    )}
-                    <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageSelect}
-                    style={{ display: "none" }}
-                    />
-                </label>
-            </div>
-
+          <div className="image-upload">
+            <label className="upload-box">
+              {imageFile ? (
+                <img src={URL.createObjectURL(imageFile)} alt="Preview" className="preview-image" />
+              ) : (
+                "Click to upload image"
+              )}
+              <input type="file" accept="image/*" onChange={handleImageSelect} style={{ display: "none" }} />
+            </label>
+          </div>
 
           <div className="product-fields">
             <label>Product title</label>
-            <input
-              name="productname"
-              className="product-name-input"
-              placeholder="Product Name"
-              value={formData.productname}
-              onChange={handleChange}
-            />
-
-            <div className="two-cols">
-              <input
-                name="description"
-                placeholder="Description"
-                value={formData.description}
-                onChange={handleChange}
-              />
-              <div className="with-label">
-                <label>₱</label>
-                <input
-                  type="number"
-                  name="cost"
-                  placeholder="Cost"
-                  value={formData.cost}
-                  onChange={handleChange}
-                />
-              </div>
-            </div>
-
-            <div className="two-cols">
-              <div className="with-label">
-                <label>Pcs</label>
-                <input
-                  type="number"
-                  name="reorderpoint"
-                  placeholder="Reorder Point"
-                  value={formData.reorderpoint}
-                  onChange={handleChange}
-                />
-              </div>
-              <div className="with-label">
-                <label>Pcs</label>
-                <input
-                  type="number"
-                  name="currentstock"
-                  placeholder="Quantity"
-                  value={formData.currentstock}
-                  onChange={handleChange}
-                />
-              </div>
-            </div>
-
-            <div className="two-cols">
-              <div className="with-icon">
-                <span>₱</span>
-                <input
-                  type="number"
-                  name="price"
-                  placeholder="Price"
-                  value={formData.price}
-                  onChange={handleChange}
-                />
-              </div>
-              <select
-                name="suppliername"
-                value={formData.suppliername}
-                onChange={handleChange}
-              >
-                <option value="">Select Supplier</option>
-                {suppliers.map((s) => (
-                  <option key={s.supplierid} value={s.suppliername}>
-                    {s.suppliername}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {formError && (
-            <div className="productForm-warning">
-              {formError}
-            </div>
-          )}
+            <input name="productname" placeholder="Product Name" value={formData.productname} onChange={handleChange} />
+            <textarea name="description" placeholder="Description" value={formData.description} onChange={handleChange} />
+            <select name="suppliername" value={formData.suppliername} onChange={handleChange}>
+              <option value="">Select Supplier</option>
+              {suppliers.map((s) => (
+                <option key={s.supplierid} value={s.suppliername}>
+                  {s.suppliername}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
+
+        <div className="categories-section">
+          <h3 className="section-title">Categories</h3>
+          {categories.map((cat, index) => (
+            <div key={index} className="category-card">
+              <div className="category-fields">
+                <input name="color" placeholder="Color" value={cat.color} onChange={(e) => handleCategoryChange(index, e)} />
+                <select name="agesize" value={cat.agesize} onChange={(e) => handleCategoryChange(index, e)}>
+                  <option value="">-- Select Age/Size --</option>
+                  <option value="Newborn">Newborn</option>
+                  <option value="0-3 Months">0-3 Months</option>
+                  <option value="3-6 Months">3-6 Months</option>
+                  <option value="6-9 Months">6-9 Months</option>
+                  <option value="9-12 Months">9-12 Months</option>
+                  <option value="12-18 Months">12-18 Months</option>
+                </select>
+                <input type="number" name="cost" placeholder="Cost" value={cat.cost} onChange={(e) => handleCategoryChange(index, e)} />
+                <input type="number" name="price" placeholder="Price" value={cat.price} onChange={(e) => handleCategoryChange(index, e)} />
+                <input type="number" name="currentstock" placeholder="Stock" value={cat.currentstock} onChange={(e) => handleCategoryChange(index, e)} />
+                <input type="number" name="reorderpoint" placeholder="Reorder Point" value={cat.reorderpoint} onChange={(e) => handleCategoryChange(index, e)} />
+              </div>
+              {categories.length > 1 && (
+                <button className="remove-category-btn" type="button" onClick={() => removeCategoryRow(index)}>
+                  ✕ Remove
+                </button>
+              )}
+            </div>
+          ))}
+          <button type="button" className="add-category-btn" onClick={addCategoryRow}>
+            + Add Category
+          </button>
+        </div>
+
+        {formError && <div className="productForm-warning">{formError}</div>}
       </div>
     </div>
   );

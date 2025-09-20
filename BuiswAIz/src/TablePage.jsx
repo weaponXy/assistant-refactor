@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from "react-router-dom";
 import { supabase } from './supabase';
 import OrderSales from './components/OrderSales';
@@ -6,131 +6,74 @@ import Bestseller from './components/Bestseller';
 import StatsContainer from './components/StatsContainer';
 import InvoiceModal from './components/InvoiceModal';
 import AddSaleModal from './components/AddSaleModal';
+import SalesSuccessModal from './components/SalesSuccessModal';
+import PeakHours from './components/PeakHours';
 import './stylecss/TablePage.css';
-
 import './stylecss/Sales/OrderSales.css';
 import './stylecss/Sales/StatsContainer.css';
 import './stylecss/Sales/InvoiceModal.css';
 import './stylecss/Sales/AddSaleModal.css';
 import './stylecss/Sales/Bestseller.css';
+import './stylecss/Sales/PeakHours.css';
+
 
 const TablePage = () => {
   const navigate = useNavigate();
   const [orderData, setOrderData] = useState([]);
-  const [bestsellers, setBestsellers] = useState([]);
+  const [products, setProducts] = useState([]);
   const [totalEarnings, setTotalEarnings] = useState(0);
   const [totalCustomers, setTotalCustomers] = useState(0);
   const [loading, setLoading] = useState(true);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [statsFilter, setStatsFilter] = useState('all');
   const [showAddSaleModal, setShowAddSaleModal] = useState(false);
+  const [showSalesSuccessModal, setShowSalesSuccessModal] = useState(false);
+  const [salesSuccessData, setSalesSuccessData] = useState(null);
   const [user, setUser] = useState(null);
-  const [products, setProducts] = useState([]);
 
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { user }, error } = await supabase.auth.getUser();
-      if (error || !user) {
-        window.location.href = '/'; // redirect to login
-        return;
+  // Memoize bestsellers calculation to prevent unnecessary recalculations
+  const bestsellers = useMemo(() => {
+    if (!orderData.length) return [];
+
+    const summary = {};
+    orderData.forEach(item => {
+      // Use productcategoryid as the unique identifier
+      const id = item.productcategoryid;
+      const name = item.products?.productname || 'Unknown';
+      const imageUrl = item.products?.image_url || '';
+
+      if (!summary[id]) {
+        summary[id] = {
+          productcategoryid: id,
+          productname: name,
+          image_url: imageUrl,
+          totalQuantity: 0,
+          timesBought: new Set(),
+        };
       }
-      
-      const { data: profile, error: profileError } = await supabase
-        .from('systemuser')
-        .select('*')
-        .eq('userid', user.id)
-        .single();
-      
-      if (profileError) {
-        console.error("Error fetching user profile:", profileError);
-        return;
-      }
-      
-      setUser(profile);
-    };
-    
-    getUser();
-    fetchOrderData();
-    fetchProducts();
-  }, []);
 
-  // Update stats based on filter
-  useEffect(() => {
-    updateStatsData(orderData, statsFilter);
-  }, [orderData, statsFilter]);
+      summary[id].totalQuantity += item.quantity;
+      summary[id].timesBought.add(item.orderid);
+    });
 
-  const fetchProducts = async () => {
-    const { data, error } = await supabase
-      .from('products')
-      .select('productid, productname, price, currentstock')
-      .order('productname');
-
-    if (error) {
-      console.error('Error fetching products:', error.message);
-    } else {
-      setProducts(data);
-    }
-  };
-
-  const fetchOrderData = async () => {
-    const { data, error } = await supabase
-      .from('orderitems')
-      .select(`
-        orderid,
-        productid,
-        quantity,
-        unitprice,
-        subtotal,
-        createdat,
-        products (productname, image_url),
-        orders (totalamount, orderstatus, amount_paid, change)
-      `);
-
-    if (error) {
-      console.error('Error fetching order data:', error.message);
-    } else {
-      setOrderData(data);
-
-      // Calculate bestsellers
-      const summary = {};
-      data.forEach(item => {
-        const id = item.productid;
-        const name = item.products?.productname || 'Unknown';
-        const imageUrl = item.products?.image_url || '';
-
-        if (!summary[id]) {
-          summary[id] = {
-            productid: id,
-            productname: name,
-            image_url: imageUrl,
-            totalQuantity: 0,
-            timesBought: new Set(),
-          };
-        }
-
-        summary[id].totalQuantity += item.quantity;
-        summary[id].timesBought.add(item.orderid);
-      });
-
-      const bestsellersArray = Object.values(summary).map(item => ({
+    return Object.values(summary)
+      .map(item => ({
         ...item,
         timesBought: item.timesBought.size,
-      }));
+      }))
+      .sort((a, b) => b.totalQuantity - a.totalQuantity);
+  }, [orderData]);
 
-      bestsellersArray.sort((a, b) => b.totalQuantity - a.totalQuantity);
-      setBestsellers(bestsellersArray);
-    }
+  // Memoize stats calculation with debouncing - now using orderdate from orders table
+  const { earnings, customers } = useMemo(() => {
+    if (!orderData.length) return { earnings: 0, customers: 0 };
 
-    setLoading(false);
-  };
-
-  const updateStatsData = (data, timeFilter) => {
     const now = new Date();
-
-    const filteredData = data.filter(item => {
-      const date = new Date(item.createdat);
+    const filteredData = orderData.filter(item => {
+      // Use orderdate from orders table instead of createdat from orderitems
+      const date = new Date(item.orders?.orderdate || item.createdat);
       
-      switch (timeFilter) {
+      switch (statsFilter) {
         case 'today':
           return date.toDateString() === now.toDateString();
         case 'week1':
@@ -146,29 +89,195 @@ const TablePage = () => {
       }
     });
 
-    const filteredEarnings = filteredData.reduce((sum, item) => sum + (item.subtotal || 0), 0);
-    setTotalEarnings(filteredEarnings);
+    const earnings = filteredData.reduce((sum, item) => sum + (item.subtotal || 0), 0);
+    const uniqueOrderIds = new Set(filteredData.map(item => item.orderid));
+    
+    return { earnings, customers: uniqueOrderIds.size };
+  }, [orderData, statsFilter]);
 
-    const filteredUniqueOrderIds = new Set(filteredData.map(item => item.orderid));
-    setTotalCustomers(filteredUniqueOrderIds.size);
-  };
+  // Update stats when calculated values change
+  useEffect(() => {
+    setTotalEarnings(earnings);
+    setTotalCustomers(customers);
+  }, [earnings, customers]);
 
-  const handleStatsFilter = (e) => {
-    setStatsFilter(e.target.value);
-  };
+  // Optimize user authentication check
+  useEffect(() => {
+    let mounted = true;
 
-  const handleAddSale = () => {
-    setShowAddSaleModal(true);
-  };
+    const getUser = async () => {
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (!mounted) return;
 
-  const handleCloseAddSaleModal = () => {
-    setShowAddSaleModal(false);
-  };
+        if (error || !user) {
+          window.location.href = '/';
+          return;
+        }
+        
+        const { data: profile, error: profileError } = await supabase
+          .from('systemuser')
+          .select('*')
+          .eq('userid', user.id)
+          .single();
+        
+        if (!mounted) return;
+        
+        if (profileError) {
+          console.error("Error fetching user profile:", profileError);
+          return;
+        }
+        
+        setUser(profile);
+      } catch (error) {
+        console.error("Authentication error:", error);
+        if (mounted) window.location.href = '/';
+      }
+    };
+    
+    getUser();
+    return () => { mounted = false; };
+  }, []);
 
-  // Generate unique order ID - sequential integer starting from 1
-  const generateUniqueOrderId = async () => {
+  // Updated products fetching to use productcategory table
+  const fetchProducts = useCallback(async () => {
     try {
-      // Get the highest existing order ID
+      const { data, error } = await supabase
+        .from('productcategory')
+        .select(`
+          productcategoryid,
+          productid,
+          price,
+          cost,
+          color,
+          agesize,
+          currentstock,
+          reorderpoint,
+          products (
+            productname,
+            description,
+            image_url
+          )
+        `)
+        .order('productcategoryid');
+
+      if (error) {
+        console.error('Error fetching products:', error.message);
+        return;
+      }
+      
+      // Transform data to match expected format
+      const transformedProducts = data?.map(item => ({
+        productcategoryid: item.productcategoryid,
+        productid: item.productid,
+        productname: item.products?.productname || 'Unknown Product',
+        description: item.products?.description || '',
+        image_url: item.products?.image_url || '',
+        price: item.price,
+        cost: item.cost,
+        color: item.color,
+        agesize: item.agesize,
+        currentstock: item.currentstock,
+        reorderpoint: item.reorderpoint
+      })) || [];
+      
+      setProducts(transformedProducts);
+    } catch (error) {
+      console.error('Unexpected error fetching products:', error);
+    }
+  }, []);
+
+  // Updated order data fetching to include orderdate from orders table
+  const fetchOrderData = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('orderitems')
+        .select(`
+          productid,
+          orderid,
+          productcategoryid,
+          quantity,
+          unitprice,
+          subtotal,
+          createdat,
+          productcategory (
+            productid,
+            price,
+            cost,
+            color,
+            agesize,
+            currentstock,
+            products (
+              productname,
+              image_url,
+              description
+            )
+          ),
+          orders (
+            totalamount,
+            orderstatus,
+            amount_paid,
+            change,
+            orderdate
+          )
+        `);
+
+      if (error) {
+        console.error('Error fetching order data:', error.message);
+        return;
+      }
+
+      // Transform data to match expected format
+      const transformedData = data?.map(item => ({
+        ...item,
+        // Create a products object for backward compatibility
+        products: {
+          productname: item.productcategory?.products?.productname || 'Unknown Product',
+          image_url: item.productcategory?.products?.image_url || '',
+          description: item.productcategory?.products?.description || ''
+        }
+      })) || [];
+
+      setOrderData(transformedData);
+    } catch (error) {
+      console.error('Unexpected error fetching order data:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Initial data fetch
+  useEffect(() => {
+    fetchOrderData();
+    fetchProducts();
+  }, [fetchOrderData, fetchProducts]);
+
+  // Debounce stats filter changes
+  const handleStatsFilter = useCallback((e) => {
+    const value = e.target.value;
+    // Use requestAnimationFrame to defer state update
+    requestAnimationFrame(() => {
+      setStatsFilter(value);
+    });
+  }, []);
+
+  const handleAddSale = useCallback(() => {
+    setShowAddSaleModal(true);
+  }, []);
+
+  const handleCloseAddSaleModal = useCallback(() => {
+    setShowAddSaleModal(false);
+  }, []);
+
+  // Add callback for sales success modal
+  const handleSalesSuccessModalClose = useCallback(() => {
+    setShowSalesSuccessModal(false);
+    setSalesSuccessData(null);
+  }, []);
+
+  // Optimize order ID generation with async handling
+  const generateUniqueOrderId = useCallback(async () => {
+    try {
       const { data, error } = await supabase
         .from('orders')
         .select('orderid')
@@ -180,170 +289,249 @@ const TablePage = () => {
         throw new Error(`Database error while fetching order IDs: ${error.message}`);
       }
       
-      // If no orders exist, start with 1
       if (!data || data.length === 0) {
         return 1;
       }
       
-      // Get the highest order ID and add 1
-      const highestOrderId = parseInt(data[0].orderid);
+      const highestOrderId = parseInt(data[0].orderid, 10);
       if (isNaN(highestOrderId)) {
-        // If somehow the existing orderid is not a number, start from 1
         console.warn('Found non-numeric order ID, starting from 1');
         return 1;
       }
       
       return highestOrderId + 1;
-      
     } catch (error) {
       console.error('Error in generateUniqueOrderId:', error);
       throw error;
     }
-  };
+  }, []);
 
-  // Check stock availability for all products in the sale
-  const checkStockAvailability = async (salesDataArray) => {
-    const stockErrors = [];
-    
-    for (const saleData of salesDataArray) {
-      if (!saleData.isCustomProduct) {
-        // Get current stock for existing products
-        const { data: product, error } = await supabase
-          .from('products')
-          .select('productid, productname, currentstock')
-          .eq('productname', saleData.productname)
-          .single();
+  // Fixed stock availability check using productcategoryid
+  const checkStockAvailability = useCallback(async (salesDataArray) => {
+    try {
+      const stockErrors = [];
+      const productsToCheck = salesDataArray.filter(item => !item.isCustomProduct);
+
+      if (productsToCheck.length === 0) {
+        return [];
+      }
+
+      // Use productcategoryid directly instead of productname matching
+      const productCategoryIds = productsToCheck
+        .map(saleData => saleData.productcategoryid)
+        .filter(id => id !== null && id !== undefined);
+
+      if (productCategoryIds.length > 0) {
+        const { data: currentStockData, error } = await supabase
+          .from('productcategory')
+          .select(`
+            productcategoryid, 
+            currentstock, 
+            color,
+            agesize,
+            products(productname)
+          `)
+          .in('productcategoryid', productCategoryIds);
 
         if (error) {
-          stockErrors.push(`Error checking stock for "${saleData.productname}": ${error.message}`);
-          continue;
+          console.error('Error fetching current stock:', error);
+          stockErrors.push('Error fetching current stock data');
+          return stockErrors;
         }
 
-        if (!product) {
-          stockErrors.push(`Product "${saleData.productname}" not found`);
-          continue;
-        }
+        // Check stock against current database values using productcategoryid
+        for (const saleData of productsToCheck) {
+          const currentStockItem = currentStockData.find(s => s.productcategoryid === saleData.productcategoryid);
+          
+          if (!currentStockItem) {
+            stockErrors.push(`Stock data not found for product variant (ID: ${saleData.productcategoryid})`);
+            continue;
+          }
 
-        if (product.currentstock < saleData.quantity) {
-          if (product.currentstock === 0) {
-            stockErrors.push(`"${saleData.productname}" is out of stock`);
-          } else {
-            stockErrors.push(`"${saleData.productname}" has insufficient stock. Available: ${product.currentstock}, Required: ${saleData.quantity}`);
+          const currentStock = currentStockItem.currentstock;
+          const requestedQuantity = parseInt(saleData.quantity, 10);
+          const productName = currentStockItem.products?.productname || 'Unknown Product';
+          const variantInfo = [currentStockItem.color, currentStockItem.agesize].filter(v => v).join(', ');
+          const fullProductName = variantInfo ? `${productName} (${variantInfo})` : productName;
+
+          if (currentStock === 0) {
+            stockErrors.push(`"${fullProductName}" is out of stock`);
+          } else if (requestedQuantity > currentStock) {
+            stockErrors.push(`"${fullProductName}" has insufficient stock. Available: ${currentStock}, Required: ${requestedQuantity}`);
           }
         }
       }
+
+      if (stockErrors.length > 0) {
+        console.log('Stock errors:', stockErrors);
+      }
+
+      return stockErrors;
+    } catch (error) {
+      console.error('Error in checkStockAvailability:', error);
+      return [`Error checking stock availability: ${error.message}`];
+    }
+  }, []);
+
+  // Fixed inventory update using productcategoryid
+  const updateInventoryStock = useCallback(async (salesDataArray) => {
+    const productsToUpdate = salesDataArray.filter(item => !item.isCustomProduct);
+
+    if (productsToUpdate.length === 0) {
+      return;
     }
 
-    return stockErrors;
-  };
+    try {
+      const updates = [];
 
-  // Update inventory stock
-  const updateInventoryStock = async (salesDataArray) => {
-    const updates = [];
-    
-    for (const saleData of salesDataArray) {
-      if (!saleData.isCustomProduct) {
-        const { data: product, error } = await supabase
-          .from('products')
-          .select('productid, currentstock')
-          .eq('productname', saleData.productname)
-          .single();
-
-        if (error || !product) {
-          throw new Error(`Failed to get product info for "${saleData.productname}"`);
+      // Process each product individually using productcategoryid
+      for (const saleData of productsToUpdate) {
+        // Validate that we have a productcategoryid
+        if (!saleData.productcategoryid) {
+          const error = `Product "${saleData.productname}" missing productcategoryid`;
+          console.error(error);
+          throw new Error(error);
         }
 
-        const newStock = product.currentstock - saleData.quantity;
+        // Get CURRENT stock from database using productcategoryid
+        const { data: currentStockData, error: stockError } = await supabase
+          .from('productcategory')
+          .select('productcategoryid, currentstock, color, agesize, products(productname)')
+          .eq('productcategoryid', saleData.productcategoryid)
+          .single();
+
+        if (stockError) {
+          const error = `Failed to get current stock for productcategoryid ${saleData.productcategoryid}: ${stockError.message}`;
+          console.error(error);
+          throw new Error(error);
+        }
+
+        const currentStock = currentStockData.currentstock;
+        const quantityToReduce = parseInt(saleData.quantity, 10);
+        const newStock = currentStock - quantityToReduce;
+        const productName = currentStockData.products?.productname || 'Unknown Product';
+        const variantInfo = [currentStockData.color, currentStockData.agesize].filter(v => v).join(', ');
+        const fullProductName = variantInfo ? `${productName} (${variantInfo})` : productName;
+
+        if (newStock < 0) {
+          const error = `Would result in negative stock for ${fullProductName}. Current: ${currentStock}, Requested: ${quantityToReduce}`;
+          console.error(error);
+          throw new Error(error);
+        }
+
         updates.push({
-          productid: product.productid,
+          productcategoryid: saleData.productcategoryid,
           currentstock: newStock,
-          updatedstock: new Date().toISOString()
+          updatedstock: new Date().toISOString(),
+          productname: fullProductName,
+          originalStock: currentStock,
+          quantityReduced: quantityToReduce
         });
       }
-    }
 
-    // Update all stock levels
-    for (const update of updates) {
-      const { error } = await supabase
-        .from('products')
-        .update({
-          currentstock: update.currentstock,
-          updatedstock: update.updatedstock
-        })
-        .eq('productid', update.productid);
+      // Perform updates one by one using productcategoryid
+      for (const update of updates) {
+        const { error } = await supabase
+          .from('productcategory')
+          .update({
+            currentstock: update.currentstock,
+            updatedstock: update.updatedstock
+          })
+          .eq('productcategoryid', update.productcategoryid)
+          .select('productcategoryid, currentstock, updatedstock');
 
-      if (error) {
-        throw new Error(`Failed to update stock: ${error.message}`);
+        if (error) {
+          const errorMsg = `Failed to update stock for ${update.productname} (ID: ${update.productcategoryid}): ${error.message}`;
+          console.error(errorMsg);
+          console.error('Full error object:', error);
+          throw new Error(errorMsg);
+        }
+
+        // Small delay to prevent overwhelming the database
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
+      
+    } catch (error) {
+      console.error('\nInventory update failed');
+      console.error('Error details:', error);
+      console.error('Error stack:', error.stack);
+      throw error;
     }
-  };
+  }, []);
 
-  const handleSaveSale = async (orderWithPayment) => {
+  // Enhanced handleSaveSale with productcategoryid validation
+  const handleSaveSale = useCallback(async (orderWithPayment) => {
     try {
-      // Extract the sales data array from the order object
       const salesDataArray = orderWithPayment.salesData;
       
-      // First, check stock availability
+      // Validate that non-custom products have productcategoryid
+      const invalidProducts = salesDataArray.filter(item => 
+        !item.isCustomProduct && !item.productcategoryid
+      );
+      
+      if (invalidProducts.length > 0) {
+        const errorMsg = `Missing productcategoryid for products: ${invalidProducts.map(p => p.productname).join(', ')}`;
+        console.error(errorMsg);
+        alert(errorMsg);
+        return;
+      }
+      
       const stockErrors = await checkStockAvailability(salesDataArray);
       if (stockErrors.length > 0) {
+        console.error('Stock validation failed:', stockErrors);
         alert(`Stock validation failed:\n\n${stockErrors.join('\n')}`);
         return;
       }
 
-      // Generate unique order ID with better error handling
-      let uniqueOrderId;
-      try {
-        uniqueOrderId = await generateUniqueOrderId();
-      } catch (error) {
-        console.error('Failed to generate unique order ID:', error);
-        alert(`Error generating order ID: ${error.message}`);
-        return;
-      }
+      const uniqueOrderId = await generateUniqueOrderId();
       
-      // Update all sales data with the generated order ID
+      // Update sales data with order ID
       const updatedSalesData = salesDataArray.map(item => ({
         ...item,
         orderid: uniqueOrderId
       }));
 
-      // Calculate total amount for the order
       const totalAmount = updatedSalesData.reduce((sum, item) => sum + item.subtotal, 0);
-      const orderDate = updatedSalesData[0].createdat;
+      // Use the exact datetime from the form input
+      const orderDateTime = orderWithPayment.orderDateTime;
+      const normalizedStatus = orderWithPayment.orderStatus.toUpperCase();
 
-      // Create order in orders table with 'completed' status and payment information
-      const { error: orderCreateError } = await supabase
+      const orderRecord = {
+        orderid: uniqueOrderId,
+        totalamount: totalAmount,
+        orderdate: orderDateTime, // Use orderdate instead of orderdate
+        orderstatus: normalizedStatus,
+        amount_paid: orderWithPayment.amountPaid,
+        change: orderWithPayment.change
+      };
+      
+      const { data: orderData, error: orderCreateError } = await supabase
         .from('orders')
-        .insert([{
-          orderid: uniqueOrderId,
-          totalamount: totalAmount,
-          orderdate: orderDate,
-          orderstatus: 'completed',
-          amount_paid: orderWithPayment.amountPaid,
-          change: orderWithPayment.change
-        }]);
+        .insert([orderRecord])
+        .select();
+
+      console.log('Order creation result:', { data: orderData, error: orderCreateError });
 
       if (orderCreateError) {
         console.error('Error creating order:', orderCreateError);
         alert(`Error creating order: ${orderCreateError.message}`);
         return;
       }
-
       const orderItemsToInsert = [];
       let newProductsCreated = false;
 
-      // Process each product in the array
       for (const saleData of updatedSalesData) {
+        let productCategoryId;
         let productId;
 
         if (saleData.isCustomProduct) {
-          // Create new product with initial stock of 0
+          // Create the product
           const { data: newProduct, error: productCreateError } = await supabase
             .from('products')
             .insert([{
               productname: saleData.productname.trim(),
-              price: saleData.unitprice,
-              currentstock: 0, // Start with 0 since we're selling immediately
-              updatedstock: new Date().toISOString()
+              description: '',
+              image_url: ''
             }])
             .select('productid')
             .single();
@@ -355,108 +543,215 @@ const TablePage = () => {
           }
 
           productId = newProduct.productid;
-          newProductsCreated = true;
-        } else {
-          // Get existing product ID
-          const { data: existingProduct, error: productCheckError } = await supabase
-            .from('products')
-            .select('productid')
-            .eq('productname', saleData.productname)
+
+          // Create the product category
+          const { data: newProductCategory, error: productCategoryCreateError } = await supabase
+            .from('productcategory')
+            .insert([{
+              productid: newProduct.productid,
+              price: saleData.unitprice,
+              cost: 0,
+              color: '',
+              agesize: '',
+              currentstock: 0,
+              reorderpoint: 0,
+              updatedstock: new Date().toISOString()
+            }])
+            .select('productcategoryid')
             .single();
 
-          if (productCheckError) {
-            console.error('Error checking product:', productCheckError);
-            alert(`Error finding product "${saleData.productname}": ${productCheckError.message}`);
+          if (productCategoryCreateError) {
+            console.error('Error creating product category:', productCategoryCreateError);
+            alert(`Error creating product category: ${productCategoryCreateError.message}`);
             return;
           }
 
-          productId = existingProduct.productid;
+          productCategoryId = newProductCategory.productcategoryid;
+          newProductsCreated = true;
+        } else {
+          // For existing products, use the productcategoryid directly from saleData
+          productCategoryId = saleData.productcategoryid;
+          
+          // Find the productid from the productcategoryid
+          const selectedProduct = products.find(p => p.productcategoryid === productCategoryId);
+          
+          if (!selectedProduct) {
+            const error = `Error: Product with productcategoryid "${productCategoryId}" not found`;
+            console.error(error);
+            alert(error);
+            return;
+          }
+          
+          productId = selectedProduct.productid;
         }
 
-        // Add to order items array
         orderItemsToInsert.push({
           orderid: saleData.orderid,
           productid: productId,
+          productcategoryid: productCategoryId,
           quantity: saleData.quantity,
           unitprice: saleData.unitprice,
           subtotal: saleData.subtotal,
-          createdat: saleData.createdat
+          createdat: orderDateTime // Use the same datetime for consistency
         });
       }
 
-      // Insert all order items at once
-      const { error: orderError } = await supabase
+      const { data: orderItemsData, error: orderError } = await supabase
         .from('orderitems')
-        .insert(orderItemsToInsert);
+        .insert(orderItemsToInsert)
+        .select();
+
+      console.log('Order items insertion result:', { data: orderItemsData, error: orderError });
 
       if (orderError) {
-        console.error('Error adding sales:', orderError);
+        console.error('Error adding order items:', orderError);
         alert(`Error adding sales: ${orderError.message}`);
         return;
       }
 
-      // Update inventory stock for existing products
-      await updateInventoryStock(salesDataArray);
-
-
-
-      // Refresh data
-      await fetchOrderData();
-      if (newProductsCreated) {
-        await fetchProducts(); // Refresh products list if new products were created
+      try {
+        await updateInventoryStock(salesDataArray);
+      } catch (stockUpdateError) {
+        console.error('CRITICAL ERROR updating inventory:', stockUpdateError);
+        alert(`CRITICAL ERROR: Sale was recorded but inventory update failed: ${stockUpdateError.message}\n\nPlease check the console for details and contact support.`);
+        return; // Don't continue if inventory update failed
       }
+
+      const refreshPromises = [
+        fetchOrderData(),
+        newProductsCreated ? fetchProducts() : Promise.resolve()
+      ];
       
-      alert(`Successfully added ${updatedSalesData.length} product${updatedSalesData.length > 1 ? 's' : ''} to the completed sale!\n\nOrder ID: ${uniqueOrderId}\nTotal Amount: ₱${totalAmount.toFixed(2)}\nAmount Paid: ₱${orderWithPayment.amountPaid.toFixed(2)}\nChange: ₱${orderWithPayment.change.toFixed(2)}`);
+      await Promise.all(refreshPromises);
+      
+      // Show success modal
+      setSalesSuccessData({
+        orderId: uniqueOrderId,
+        totalAmount: totalAmount,
+        amountPaid: orderWithPayment.amountPaid,
+        change: orderWithPayment.change,
+        status: normalizedStatus,
+        itemCount: updatedSalesData.length
+      });
+      setShowSalesSuccessModal(true);
+      
     } catch (error) {
-      console.error('Unexpected error adding sales:', error);
-      alert('Unexpected error occurred. Check console for details.');
+      console.error('UNEXPECTED ERROR in sale save process:', error);
+      console.error('Error stack:', error.stack);
+      alert(`Unexpected error occurred: ${error.message}\n\nPlease check the console for details.`);
     }
-  };
+  }, [checkStockAvailability, generateUniqueOrderId, updateInventoryStock, fetchOrderData, fetchProducts, products]);
 
-  const handleInvoiceSelect = async (selectedItem) => {
+  // Optimize update order with async processing
+  const handleUpdateOrder = useCallback(async (updateOrderData) => {
     try {
-      // Fetch all items for the same order
-      const { data: orderItems, error } = await supabase
-        .from('orderitems')
-        .select(`
-          orderid,
-          productid,
-          quantity,
-          unitprice,
-          subtotal,
-          createdat,
-          products (productname, image_url),
-          orders (totalamount, orderstatus, amount_paid, change)
-        `)
-        .eq('orderid', selectedItem.orderid);
+      const normalizedStatus = updateOrderData.orderStatus.toUpperCase();
+      
+      const { error: orderUpdateError } = await supabase
+        .from('orders')
+        .update({
+          amount_paid: updateOrderData.amountPaid,
+          change: updateOrderData.change,
+          orderstatus: normalizedStatus
+        })
+        .eq('orderid', updateOrderData.orderid);
 
-      if (error) {
-        console.error('Error fetching order items:', error);
-        alert('Error loading invoice details');
-        return;
+      if (orderUpdateError) {
+        console.error('Database update error:', orderUpdateError);
+        throw new Error(`Failed to update order: ${orderUpdateError.message}`);
       }
 
-      // Set the complete order data for the invoice
-      setSelectedInvoice({
-        ...selectedItem,
-        orderItems: orderItems,
-        totalOrderAmount: orderItems[0]?.orders?.totalamount || 0,
-        orderStatus: orderItems[0]?.orders?.orderstatus || 'unknown',
-        // Make sure payment data is accessible at the root level as well
-        amount_paid: orderItems[0]?.orders?.amount_paid,
-        change: orderItems[0]?.orders?.change,
-        orders: {
-          totalamount: orderItems[0]?.orders?.totalamount,
-          orderstatus: orderItems[0]?.orders?.orderstatus,
-          amount_paid: orderItems[0]?.orders?.amount_paid,
-          change: orderItems[0]?.orders?.change
+      // Fetch data asynchronously
+      await fetchOrderData();
+    } catch (error) {
+      console.error('Error updating order:', error);
+      throw error;
+    }
+  }, [fetchOrderData]);
+
+  // Updated invoice selection to handle new structure with variant data
+  const handleInvoiceSelect = useCallback(async (selectedItem) => {
+    try {
+      // Use requestAnimationFrame to defer heavy operations
+      requestAnimationFrame(async () => {
+        const { data: orderItems, error } = await supabase
+          .from('orderitems')
+          .select(`
+            orderid,
+            productcategoryid,
+            quantity,
+            unitprice,
+            subtotal,
+            createdat,
+            productcategory (
+              productid,
+              price,
+              color,
+              agesize,
+              products (
+                productname,
+                image_url,
+                description
+              )
+            ),
+            orders (
+              totalamount,
+              orderstatus,
+              amount_paid,
+              change,
+              orderdate
+            )
+          `)
+          .eq('orderid', selectedItem.orderid);
+
+        if (error) {
+          console.error('Error fetching order items:', error);
+          alert('Error loading invoice details');
+          return;
         }
+
+        // Transform data for backward compatibility
+        const transformedOrderItems = orderItems?.map(item => ({
+          ...item,
+          products: {
+            productname: item.productcategory?.products?.productname || 'Unknown Product',
+            image_url: item.productcategory?.products?.image_url || ''
+          }
+        })) || [];
+
+        setSelectedInvoice({
+          ...selectedItem,
+          orderItems: transformedOrderItems,
+          totalOrderAmount: transformedOrderItems[0]?.orders?.totalamount || 0,
+          orderStatus: transformedOrderItems[0]?.orders?.orderstatus || 'INCOMPLETE',
+          amount_paid: transformedOrderItems[0]?.orders?.amount_paid,
+          change: transformedOrderItems[0]?.orders?.change,
+          orderdate: transformedOrderItems[0]?.orders?.orderdate, // Add orderdate
+          orders: {
+            totalamount: transformedOrderItems[0]?.orders?.totalamount,
+            orderstatus: transformedOrderItems[0]?.orders?.orderstatus,
+            amount_paid: transformedOrderItems[0]?.orders?.amount_paid,
+            change: transformedOrderItems[0]?.orders?.change,
+            orderdate: transformedOrderItems[0]?.orders?.orderdate
+          }
+        });
       });
     } catch (error) {
       console.error('Error loading invoice:', error);
       alert('Error loading invoice details');
     }
-  };
+  }, []);
+
+  const handleLogout = useCallback(async () => {
+    try {
+      await supabase.auth.signOut();
+      localStorage.clear();
+      window.location.href = '/';
+    } catch (error) {
+      console.error('Error during logout:', error);
+      window.location.href = '/';
+    }
+  }, []);
 
   return (
     <div className="sales-page">
@@ -473,7 +768,7 @@ const TablePage = () => {
               <li onClick={() => navigate("/inventory")}>Inventory</li>
               <li onClick={() => navigate("/supplier")}>Supplier</li>
               <li className="active">Sales</li>
-              <li>Expenses</li>
+              <li onClick={() => navigate("/expenses")}>Expenses</li>
               <li>AI Assistant</li>
             </ul>
             <p className="nav-header">SUPPORT</p>
@@ -487,9 +782,8 @@ const TablePage = () => {
         <div className="main-content">
           <div className="sales-panel">
             {loading ? (
-              <p>Loading...</p>
-            ) : orderData.length === 0 ? (
-              <p>No data available.</p>
+              <div className="loading-states">
+              </div>
             ) : (
               <>
                 <div className="table-flex-wrapper">
@@ -507,25 +801,24 @@ const TablePage = () => {
                           {user ? user.username : "Loading..."}
                         </div>
                       </div>
-                      <button className="logout-button"
-                        onClick={async () => {
-                          await supabase.auth.signOut();
-                          localStorage.clear();
-                          window.location.href = '/'; // redirect to login
-                        }}
-                      >Logout</button>
+                      <button className="logout-button" onClick={handleLogout}>
+                        Logout
+                      </button>
                     </div>
                     <Bestseller bestsellers={bestsellers} />
                   </div>
                 </div>
 
-                <StatsContainer 
-                  totalEarnings={totalEarnings}
-                  totalCustomers={totalCustomers}
-                  statsFilter={statsFilter}
-                  onStatsFilterChange={handleStatsFilter}
-                  orderData={orderData}
-                />
+                <div className="bottom-analytics-wrapper">
+                  <StatsContainer 
+                    totalEarnings={totalEarnings}
+                    totalCustomers={totalCustomers}
+                    statsFilter={statsFilter}
+                    onStatsFilterChange={handleStatsFilter}
+                    orderData={orderData}
+                  />
+                  <PeakHours orderData={orderData} />
+                </div>
               </>
             )}
           </div>
@@ -536,6 +829,7 @@ const TablePage = () => {
         <InvoiceModal 
           invoice={selectedInvoice}
           onClose={() => setSelectedInvoice(null)}
+          onUpdateOrder={handleUpdateOrder}
         />
       )}
 
@@ -544,6 +838,12 @@ const TablePage = () => {
         onClose={handleCloseAddSaleModal}
         onSave={handleSaveSale}
         products={products}
+      />
+
+      <SalesSuccessModal 
+        isOpen={showSalesSuccessModal}
+        onClose={handleSalesSuccessModalClose}
+        orderData={salesSuccessData}
       />
     </div>
   );

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
-import '../stylecss/DailyGrossSales.css';
+import '../stylecss/Dashboard/DailyGrossSales.css';
 
 const DailyGrossSales = () => {
   const [dailySales, setDailySales] = useState([]);
@@ -86,7 +86,7 @@ const DailyGrossSales = () => {
     `₱${amount.toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
   const formatChange = (amount) => {
-    const sign = amount >= 0 ? '+' : '';
+    const sign = amount >= 0 ? '+' : '-';
     return `${sign}₱${Math.abs(amount).toLocaleString('en-PH', {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
