@@ -60,7 +60,7 @@ const Supplier = () => {
 
   return (
     <div className="supplier-page">
-        <header className="header-bar">
+      <header className="header-bar">
         <h1 className="header-title">BuiswAIz</h1>
       </header>
       <div className="main-section">
@@ -77,7 +77,7 @@ const Supplier = () => {
             </ul>
             <p className="nav-header">SUPPORT</p>
             <ul>
-              <li>Help</li>
+              <li onClick={() => navigate("/HelpPage")}>Help</li>
               <li>Settings</li>
             </ul>
           </div>
