@@ -1,7 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import React, { useState, useEffect } from "react";
 import { formatDistanceToNow } from "date-fns";
-import "./stylecss/dashboard.css";
 import { supabase } from "./supabase"; 
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar, ResponsiveContainer,
@@ -12,7 +11,7 @@ import DailyGrossSales from "./Dashboard/DailyGrossSales";
 import Notifications from "./Dashboard/Notifications";
 import UploadSheets from "./components/UploadSheets";
 
-import "./stylecss/Dashboard/dashboard.css";
+import "./stylecss/Dashboard/Dashboard.css";
 
 const Dashboard = () => {
   const navigate = useNavigate(); 
