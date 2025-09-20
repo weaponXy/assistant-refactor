@@ -217,6 +217,11 @@ obj/
 .vs/
 TestResults/
 
+
+bin/
+obj/
+
+
 csharp-backend/obj/Debug/net9.0/csharp-backend.AssemblyInfo.cs
 csharp-backend/obj/Debug/net9.0/csharp-backend.AssemblyInfoInputs.cache
 *.cs
