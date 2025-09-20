@@ -249,3 +249,29 @@
     padding: 6px 12px;
   }
 }
+
+.sales-table-wrapper table th:first-child,
+.sales-table-wrapper table td:first-child {
+  text-align: justify;
+  text-align-last: left; /* Ensures last line aligns left */
+  hyphens: auto; /* Allows word breaking for better justification */
+  word-wrap: break-word; /* Prevents overflow */
+}
+
+/* Alternative approach - more specific selector */
+.sales-table-wrapper .table-scroll-box table thead tr th:nth-child(1),
+.sales-table-wrapper .table-scroll-box table tbody tr td:nth-child(1) {
+  font-weight: bold;
+  text-align: justify;
+  text-align-last: left;
+  hyphens: auto;
+  word-wrap: break-word;
+  padding-left: 15px;
+  padding-right: 15px;
+}
+
+/* Ensure other columns remain centered */
+.sales-table-wrapper table th:not(:first-child),
+.sales-table-wrapper table td:not(:first-child) {
+  text-align: center;
+}
