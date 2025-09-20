@@ -431,7 +431,7 @@ const TablePage = () => {
 
       // Perform updates one by one using productcategoryid
       for (const update of updates) {
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from('productcategory')
           .update({
             currentstock: update.currentstock,
@@ -445,15 +445,6 @@ const TablePage = () => {
           console.error(errorMsg);
           console.error('Full error object:', error);
           throw new Error(errorMsg);
-        }
-
-        if (data && data.length > 0) {
-          console.log(`Successfully updated ${update.productname} (ID: ${update.productcategoryid}):`);
-          console.log(`  - Previous stock: ${update.originalStock}`);
-          console.log(`  - Quantity sold: ${update.quantityReduced}`);
-          console.log(`  - New stock: ${update.currentstock}`);
-        } else {
-          console.warn('Update succeeded but no data returned');
         }
 
         // Small delay to prevent overwhelming the database
