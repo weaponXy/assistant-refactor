@@ -1,0 +1,92 @@
+/* Panel Container */
+.inherited-batches-panel {
+  margin-top: 20px;
+  padding: 20px;
+  background-color: #fff; /* White panel */
+  border-radius: 18px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  min-height: 400px; /* Minimum height */
+  max-height: 600px; /* Optional max height */
+}
+
+/* Panel Title */
+.inherited-batches-panel h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 16px;
+}
+
+/* Table Wrapper */
+.restock-container {
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: auto;
+  border-radius: 12px;
+  border: 1px solid #e0e6f0; 
+}
+
+/* Table Styling */
+.restock-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 8px; /* small spacing between rows */
+  
+}
+/* Table Headers */
+.restock-table th {
+  background-color: #d6f1fb;
+  font-weight: 600;
+  font-size: 13px;
+  color: #888;
+  text-align: left;
+  padding: 10px 12px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+/* Rounded corners on header row */
+.restock-table th:first-child {
+  border-top-left-radius: 12px;
+}
+
+.restock-table th:last-child {
+  border-top-right-radius: 12px;
+}
+
+
+/* Table Cells */
+.restock-table td {
+  font-size: 13px;
+  padding: 10px 12px;
+  color: #555;
+  background-color: #f9f9f9;
+  border-bottom: 1px solid #fcfcfc;
+}
+
+/* Hover Effect */
+.restock-table tr:hover td {
+  background-color: #e8f0fe;
+  transition: background-color 0.2s ease;
+}
+
+/* Bold first column (optional) */
+.restock-table td:first-child {
+  font-weight: 500;
+}
+
+/* Responsive adjustments */
+@media screen and (max-width: 900px) {
+  .inherited-batches-panel {
+    padding: 15px;
+  }
+
+  .restock-table th,
+  .restock-table td {
+    font-size: 12px;
+    padding: 8px 6px;
+  }
+}

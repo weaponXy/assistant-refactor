@@ -82,6 +82,11 @@
   background-color: #F9FAFB;
 }
 
+.view-product-modal .delete-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .view-product-modal .update-button {
   background-color: #000;
   color: #fff;
@@ -95,6 +100,51 @@
 
 .view-product-modal .update-button:hover {
   background-color: #1a1a1a;
+}
+
+.view-product-modal .update-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.view-product-modal .items-button {
+  background-color: #1a1a1a;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.view-product-modal .items-button:hover {
+  background-color: grey;
+}
+
+.view-product-modal .items-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.view-product-modal .add-category-button {
+  background-color: #1a1a1a;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.view-product-modal .add-category-button:hover {
+  background-color: grey;
+}
+
+.view-product-modal .add-category-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .view-product-modal .modal-body {
@@ -164,6 +214,12 @@
   background-color: #fff;
 }
 
+.view-product-modal .info-section input:disabled {
+  background-color: #f9f9f9;
+  color: #999;
+  cursor: not-allowed;
+}
+
 .view-product-modal .input-row {
   display: flex;
   gap: 10px;
@@ -177,6 +233,7 @@
 .view-product-modal .modal-footer {
   display: flex;
   justify-content: flex-end;
+  gap: 12px;
   margin-top: 20px;
 }
 
@@ -195,9 +252,44 @@
   background-color: #1a1a1a;
 }
 
+.view-product-modal .save-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.view-product-modal .cancel-button {
+  background-color: #fff;
+  color: #000;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 14px;
+  border: 1px solid #D0D5DD;
+  cursor: pointer;
+}
+
+.view-product-modal .cancel-button:hover {
+  background-color: #f9f9f9;
+}
+
+.view-product-modal .cancel-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .with-label {
   display: flex;
   align-items: center;
+  gap: 8px;
+}
+
+.supplier-container {
+  margin-bottom: 12px;
+}
+
+.supplier-edit-container {
+  display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
@@ -215,6 +307,7 @@
   background-repeat: no-repeat;
   background-position: right 12px center;
   background-size: 20px 20px;
+  margin-bottom: 12px;
 }
 
 .supplier-select:disabled {
@@ -224,11 +317,50 @@
   background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg width='20' height='20' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M6 8l4 4 4-4' stroke='%23999' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
-
 .supplier-select:not(:disabled):hover {
   border-color: #b5b5b5;
 }
 
+.supplier-display {
+  padding: 10px 12px;
+  font-size: 14px;
+  border-radius: 8px;
+  border: 1px solid #D0D5DD;
+  background-color: #f9f9f9;
+  color: #344054;
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.supplier-name {
+  font-size: 14px;
+  color: #344054;
+  font-weight: 500;
+}
+
+.supplier-id {
+  font-size: 12px;
+  color: #6B7280;
+  font-style: italic;
+}
+
+.selected-supplier-preview {
+  background-color: #f0f9ff;
+  border: 1px solid #0ea5e9;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 14px;
+  color: #0369a1;
+}
+
+.selected-supplier-preview strong {
+  color: #0c4a6e;
+  font-weight: 600;
+}
 
 /* Modern form warning inside modal */
 .form-warning {
@@ -258,7 +390,56 @@
   }
 }
 
+.product-items-panel {
+  margin-top: 20px;
+  width: 100%;
+}
 
+.product-items-panel h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: #344054;
+}
+
+.product-items-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.product-item-card {
+  background: #f8f8f8;
+  padding: 12px;
+  border-radius: 8px;
+  box-shadow: 0px 2px 5px rgba(0,0,0,0.1);
+  width: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.item-detail {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.item-detail strong {
+  color: #344054;
+  font-weight: 600;
+}
+
+.no-items {
+  color: #6B7280;
+  font-style: italic;
+  text-align: center;
+  padding: 20px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  border: 1px dashed #D0D5DD;
+}
 
 .delete-warning {
   background: #ffe6e6;

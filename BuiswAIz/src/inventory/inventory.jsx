@@ -8,9 +8,10 @@ import AddDefect from "../inventory/AddDefect";
 import RestockStorage from "../inventory/RestockStorage";
 import { useNavigate } from "react-router-dom";
 import { fetchLowStockProducts } from "../inventory/fetchLowStockProduct";
-import { formatDistanceToNow, parseISO } from "date-fns";
 import { fetchDefectiveItems } from "../inventory/fetchdefectitem";
-import { updateDefectStatus } from "../inventory/UpdateStatusDefect"; 
+import DefectivePanel from "../inventory/DefectivePanel";
+import InheritedBatches from "../inventory/inheritedBatches";
+import ProductAvailability from "../inventory/ProductAvailability";   
 
 
 const Inventory = () => {
@@ -163,11 +164,7 @@ const Inventory = () => {
                 <thead>
                   <tr>
                     <th>Name</th>
-                    <th>Code</th>
                     <th>Description</th>
-                    <th>Price</th>
-                    <th>Cost</th>
-                    <th>Quantity</th>
                     <th>Supplier</th>
                     <th>Image</th>
                   </tr>
@@ -180,11 +177,7 @@ const Inventory = () => {
                       style={{ cursor: "pointer" }}
                     >
                       <td>{product.productname}</td>
-                      <td>{product.productid}</td>
                       <td>{product.description}</td>
-                      <td>{product.price}</td>
-                      <td>{product.cost}</td>
-                      <td>{product.currentstock}</td>
                       <td>{product.suppliers?.suppliername || "Unknown"}</td>
                       <td>
                         <div className="image-cell">
@@ -204,8 +197,10 @@ const Inventory = () => {
                 </tbody>
               </table>
             </div>
-          </div>
 
+            <InheritedBatches user={user}/>
+          </div>
+                            
           {/* Right Panel */}
           <div className="I-right-panel">
             <div className="I-user-info-card">
@@ -224,124 +219,15 @@ const Inventory = () => {
               >Logout</button>
             </div>
 
-            <div className="availability-panel">
-              <h3>Product Availability</h3>
-              <div className="availability-container">
-                {lowStockProducts.length === 0 ? (
-                  <p className="no-low-stock">All items are sufficiently stocked.</p>
-                  ) : (
-                  lowStockProducts.map((product, i) => {
-                    let timeAgo = "N/A";
-                    if (product.updatedstock) {
-                      try {
-                        timeAgo = formatDistanceToNow(parseISO(product.updatedstock), { addSuffix: true });
-                      } catch (e) {
-                        console.warn("Invalid updatedstock date:", e);
-                      }
-                    }
+            <ProductAvailability lowStockProducts={lowStockProducts}/>
 
-                    return (
-                      <div key={i} className="availability-item">
-                        {product.image_url ? (
-                          <img src={product.image_url} alt="Product" className="product-thumbnail" />
-                        ) : (
-                          <div className="img-placeholder" />
-                        )}
-                        <div className="availability-details">
-                          <span className="name">{product.productname}</span>
-                          <span className="stock">{product.currentstock} pcs left</span>
-                          <span className="time">{timeAgo}</span>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
+            <DefectivePanel 
+              defectiveItems={defectiveItems} 
+              user={user} 
+              loadDefectiveItems={loadDefectiveItems}
+              onAddDefect={() => setShowDefectModal(true)}
+            />
 
-            <div className="defective-panel">
-              <div className="panel-title-row">
-                <h3>Defective Item</h3>
-                <button className="panel-action-button" onClick={() => setShowDefectModal(true)}>+Add-Defect</button>
-              </div>
-              <div className="defective-container">
-                {defectiveItems.length === 0 ? (
-                  <p className="no-low-stock">No defective items reported.</p>
-                ) : (
-                  defectiveItems.map((item) => (
-                    <div key={item.defectiveitemid} className="defective-item">
-                      {item.products?.image_url ? (
-                        <img
-                          src={item.products.image_url}
-                          alt="Product"
-                          className="defectimg-placeholder"
-                        />
-                      ) : (
-                        <div className="defectimg-placeholder" />
-                      )}
-
-                      <div className="defective-details">
-                        <div className="defect-main">
-                          <span className="defect-name">{item.products?.productname || "Unnamed"}</span>
-                          <span className="Description">{item.defectdescription}</span>
-                          <span className="Quantity">{item.quantity} pcs</span>
-                        </div>
-
-                        <div className="defect-status">
-                          <select
-                          className="status-dropdown"
-                          value={item.status}
-                          onChange={async (e) => {
-                            if (!user) {
-                              alert("User not loaded. Please wait...");
-                              return;
-                            }
-
-                            try {
-                              await updateDefectStatus(item.defectiveitemid, e.target.value, user);
-                              loadDefectiveItems();
-                            } catch (err) {
-                              console.error("Update failed:", err);
-                              alert("Failed to update status. See console for details.");
-                            }
-                          }}
-                          >
-                          <option value="In-Process">In-Process</option>
-                          <option value="Returned">Returned</option>
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            
-            <div className="activity-panel">
-              <h3>Recent Activity</h3>
-              <div className="activity-container">
-                <ul>
-                  {activityLogs.length === 0 ? (
-                    <li className="activity-item">No recent activity</li>
-                  ) : (
-                    activityLogs.map((log, i) => (
-                      <li key={i} className="activity-item">
-                        <span>
-                          <span className="log-username">
-                            {log.systemuser?.username ? log.systemuser.username : "Someone"}
-                          </span>{" "}
-                          {log.action_desc}
-                        </span>
-                        <span className="time">
-                          {formatDistanceToNow(new Date(log.created_at), { addSuffix: true })}
-                        </span>
-                      </li>
-                    ))
-                  )}
-                </ul>
-              </div>
-            </div>
           </div>
         </div>
       </div>
