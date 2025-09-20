@@ -1,15 +1,17 @@
 .sales-table-wrapper {
-  flex: 1;
-  width: 1500px;
-  text-align: left;
-  position: relative; 
+  grid-column: 1;
+  grid-row: 1;
   border: 1px solid #ddd;
-  border-right: none; 
   padding: 20px;
   background-color: #fff;
-  height: 522px;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto auto 1fr;
+  gap: 15px;
+  overflow: hidden;
+  border-radius: 20px;
+  min-width: 500px; /* Prevent shrinking below this width */
+  width: 100%; /* Maintain full width within grid */
 }
 
 .table-header {
@@ -32,7 +34,6 @@
   font-weight: 600;
   font-size: 14px;
   font-family: 'Montserrat', sans-serif;
-  transition: all 0.3s ease;
   box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3);
 }
 
@@ -58,7 +59,6 @@
   border-radius: 8px;
   padding: 12px 16px;
   cursor: pointer;
-  transition: all 0.2s ease;
   min-width: 220px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
@@ -90,18 +90,6 @@
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
   z-index: 1000;
   overflow: hidden;
-  animation: dropdownSlideDown 0.2s ease-out;
-}
-
-@keyframes dropdownSlideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 .item-icon {
@@ -260,4 +248,30 @@
     text-align: center;
     padding: 6px 12px;
   }
+}
+
+.sales-table-wrapper table th:first-child,
+.sales-table-wrapper table td:first-child {
+  text-align: justify;
+  text-align-last: left; /* Ensures last line aligns left */
+  hyphens: auto; /* Allows word breaking for better justification */
+  word-wrap: break-word; /* Prevents overflow */
+}
+
+/* Alternative approach - more specific selector */
+.sales-table-wrapper .table-scroll-box table thead tr th:nth-child(1),
+.sales-table-wrapper .table-scroll-box table tbody tr td:nth-child(1) {
+  font-weight: bold;
+  text-align: justify;
+  text-align-last: left;
+  hyphens: auto;
+  word-wrap: break-word;
+  padding-left: 15px;
+  padding-right: 15px;
+}
+
+/* Ensure other columns remain centered */
+.sales-table-wrapper table th:not(:first-child),
+.sales-table-wrapper table td:not(:first-child) {
+  text-align: center;
 }
