@@ -12,7 +12,7 @@
   overflow: hidden;
   border-radius: 20px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  min-height: 200px;
+  min-height: 150px;
 }
 
 .peak-hours-header {
@@ -58,7 +58,7 @@
 
 .peak-hours-chart-container {
   flex: 1;
-  min-height: 150px;
+  min-height: 120px;
   position: relative;
   background-color: #fafafa;
   border-radius: 8px;
@@ -130,7 +130,7 @@
   background-color: #f8f9fa;
   border: 1px solid #e9ecef;
   border-radius: 8px;
-  padding: 12px;
+  padding: 5px;
 }
 
 .summary-stats {

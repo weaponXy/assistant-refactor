@@ -135,7 +135,7 @@ h3 {
   grid-column: 1;
   grid-row: 1;
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: minmax(500px, 2fr) minmax(300px, 1fr); /* Use minmax to prevent shrinking */
   gap: 20px;
   height: 100%;
   overflow: hidden;
@@ -150,6 +150,8 @@ h3 {
   grid-template-rows: auto 1fr;
   gap: 15px;
   max-height: 100%;
+  min-width: 300px; /* Prevent shrinking below this width */
+  width: 100%; /* Maintain full width within grid */
 }
 
 /* NEW: Bottom analytics wrapper for StatsContainer and PeakHours side by side */
@@ -160,7 +162,7 @@ h3 {
   grid-template-columns: 2fr 1fr;
   gap: 15px;
   height: auto;
-  min-height: 200px;
+  min-height: 150px;
 }
 
 .user-info-card-inline {
@@ -174,6 +176,8 @@ h3 {
   align-items: center;
   min-height: 70px;
   border-radius: 20px;
+  min-width: 280px; /* Prevent shrinking below this width */
+  width: 100%; /* Maintain full width within grid */
 }
 
 /* Bestseller takes the second row */
@@ -349,6 +353,13 @@ table tbody td {
   .sidebar {
     padding: 20px 15px;
   }
+
+  .right-column-wrapper {
+    min-width: 280px;
+  }
+  .sales-table-wrapper {
+    min-width: 450px;
+  }
   
   .bottom-analytics-wrapper {
     grid-template-columns: 2fr 1fr;
@@ -373,9 +384,16 @@ table tbody td {
   
   .table-flex-wrapper {
     grid-template-columns: 1fr;
-    grid-template-rows: auto auto;
+    grid-template-rows: minmax(400px, auto) minmax(300px, auto);
     gap: 15px;
   }
+
+  .sales-table-wrapper {
+    min-width: 100%;
+    min-height: 400px;
+  }
+
+
   
   .right-column-wrapper {
     grid-column: 1;
@@ -388,11 +406,13 @@ table tbody td {
   .user-info-card-inline {
     grid-column: 1 / -1;
     grid-row: 1;
+    min-width: 100%;  
   }
   
   .bestseller-table-wrapper {
     grid-column: 1 / -1;
     grid-row: 2;
+    min-width: 100%;
   }
   
   .bottom-analytics-wrapper {

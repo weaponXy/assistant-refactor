@@ -10,6 +10,8 @@
   gap: 15px;
   overflow: hidden;
   border-radius: 20px;
+  min-width: 280px; /* Prevent shrinking below this width */
+  width: 100%; /* Maintain full width within grid */
 }
 
 .bestseller-table-wrapper h3 {
