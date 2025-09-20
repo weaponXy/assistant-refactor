@@ -21,7 +21,6 @@
   width: 100%;
   font-family: 'Montserrat', sans-serif;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-  animation: slideIn 0.3s ease-out;
   max-height: 90vh;
   overflow-y: auto;
 }
@@ -338,37 +337,9 @@
   max-height: 200px;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: #04B4FC #f1f1f1;
+  scrollbar-color: #f1f1f1 #ffffff;
 }
 
-.modal-custom-dropdown-list::-webkit-scrollbar {
-  width: 6px;
-}
-
-.modal-custom-dropdown-list::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 3px;
-}
-
-.modal-custom-dropdown-list::-webkit-scrollbar-thumb {
-  background: #04B4FC;
-  border-radius: 3px;
-}
-
-.modal-custom-dropdown-list::-webkit-scrollbar-thumb:hover {
-  background: #0290c4;
-}
-
-@keyframes modalDropdownSlideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
 
 /* Modal Dropdown Items */
 .modal-custom-dropdown-list .dropdown-item {
@@ -808,7 +779,6 @@
   font-weight: 600;
   font-size: 14px;
   font-family: 'Montserrat', sans-serif;
-  transition: all 0.3s ease;
 }
 
 .add-sale-modal-content .cancel-btn:hover {
@@ -868,4 +838,174 @@
     width: 100%;
     padding: 14px;
   }
+}
+.success-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1100;
+}
+
+.success-modal {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  width: 90%;
+  max-width: 450px;
+  overflow: hidden;
+  animation: successModalSlideIn 0.3s ease-out;
+}
+
+@keyframes successModalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.success-modal-header {
+  background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+  color: white;
+  padding: 24px;
+  text-align: center;
+  position: relative;
+}
+
+.success-modal-header.incomplete {
+  background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%);
+}
+
+.success-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: bold;
+  margin: 0 auto 16px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+}
+
+.success-icon.complete {
+  background: rgba(76, 175, 80, 0.2);
+  border-color: rgba(76, 175, 80, 0.3);
+}
+
+.success-icon.incomplete {
+  background: rgba(255, 152, 0, 0.2);
+  border-color: rgba(255, 152, 0, 0.3);
+}
+
+.success-modal-header h3 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.success-modal-body {
+  padding: 24px;
+}
+
+.transaction-details {
+  margin-bottom: 20px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.detail-row:last-child {
+  border-bottom: none;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.detail-label {
+  color: #666;
+  font-weight: 500;
+}
+
+.detail-value {
+  color: #333;
+  font-weight: 600;
+}
+
+.status-message {
+  text-align: center;
+  padding: 16px;
+  border-radius: 8px;
+  font-weight: 500;
+  margin-top: 16px;
+}
+
+.status-message.complete {
+  background: #e8f5e8;
+  color: #2e7d2e;
+  border: 1px solid #c3e6c3;
+}
+
+.status-message.incomplete {
+  background: #fff3e0;
+  color: #e65100;
+  border: 1px solid #ffcc02;
+}
+
+.success-modal-footer {
+  padding: 20px 24px;
+  background: #f8f9fa;
+  text-align: center;
+}
+
+.success-ok-btn {
+  background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+  color: white;
+  border: none;
+  padding: 12px 32px;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 120px;
+}
+
+.success-ok-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+.success-ok-btn:active {
+  transform: translateY(0);
+}
+
+.dropdown-group-header {
+  padding: 8px 16px;
+  background: #f5f5f5;
+  font-size: 14px;
+  color: #666;
+  border-bottom: 1px solid #e0e0e0;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.dropdown-group-header strong {
+  color: #333;
 }

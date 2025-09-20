@@ -148,11 +148,50 @@ const OrderSales = ({ orderData, onInvoiceSelect, onAddSale }) => {
     return sortOptions.find(option => option.value === sortOption);
   };
 
-  const getStatusBadge = (status) => {
-    const statusClass = status === 'completed' ? 'status-completed' : 'status-pending';
+  const getOrderStatus = (item) => {
+    let status = '';
+    
+    // Check multiple possible paths for order status
+    if (item.orders?.orderstatus) {
+      status = item.orders.orderstatus;
+    } else if (item.orderstatus) {
+      status = item.orderstatus;
+    } else if (item.orderItems && item.orderItems.length > 0 && item.orderItems[0]?.orders?.orderstatus) {
+      status = item.orderItems[0].orders.orderstatus;
+    }
+
+    // Normalize to uppercase and only return valid statuses
+    const normalizedStatus = status.toUpperCase();
+    if (normalizedStatus === 'COMPLETE' || normalizedStatus === 'INCOMPLETE') {
+      return normalizedStatus;
+    }
+    
+    // Default to INCOMPLETE if status is unknown or invalid
+    return 'INCOMPLETE';
+  };
+
+  const getStatusBadge = (item) => {
+    const status = getOrderStatus(item);
+    let statusClass = '';
+    let displayText = '';
+
+    switch (status) {
+      case 'COMPLETE':
+        statusClass = 'status-completed';
+        displayText = 'COMPLETE';
+        break;
+      case 'INCOMPLETE':
+        statusClass = 'status-incomplete';
+        displayText = 'INCOMPLETE';
+        break;
+      default:
+        statusClass = 'status-incomplete';
+        displayText = 'INCOMPLETE';
+    }
+
     return (
       <span className={`status-badge ${statusClass}`}>
-        {status ? status.toUpperCase() : 'UNKNOWN'}
+        {displayText}
       </span>
     );
   };
@@ -208,7 +247,6 @@ const OrderSales = ({ orderData, onInvoiceSelect, onAddSale }) => {
         <table>
           <thead>
             <tr>
-              <th></th>
               <th>Product Name</th>
               <th>Order Code</th>
               <th>Status</th>
@@ -234,10 +272,9 @@ const OrderSales = ({ orderData, onInvoiceSelect, onAddSale }) => {
           <tbody>
             {filteredData.map((item, index) => (
               <tr key={index}>
-                <td><input type="radio" name="selectedRow" /></td>
                 <td>{item.products?.productname || 'N/A'}</td>
                 <td>{item.orderid}</td>
-                <td>{getStatusBadge(item.orders?.orderstatus)}</td>
+                <td>{getStatusBadge(item)}</td>
                 <td>{item.quantity}</td>
                 <td>₱{item.unitprice.toLocaleString()}</td>
                 <td>₱{item.subtotal.toLocaleString()}</td>

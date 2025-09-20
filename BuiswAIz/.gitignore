@@ -12,6 +12,8 @@ dist
 dist-ssr
 *.local
 
+
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -26,3 +28,14 @@ dist-ssr
 
 bin/
 obj/
+
+
+# Ignore build artifacts
+csharp-backend/obj/
+csharp-backend/bin/
+
+
+# open or create .gitignore in repo root and add:
+echo -e "\n# .NET build output\ncsharp-backend/obj/\ncsharp-backend/bin/\n" >> .gitignore
+git add .gitignore
+git commit -m "chore: ignore .NET build output"

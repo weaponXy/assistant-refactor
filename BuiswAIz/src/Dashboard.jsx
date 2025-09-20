@@ -9,7 +9,10 @@ import {
 import TopSellingProducts from "./Dashboard/TopSellingProducts";
 import SalesSummary from "./Dashboard/SalesSummary";
 import DailyGrossSales from "./Dashboard/DailyGrossSales";
+import Notifications from "./Dashboard/Notifications";
 import UploadSheets from "./components/UploadSheets";
+
+import "./stylecss/Dashboard/dashboard.css";
 
 const Dashboard = () => {
   const navigate = useNavigate(); 
@@ -289,7 +292,9 @@ const Dashboard = () => {
             <div className="bottom-section">
               <div className="dashboard-panel notifications">
                 <h3>Notifications</h3>
-                <div className="panel-content"></div>
+                <div className="panel-content">
+                  <Notifications />
+                </div>
               </div>
 
               <div className="dashboard-panel top-selling">

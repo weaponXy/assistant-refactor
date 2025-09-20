@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
-import '../stylecss/SalesSummary.css';
+import '../stylecss/Dashboard/SalesSummary.css';
 
 const SalesSummary = () => {
   const [salesData, setSalesData] = useState({

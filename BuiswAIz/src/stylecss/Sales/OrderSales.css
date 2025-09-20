@@ -1,15 +1,17 @@
 .sales-table-wrapper {
-  flex: 1;
-  width: 1500px;
-  text-align: left;
-  position: relative; 
+  grid-column: 1;
+  grid-row: 1;
   border: 1px solid #ddd;
-  border-right: none; 
   padding: 20px;
   background-color: #fff;
-  height: 522px;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto auto 1fr;
+  gap: 15px;
+  overflow: hidden;
+  border-radius: 20px;
+  min-width: 500px; /* Prevent shrinking below this width */
+  width: 100%; /* Maintain full width within grid */
 }
 
 .table-header {
@@ -23,32 +25,22 @@
 
 /* Add Sale Button */
 .add-sale-btn {
+  padding: 12px 24px;
+  border: 2px solid #04B4FC;
+  border-radius: 8px;
   background-color: #04B4FC;
   color: white;
-  border: none;
-  padding: 12px 20px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  font-family: 'Montserrat', sans-serif;
   cursor: pointer;
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  order: 1;
-  white-space: nowrap;
+  font-weight: 600;
+  font-size: 14px;
+  font-family: 'Montserrat', sans-serif;
+  box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3);
 }
 
 .add-sale-btn:hover {
-  background: linear-gradient(135deg, #04B4FC);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px #026b8a;
-}
-Y
-.add-sale-btn:active {
-  transform: translateY(0);
-  box-shadow: 0 4px 8px #026b8a;
+  background-color: #0290c4;
+  border-color: #0290c4;
+  transform: translateY(-1px);
 }
 
 /* For sorting css */
@@ -67,7 +59,6 @@ Y
   border-radius: 8px;
   padding: 12px 16px;
   cursor: pointer;
-  transition: all 0.2s ease;
   min-width: 220px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
@@ -99,18 +90,6 @@ Y
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
   z-index: 1000;
   overflow: hidden;
-  animation: dropdownSlideDown 0.2s ease-out;
-}
-
-@keyframes dropdownSlideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 .item-icon {
@@ -226,8 +205,73 @@ Y
   text-transform: uppercase;
   cursor: pointer;
 }
-        
-.status-badge:hover {
-  background-color: rgba(0, 255, 0, 0.5);
-  box-shadow: 0 2px 5px rgba(0, 255, 0, 0.7);
+    
+/* Status badge for OrderSales table */
+.status-badge.status-completed {
+  color: rgb(0, 47, 0);
+  background-color: #a8ffa8;
+  border: #a8ffa8 1px solid;
+}
+
+.status-badge.status-incomplete {
+  color: rgb(47, 0, 0);
+  background-color: #ffcccb;
+  border: #ffcccb 1px solid;
+}
+
+.status-badge.status-unknown {
+  color: rgb(47, 47, 47);
+  background-color: #f8f9fa;
+  border: #dee2e6 1px solid;
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 768px) {
+  .modal-header {
+    flex-direction: column;
+    gap: 10px;
+    align-items: stretch;
+  }
+  
+  .update-order-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 12px;
+    font-size: 14px;
+  }
+  
+  .update-form .form-group {
+    max-width: 100%;
+  }
+  
+  .status-indicator {
+    text-align: center;
+    padding: 6px 12px;
+  }
+}
+
+.sales-table-wrapper table th:first-child,
+.sales-table-wrapper table td:first-child {
+  text-align: justify;
+  text-align-last: left; /* Ensures last line aligns left */
+  hyphens: auto; /* Allows word breaking for better justification */
+  word-wrap: break-word; /* Prevents overflow */
+}
+
+/* Alternative approach - more specific selector */
+.sales-table-wrapper .table-scroll-box table thead tr th:nth-child(1),
+.sales-table-wrapper .table-scroll-box table tbody tr td:nth-child(1) {
+  font-weight: bold;
+  text-align: justify;
+  text-align-last: left;
+  hyphens: auto;
+  word-wrap: break-word;
+  padding-left: 15px;
+  padding-right: 15px;
+}
+
+/* Ensure other columns remain centered */
+.sales-table-wrapper table th:not(:first-child),
+.sales-table-wrapper table td:not(:first-child) {
+  text-align: center;
 }
