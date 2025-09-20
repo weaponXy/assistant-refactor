@@ -19,7 +19,7 @@
   padding: 10px; 
   max-height: 90vh;
   scrollbar-width: thin;
-  scrollbar-color: #f1f1f1 #ffffff;
+  scrollbar-color: gray #ffffff;
 }
 
 /* Add Sale Modal - Fixed border-radius with scrollbar */
@@ -44,7 +44,7 @@
   padding: 10px; 
   max-height: 90vh;
   scrollbar-width: thin;
-  scrollbar-color: #f1f1f1 #ffffff;
+  scrollbar-color: gray #ffffff;
 }
 
 /* Multiple Products Modal */

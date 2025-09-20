@@ -1,13 +1,15 @@
-/* FIXED: Bestseller table with proper scrolling */
 .bestseller-table-wrapper {
-  text-align: left;
+  grid-column: 1;
+  grid-row: 2;
   border: 1px solid #ddd;
   padding: 20px;
   background-color: #fff;
-  height: 422px;
-  max-height: 422px;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto 1fr;
+  gap: 15px;
+  overflow: hidden;
+  border-radius: 20px;
 }
 
 .bestseller-table-wrapper h3 {
