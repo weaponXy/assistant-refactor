@@ -13,8 +13,6 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
     quantity: '',
     unitprice: '',
     subtotal: '',
-    isCustomProduct: false,
-    showCustomInput: false,
     availableStock: 0,
     stockWarning: '',
     isDropdownOpen: false,
@@ -81,8 +79,6 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
         quantity: '',
         unitprice: '',
         subtotal: '',
-        isCustomProduct: false,
-        showCustomInput: false,
         availableStock: 0,
         stockWarning: '',
         isDropdownOpen: false,
@@ -102,7 +98,7 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
     if (isOpen && products.length > 0) {
       setProductRows(prevRows => 
         prevRows.map(row => {
-          if (!row.isCustomProduct && row.selectedVariant) {
+          if (row.selectedVariant) {
             const updatedProduct = products.find(p => p.productcategoryid === row.selectedVariant.productcategoryid);
             if (updatedProduct) {
               const quantity = parseFloat(row.quantity) || 0;
@@ -136,7 +132,7 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
       const calculatedSubtotal = quantity * unitprice;
       
       let stockWarning = '';
-      if (!row.isCustomProduct && row.selectedVariant && quantity > 0) {
+      if (row.selectedVariant && quantity > 0) {
         if (row.availableStock === 0) {
           stockWarning = 'OUT OF STOCK';
         } else if (quantity > row.availableStock) {
@@ -239,33 +235,11 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
   }, []);
 
   const handleProductSelect = useCallback((rowId, selectedProduct) => {
-    if (selectedProduct === 'custom') {
+    if (selectedProduct === '') {
       setProductRows(prev => prev.map(row => {
         if (row.id === rowId) {
           return {
             ...row,
-            showCustomInput: true,
-            isCustomProduct: true,
-            productname: '',
-            unitprice: '',
-            availableStock: 0,
-            stockWarning: '',
-            isDropdownOpen: false,
-            productcategoryid: null,
-            color: '',
-            agesize: '',
-            selectedVariant: null
-          };
-        }
-        return row;
-      }));
-    } else if (selectedProduct === '') {
-      setProductRows(prev => prev.map(row => {
-        if (row.id === rowId) {
-          return {
-            ...row,
-            showCustomInput: false,
-            isCustomProduct: false,
             productname: '',
             unitprice: '',
             availableStock: 0,
@@ -285,8 +259,6 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
         if (row.id === rowId) {
           return {
             ...row,
-            showCustomInput: false,
-            isCustomProduct: false,
             productname: selectedProduct.productname,
             unitprice: selectedProduct.price.toString(),
             availableStock: selectedProduct.currentstock,
@@ -319,8 +291,6 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
       quantity: '',
       unitprice: '',
       subtotal: '',
-      isCustomProduct: false,
-      showCustomInput: false,
       availableStock: 0,
       stockWarning: '',
       isDropdownOpen: false,
@@ -379,10 +349,8 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
     }
 
     productRows.forEach(row => {
-      if (!row.showCustomInput && !row.productname) {
+      if (!row.productname) {
         newErrors[`${row.id}-productname`] = 'Please select a product';
-      } else if (row.showCustomInput && !row.productname.trim()) {
-        newErrors[`${row.id}-productname`] = 'Product name is required';
       }
 
       if (!row.quantity || parseFloat(row.quantity) <= 0) {
@@ -432,7 +400,6 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
         unitprice: parseFloat(row.unitprice),
         subtotal: parseFloat(row.subtotal),
         createdat: datetime, // Keep createdat for orderitems table
-        isCustomProduct: row.isCustomProduct,
         productcategoryid: row.productcategoryid,
         color: row.color,
         agesize: row.agesize
@@ -530,7 +497,6 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
                     className={`form-input ${errors.ordertime ? 'error' : ''}`}
                   />
                   {errors.ordertime && <span className="error-message">{errors.ordertime}</span>}
-                  <small className="help-text">Use 24-hour format (HH:MM)</small>
                 </div>
               </div>
             </div>
@@ -566,85 +532,54 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
                   <div className="form-row">
                     <div className="form-group">
                       <label>Product *</label>
-                      {!row.showCustomInput ? (
-                        <div className="modal-custom-dropdown-wrapper" ref={el => dropdownRefs.current[row.id] = el}>
-                          <div 
-                            className={`modal-custom-dropdown-button ${errors[`${row.id}-productname`] ? 'error' : ''}`}
-                            onClick={() => toggleDropdown(row.id)}
-                          >
-                            <div className="dropdown-button-content">
-                              <span className="dropdown-text">
-                                {row.selectedVariant 
-                                  ? `${row.productname}${getVariantDisplay(row.selectedVariant)}` 
-                                  : 'Select a product...'}
-                              </span>
-                              <span className={`dropdown-arrow ${row.isDropdownOpen ? 'open' : ''}`}>▼</span>
-                            </div>
+                      <div className="modal-custom-dropdown-wrapper" ref={el => dropdownRefs.current[row.id] = el}>
+                        <div 
+                          className={`modal-custom-dropdown-button ${errors[`${row.id}-productname`] ? 'error' : ''}`}
+                          onClick={() => toggleDropdown(row.id)}
+                        >
+                          <div className="dropdown-button-content">
+                            <span className="dropdown-text">
+                              {row.selectedVariant 
+                                ? `${row.productname}${getVariantDisplay(row.selectedVariant)}` 
+                                : 'Select a product...'}
+                            </span>
+                            <span className={`dropdown-arrow ${row.isDropdownOpen ? 'open' : ''}`}>▼</span>
                           </div>
-                          
-                          {row.isDropdownOpen && (
-                            <div className="modal-custom-dropdown-list">
-                              <div
-                                className="dropdown-item"
-                                onClick={() => handleProductSelect(row.id, '')}
-                              >
-                                <span className="item-text">Select a product...</span>
-                              </div>
-                              {Object.entries(productGroups).map(([productName, variants]) => (
-                                <div key={productName}>
-                                  <div className="dropdown-group-header">
-                                    <strong>{productName}</strong>
-                                  </div>
-                                  {variants.map((variant, idx) => (
-                                    <div
-                                      key={`${productName}-${idx}`}
-                                      className={`dropdown-item ${row.selectedVariant?.productcategoryid === variant.productcategoryid ? 'selected' : ''}`}
-                                      onClick={() => handleProductSelect(row.id, variant)}
-                                    >
-                                      <span className="item-text">
-                                        {getVariantDisplay(variant)} - ₱{variant.price} (Stock: {variant.currentstock})
-                                      </span>
-                                    </div>
-                                  ))}
-                                </div>
-                              ))}
-                              <div
-                                className="dropdown-item"
-                                onClick={() => handleProductSelect(row.id, 'custom')}
-                              >
-                                <span className="item-text">+ Add New Product</span>
-                              </div>
+                        </div>
+                        
+                        {row.isDropdownOpen && (
+                          <div className="modal-custom-dropdown-list">
+                            <div
+                              className="dropdown-item"
+                              onClick={() => handleProductSelect(row.id, '')}
+                            >
+                              <span className="item-text">Select a product...</span>
                             </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="custom-product-input">
-                          <input
-                            type="text"
-                            value={row.productname}
-                            onChange={(e) => handleProductRowChange(row.id, 'productname', e.target.value)}
-                            className={`form-input ${errors[`${row.id}-productname`] ? 'error' : ''}`}
-                            placeholder="Enter new product name"
-                          />
-                          <button 
-                            type="button" 
-                            className="back-to-select-btn"
-                            onClick={() => {
-                              setProductRows(prev => prev.map(r => 
-                                r.id === row.id 
-                                  ? { ...r, showCustomInput: false, isCustomProduct: false, productname: '', unitprice: '', availableStock: 0, stockWarning: '', productcategoryid: null, color: '', agesize: '', selectedVariant: null }
-                                  : r
-                              ));
-                            }}
-                          >
-                            Back
-                          </button>
-                        </div>
-                      )}
+                            {Object.entries(productGroups).map(([productName, variants]) => (
+                              <div key={productName}>
+                                <div className="dropdown-group-header">
+                                  <strong>{productName}</strong>
+                                </div>
+                                {variants.map((variant, idx) => (
+                                  <div
+                                    key={`${productName}-${idx}`}
+                                    className={`dropdown-item ${row.selectedVariant?.productcategoryid === variant.productcategoryid ? 'selected' : ''}`}
+                                    onClick={() => handleProductSelect(row.id, variant)}
+                                  >
+                                    <span className="item-text">
+                                      {getVariantDisplay(variant)} - ₱{variant.price} (Stock: {variant.currentstock})
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                       {errors[`${row.id}-productname`] && (
                         <span className="error-message">{errors[`${row.id}-productname`]}</span>
                       )}
-                      {!row.isCustomProduct && row.availableStock > 0 && (
+                      {row.availableStock > 0 && (
                         <div className="stock-info">
                           <span className="stock-available">Available Stock: {row.availableStock}</span>
                         </div>
@@ -679,15 +614,15 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
                         value={row.unitprice}
                         onChange={(e) => handleProductRowChange(row.id, 'unitprice', e.target.value)}
                         className={`form-input ${errors[`${row.id}-unitprice`] ? 'error' : ''} ${
-                          !row.showCustomInput && row.selectedVariant && !row.isCustomProduct ? 'readonly' : ''
+                          row.selectedVariant ? 'readonly' : ''
                         }`}
-                        placeholder={!row.showCustomInput && row.selectedVariant && !row.isCustomProduct 
+                        placeholder={row.selectedVariant 
                           ? "Price from selected product" 
                           : "Enter unit price"
                         }
                         min="0"
                         step="0.01"
-                        readOnly={!row.showCustomInput && row.selectedVariant && !row.isCustomProduct}
+                        readOnly={row.selectedVariant}
                       />
                       {errors[`${row.id}-unitprice`] && (
                         <span className="error-message">{errors[`${row.id}-unitprice`]}</span>
