@@ -7,70 +7,87 @@
 
 body {
   background-color: #f6f9ff;
+  color: #333;
+  line-height: 1.5;
 }
 
+/* Supplier Page Layout */
 .supplier-page {
   display: flex;
   flex-direction: column;
-  min-height: 100vh; 
+  min-height: 100vh;
 }
 
 /* Header Bar */
 .header-bar {
   height: 60px;
-  background-color: #ffffff;
+  background-color: #fff;
   display: flex;
   align-items: center;
-  padding: 0 24px;
+  padding: 0 28px;
   border-bottom: 1px solid #e1e4ea;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .header-title {
   font-size: 20px;
-  font-weight: bold;
+  font-weight: 700;
   color: #0084ff;
+  letter-spacing: 0.3px;
 }
 
-/* Main Layout */
+/* Main Section */
 .main-section {
   display: flex;
   flex: 1;
   height: calc(100vh - 60px);
+  overflow: hidden;
 }
 
 /* Sidebar */
 .sidebar {
-  width: 220px;
+  width: 230px;
   background-color: #f9fbfd;
   padding: 30px 20px;
   border-right: 1px solid #e3e9f1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .nav-header {
   font-size: 12px;
-  color: #aaa;
-  margin: 20px 0 10px;
-  font-weight: bold;
+  color: #888;
+  margin: 20px 0 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .sidebar ul {
   list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .sidebar li {
-  padding: 10px 12px;
-  margin-bottom: 6px;
+  padding: 10px 14px;
   border-radius: 10px;
   color: #333;
+  font-size: 14px;
   cursor: pointer;
+  transition: all 0.25s ease;
 }
 
 .sidebar li.active,
 .sidebar li:hover {
   background-color: #04B4FC;
-  color: white;
+  color: #fff;
+  transform: translateX(4px);
 }
 
+/* Main Content */
 .S-main-content {
   flex: 1;
   display: flex;
@@ -80,12 +97,13 @@ body {
   height: calc(100vh - 60px);
 }
 
+/* Supplier Panel */
 .supplier-panel {
   flex: 2;
-  background: white;
-  border-radius: 18px;
-  padding: 20px;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+  background: #fff;
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.06);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -99,51 +117,69 @@ body {
   flex-shrink: 0;
 }
 
+.panel-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #222;
+}
+
 .supplier-container {
   flex: 1;
   overflow-y: auto;
-  border: 1px solid #ddd;
-  border-radius: 8px;
+  border: 1px solid #eee;
+  border-radius: 12px;
 }
 
-
-.panel-title {
-  font-size: 16px;
-  font-weight: 600;
-}
-
+/* Search Input */
 .supplier-search {
-  padding: 8px 14px;
+  padding: 10px 16px;
   border-radius: 12px;
   border: 1px solid #ccc;
   background-color: #fff;
-  font-size: 13px;
+  font-size: 14px;
   width: 240px;
   color: #333;
+  transition: border 0.2s ease;
 }
 
+.supplier-search:focus {
+  outline: none;
+  border-color: #04B4FC;
+  box-shadow: 0 0 0 3px rgba(4, 180, 252, 0.15);
+}
+
+/* Tables */
 table {
   width: 100%;
-  border-spacing: 0 12px;
+  border-spacing: 0 10px;
 }
 
 thead th {
-  text-align: center !important;
-  vertical-align: middle;
   text-align: left;
   font-size: 13px;
-  color: #888;
-  padding: 8px 6px;
+  color: #666;
+  padding: 10px 6px;
+  font-weight: 600;
+  border-bottom: 2px solid #f0f0f0;
 }
 
 tbody td {
   text-align: center;
   vertical-align: middle;
   background-color: #f0f4fa;
-  padding: 10px;
-  border-radius: 0px;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #444;
 }
 
+tbody tr:hover td {
+  background-color: #e8f0fe;
+  transition: background-color 0.2s ease;
+  cursor: pointer;
+}
+
+/* Placeholder rows */
 .table-placeholder {
   height: 36px;
   background: #dfe7f3;
@@ -161,31 +197,35 @@ tbody td {
   padding-right: 10px;
 }
 
+/* Add Supplier Button */
 .add-supplier-button {
   background-color: #04B4FC;
-  color: white;
+  color: #fff;
   border: none;
-  padding: 8px 16px;
+  padding: 10px 18px;
   border-radius: 12px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s ease;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 12px rgba(4, 180, 252, 0.2);
 }
 
 .add-supplier-button:hover {
   background-color: #91c3d7;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(4, 180, 252, 0.25);
 }
 
+/* User Info Card */
 .S-user-info-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background-color: #ffffff;
+  background-color: #fff;
   border-radius: 16px;
   padding: 12px 18px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
-  margin-bottom: 0px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
   height: 64px;
 }
 
@@ -208,40 +248,40 @@ tbody td {
   color: #1f2937;
 }
 
-.supply-returned-panel{
+/* Supply Returned Panel */
+.supply-returned-panel {
   display: flex;
   flex-direction: column;
-  background: white;
-  border-radius: 18px;
+  background: #fff;
+  border-radius: 20px;
   padding: 20px;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
-  flex: 1; /* Let it grow */
-  min-height: 0; /* Prevent overflow issues */
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
+  flex: 1;
+  min-height: 0;
 }
 
 .returned-container {
   flex: 1;
   overflow-y: auto;
-  border: hidden;
   border-radius: 8px;
   max-height: 100%;
 }
 
 .returned-card {
-  background: #ffffff;
-  border-radius: 10px;
-  padding: 12px 16px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px 18px;
   margin-bottom: 12px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
 
 .returned-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
 }
 
-/* Supplier name and number */
+/* Supplier Info Row */
 .supplier-info {
   display: flex;
   justify-content: space-between;
@@ -256,11 +296,11 @@ tbody td {
 }
 
 .returned-count {
-  font-weight: bold;
-  color: #04B4FC;;
+  font-weight: 700;
+  color: #04B4FC;
 }
 
-/* Progress bar track */
+/* Progress Bar */
 .progress-bar {
   background: #f1f3f5;
   border-radius: 6px;
@@ -268,11 +308,10 @@ tbody td {
   overflow: hidden;
 }
 
-/* Progress bar fill with animation */
 .progress-fill {
   height: 100%;
   background: linear-gradient(90deg, #04B4FC, #0077cc);
   border-radius: 6px;
-  width: 0; /* default before JS sets width */
+  width: 0; /* set dynamically with JS */
   transition: width 0.4s ease-in-out;
 }
