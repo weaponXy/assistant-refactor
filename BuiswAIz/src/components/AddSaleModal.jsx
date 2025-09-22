@@ -24,6 +24,7 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
 
   const [errors, setErrors] = useState({});
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [isConfirmationLoading, setIsConfirmationLoading] = useState(false);
   const dropdownRefs = useRef({});
 
   // Group products by name to show variants
@@ -42,6 +43,9 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
   // Close dropdown when clicking outside - optimized
   useEffect(() => {
     const handleClickOutside = (event) => {
+      // Don't handle clicks when loading
+      if (isConfirmationLoading) return;
+      
       Object.entries(dropdownRefs.current).forEach(([rowId, dropdownRef]) => {
         if (dropdownRef && !dropdownRef.contains(event.target)) {
           setProductRows(prev => prev.map(row => 
@@ -55,7 +59,7 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
-  }, [isOpen]);
+  }, [isOpen, isConfirmationLoading]);
 
   // Initialize form data when modal opens - now with current time
   useEffect(() => {
@@ -90,6 +94,7 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
       
       setErrors({});
       setShowConfirmation(false);
+      setIsConfirmationLoading(false);
     }
   }, [isOpen]);
 
@@ -195,6 +200,9 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
 
   // Order data change handler with time validation
   const handleOrderDataChange = useCallback((e) => {
+    // Prevent interaction during loading
+    if (isConfirmationLoading) return;
+    
     const { name, value } = e.target;
     
     setOrderData(prev => ({
@@ -208,9 +216,12 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
         [name]: ''
       }));
     }
-  }, [errors]);
+  }, [errors, isConfirmationLoading]);
 
   const handleProductRowChange = useCallback((rowId, field, value) => {
+    // Prevent interaction during loading
+    if (isConfirmationLoading) return;
+    
     setProductRows(prev => prev.map(row => {
       if (row.id === rowId) {
         return { ...row, [field]: value };
@@ -225,16 +236,22 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
         [errorKey]: ''
       }));
     }
-  }, [errors]);
+  }, [errors, isConfirmationLoading]);
 
   const toggleDropdown = useCallback((rowId) => {
+    // Prevent interaction during loading
+    if (isConfirmationLoading) return;
+    
     setProductRows(prev => prev.map(row => ({
       ...row,
       isDropdownOpen: row.id === rowId ? !row.isDropdownOpen : false
     })));
-  }, []);
+  }, [isConfirmationLoading]);
 
   const handleProductSelect = useCallback((rowId, selectedProduct) => {
+    // Prevent interaction during loading
+    if (isConfirmationLoading) return;
+    
     if (selectedProduct === '') {
       setProductRows(prev => prev.map(row => {
         if (row.id === rowId) {
@@ -281,9 +298,12 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
         [errorKey]: ''
       }));
     }
-  }, [errors]);
+  }, [errors, isConfirmationLoading]);
 
   const addProductRow = useCallback(() => {
+    // Prevent interaction during loading
+    if (isConfirmationLoading) return;
+    
     const newId = Math.max(...productRows.map(row => row.id)) + 1;
     setProductRows(prev => [...prev, {
       id: newId,
@@ -299,22 +319,23 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
       agesize: '',
       selectedVariant: null
     }]);
-  }, [productRows]);
+  }, [productRows, isConfirmationLoading]);
 
   const removeProductRow = useCallback((rowId) => {
-    if (productRows.length > 1) {
-      setProductRows(prev => prev.filter(row => row.id !== rowId));
-      setErrors(prev => {
-        const newErrors = { ...prev };
-        Object.keys(newErrors).forEach(key => {
-          if (key.startsWith(`${rowId}-`)) {
-            delete newErrors[key];
-          }
-        });
-        return newErrors;
+    // Prevent interaction during loading
+    if (isConfirmationLoading || productRows.length <= 1) return;
+    
+    setProductRows(prev => prev.filter(row => row.id !== rowId));
+    setErrors(prev => {
+      const newErrors = { ...prev };
+      Object.keys(newErrors).forEach(key => {
+        if (key.startsWith(`${rowId}-`)) {
+          delete newErrors[key];
+        }
       });
-    }
-  }, [productRows.length]);
+      return newErrors;
+    });
+  }, [productRows.length, isConfirmationLoading]);
 
   // Check if we have complete data for change calculation
   const hasCompleteData = useMemo(() => {
@@ -379,12 +400,20 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
   const handleSubmit = useCallback((e) => {
     e.preventDefault();
     
+    // Prevent submission during loading
+    if (isConfirmationLoading) return;
+    
     if (validateForm()) {
       setShowConfirmation(true);
     }
-  }, [validateForm]);
+  }, [validateForm, isConfirmationLoading]);
 
   const handleConfirmSave = useCallback(async () => {
+    // Prevent double clicking
+    if (isConfirmationLoading) return;
+    
+    setIsConfirmationLoading(true);
+    
     try {
       // Generate proper order ID
       const generatedOrderId = generateOrderId();
@@ -419,21 +448,29 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
       
       // Simply close the modal after successful save
       setShowConfirmation(false);
+      setIsConfirmationLoading(false);
       onClose();
     } catch (error) {
       console.error('Error saving transaction:', error);
+      setIsConfirmationLoading(false);
       alert('Error occurred while saving the transaction. Please try again.');
     }
-  }, [orderData, productRows, grandTotal, change, orderStatus, onSave, generateOrderId, onClose]);
+  }, [orderData, productRows, grandTotal, change, orderStatus, onSave, generateOrderId, onClose, isConfirmationLoading]);
 
   const handleCancelConfirmation = useCallback(() => {
+    // Prevent interaction during loading
+    if (isConfirmationLoading) return;
+    
     setShowConfirmation(false);
-  }, []);
+  }, [isConfirmationLoading]);
 
   const handleCancel = useCallback(() => {
+    // Prevent interaction during loading
+    if (isConfirmationLoading) return;
+    
     setShowConfirmation(false);
     onClose();
-  }, [onClose]);
+  }, [onClose, isConfirmationLoading]);
 
   const getVariantDisplay = useCallback((product) => {
     const variants = [];
@@ -450,7 +487,7 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
 
   return (
     <div className="modal-overlay">
-      <div className="add-sale-modal-content multiple-products">
+      <div className={`add-sale-modal-content multiple-products ${isConfirmationLoading ? 'loading' : ''}`}>
         <div className="add-sale-modal-inner">
           <div className="modal-header">
             <h3>Add New Sale</h3>
@@ -482,6 +519,7 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
                     value={orderData.orderdate}
                     onChange={handleOrderDataChange}
                     className={`form-input ${errors.orderdate ? 'error' : ''}`}
+                    disabled={isConfirmationLoading}
                   />
                   {errors.orderdate && <span className="error-message">{errors.orderdate}</span>}
                 </div>
@@ -495,6 +533,7 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
                     value={orderData.ordertime}
                     onChange={handleOrderDataChange}
                     className={`form-input ${errors.ordertime ? 'error' : ''}`}
+                    disabled={isConfirmationLoading}
                   />
                   {errors.ordertime && <span className="error-message">{errors.ordertime}</span>}
                 </div>
@@ -509,6 +548,7 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
                   type="button" 
                   className="add-product-btn"
                   onClick={addProductRow}
+                  disabled={isConfirmationLoading}
                 >
                   + Add Product
                 </button>
@@ -523,6 +563,7 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
                         type="button"
                         className="remove-product-btn"
                         onClick={() => removeProductRow(row.id)}
+                        disabled={isConfirmationLoading}
                       >
                         ✕
                       </button>
@@ -536,6 +577,7 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
                         <div 
                           className={`modal-custom-dropdown-button ${errors[`${row.id}-productname`] ? 'error' : ''}`}
                           onClick={() => toggleDropdown(row.id)}
+                          style={{ pointerEvents: isConfirmationLoading ? 'none' : 'auto' }}
                         >
                           <div className="dropdown-button-content">
                             <span className="dropdown-text">
@@ -547,7 +589,7 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
                           </div>
                         </div>
                         
-                        {row.isDropdownOpen && (
+                        {row.isDropdownOpen && !isConfirmationLoading && (
                           <div className="modal-custom-dropdown-list">
                             <div
                               className="dropdown-item"
@@ -596,6 +638,7 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
                         placeholder="Qty"
                         min="1"
                         step="1"
+                        disabled={isConfirmationLoading}
                       />
                       {errors[`${row.id}-quantity`] && (
                         <span className="error-message">{errors[`${row.id}-quantity`]}</span>
@@ -623,6 +666,7 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
                         min="0"
                         step="0.01"
                         readOnly={row.selectedVariant}
+                        disabled={isConfirmationLoading}
                       />
                       {errors[`${row.id}-unitprice`] && (
                         <span className="error-message">{errors[`${row.id}-unitprice`]}</span>
@@ -637,6 +681,7 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
                         className="form-input readonly"
                         placeholder="Auto-calculated"
                         readOnly
+                        disabled={isConfirmationLoading}
                       />
                     </div>
                   </div>
@@ -662,6 +707,7 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
                     placeholder="Enter amount paid"
                     min="0"
                     step="0.01"
+                    disabled={isConfirmationLoading}
                   />
                   {errors.amountPaid && <span className="error-message">{errors.amountPaid}</span>}
                   <small className="help-text">
@@ -689,10 +735,10 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
             </div>
 
             <div className="modal-footer">
-              <button type="button" className="cancel-btn" onClick={handleCancel}>
+              <button type="button" className="cancel-btn" onClick={handleCancel} disabled={isConfirmationLoading}>
                 Cancel
               </button>
-              <button type="submit" className="save-btn">
+              <button type="submit" className="save-btn" disabled={isConfirmationLoading}>
                 Save All Products
               </button>
             </div>
@@ -702,7 +748,7 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
         {/* Confirmation Dialog */}
         {showConfirmation && (
           <div className="confirmation-overlay">
-            <div className="confirmation-dialog">
+            <div className={`confirmation-dialog ${isConfirmationLoading ? 'loading' : ''}`}>
               <div className="confirmation-header">
                 <h4>Confirm Save</h4>
               </div>
@@ -725,6 +771,7 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
                   type="button" 
                   className="confirmation-no-btn" 
                   onClick={handleCancelConfirmation}
+                  disabled={isConfirmationLoading}
                 >
                   No
                 </button>
@@ -732,10 +779,20 @@ const AddSaleModal = ({ isOpen, onClose, onSave, products = [] }) => {
                   type="button" 
                   className="confirmation-yes-btn" 
                   onClick={handleConfirmSave}
+                  disabled={isConfirmationLoading}
                 >
                   Yes
                 </button>
               </div>
+
+              {/* Loading overlay inside confirmation dialog */}
+              {isConfirmationLoading && (
+                <div className="confirmation-loading-overlay">
+                  <div className="confirmation-loading-spinner"></div>
+                  <div className="confirmation-loading-text">Saving Sale...</div>
+                  <div className="confirmation-loading-subtext">Please wait while we process your transaction</div>
+                </div>
+              )}
             </div>
           </div>
         )}
