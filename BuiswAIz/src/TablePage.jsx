@@ -16,7 +16,6 @@ import './stylecss/Sales/AddSaleModal.css';
 import './stylecss/Sales/Bestseller.css';
 import './stylecss/Sales/PeakHours.css';
 
-
 const TablePage = () => {
   const navigate = useNavigate();
   const [orderData, setOrderData] = useState([]);
@@ -30,6 +29,7 @@ const TablePage = () => {
   const [showSalesSuccessModal, setShowSalesSuccessModal] = useState(false);
   const [salesSuccessData, setSalesSuccessData] = useState(null);
   const [user, setUser] = useState(null);
+  const [isSavingSale, setIsSavingSale] = useState(false);
 
   // Memoize bestsellers calculation to prevent unnecessary recalculations
   const bestsellers = useMemo(() => {
@@ -459,8 +459,9 @@ const TablePage = () => {
     }
   }, []);
 
-  // Enhanced handleSaveSale with productcategoryid validation
+  // Enhanced handleSaveSale with productcategoryid validation and loading state
   const handleSaveSale = useCallback(async (orderWithPayment) => {
+    setIsSavingSale(true);
     try {
       const salesDataArray = orderWithPayment.salesData;
       
@@ -518,7 +519,6 @@ const TablePage = () => {
         return;
       }
       const orderItemsToInsert = [];
-      let newProductsCreated = false;
 
       for (const saleData of updatedSalesData) {
         let productCategoryId;
@@ -567,7 +567,6 @@ const TablePage = () => {
           }
 
           productCategoryId = newProductCategory.productcategoryid;
-          newProductsCreated = true;
         } else {
           // For existing products, use the productcategoryid directly from saleData
           productCategoryId = saleData.productcategoryid;
@@ -617,9 +616,11 @@ const TablePage = () => {
         return; // Don't continue if inventory update failed
       }
 
+      // FIXED: Always refresh products data after any sale, not just when new products are created
+      // This ensures the dropdown shows updated stock levels
       const refreshPromises = [
         fetchOrderData(),
-        newProductsCreated ? fetchProducts() : Promise.resolve()
+        fetchProducts() // Always fetch products to get updated stock levels
       ];
       
       await Promise.all(refreshPromises);
@@ -639,6 +640,8 @@ const TablePage = () => {
       console.error('UNEXPECTED ERROR in sale save process:', error);
       console.error('Error stack:', error.stack);
       alert(`Unexpected error occurred: ${error.message}\n\nPlease check the console for details.`);
+    } finally {
+      setIsSavingSale(false);
     }
   }, [checkStockAvailability, generateUniqueOrderId, updateInventoryStock, fetchOrderData, fetchProducts, products]);
 
@@ -838,6 +841,7 @@ const TablePage = () => {
         onClose={handleCloseAddSaleModal}
         onSave={handleSaveSale}
         products={products}
+        isLoading={isSavingSale}
       />
 
       <SalesSuccessModal 

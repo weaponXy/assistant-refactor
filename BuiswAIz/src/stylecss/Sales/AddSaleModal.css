@@ -137,14 +137,6 @@
   box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1) !important;
 }
 
-/* Help text styling */
-.help-text {
-  font-size: 12px;
-  color: #6c757d;
-  font-style: italic;
-  margin-top: 4px;
-}
-
 .products-section {
   margin-bottom: 25px;
 }
@@ -1008,4 +1000,101 @@
 
 .dropdown-group-header strong {
   color: #333;
+}
+
+
+.confirmation-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-radius: 15px;
+  z-index: 10000;
+  backdrop-filter: blur(2px);
+}
+
+.confirmation-loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #04B4FC;
+  border-radius: 50%;
+  animation: confirmationSpin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+.confirmation-loading-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  text-align: center;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.confirmation-loading-subtext {
+  font-size: 14px;
+  color: #666;
+  text-align: center;
+  font-family: 'Montserrat', sans-serif;
+  margin-top: 8px;
+  font-style: italic;
+}
+
+@keyframes confirmationSpin {
+  0% { 
+    transform: rotate(0deg); 
+  }
+  100% { 
+    transform: rotate(360deg); 
+  }
+}
+
+/* Disabled state for confirmation buttons */
+.confirmation-dialog.loading {
+  pointer-events: none;
+}
+
+.confirmation-dialog.loading .confirmation-footer button {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Add subtle animation to the loading overlay */
+.confirmation-loading-overlay {
+  animation: fadeInLoading 0.3s ease-in-out;
+}
+
+@keyframes fadeInLoading {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+  }
+  to {
+    opacity: 1;
+    backdrop-filter: blur(2px);
+  }
+}
+
+/* Mobile responsive for loading overlay */
+@media (max-width: 768px) {
+  .confirmation-loading-spinner {
+    width: 40px;
+    height: 40px;
+    border-width: 3px;
+  }
+  
+  .confirmation-loading-text {
+    font-size: 15px;
+  }
+  
+  .confirmation-loading-subtext {
+    font-size: 13px;
+  }
 }
