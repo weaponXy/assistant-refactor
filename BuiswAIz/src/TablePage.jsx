@@ -31,29 +31,27 @@ const TablePage = () => {
   const [user, setUser] = useState(null);
   const [isSavingSale, setIsSavingSale] = useState(false);
 
-  // Memoize bestsellers calculation to prevent unnecessary recalculations
+  // Updated bestsellers calculation to group by product name instead of productcategoryid
   const bestsellers = useMemo(() => {
     if (!orderData.length) return [];
 
     const summary = {};
     orderData.forEach(item => {
-      // Use productcategoryid as the unique identifier
-      const id = item.productcategoryid;
-      const name = item.products?.productname || 'Unknown';
+      // Use product name as the unique identifier instead of productcategoryid
+      const productName = item.products?.productname || 'Unknown';
       const imageUrl = item.products?.image_url || '';
 
-      if (!summary[id]) {
-        summary[id] = {
-          productcategoryid: id,
-          productname: name,
+      if (!summary[productName]) {
+        summary[productName] = {
+          productname: productName,
           image_url: imageUrl,
           totalQuantity: 0,
           timesBought: new Set(),
         };
       }
 
-      summary[id].totalQuantity += item.quantity;
-      summary[id].timesBought.add(item.orderid);
+      summary[productName].totalQuantity += item.quantity;
+      summary[productName].timesBought.add(item.orderid);
     });
 
     return Object.values(summary)
