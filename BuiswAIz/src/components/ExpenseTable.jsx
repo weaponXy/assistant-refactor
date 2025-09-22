@@ -17,7 +17,13 @@ export default function ExpenseTable({ expenses, onEdit, onDelete }) {
               <td>{expense.description}</td>
               <td>{expense.category}</td>
               <td>₱{Number(expense.amount).toFixed(2)}</td>
-              <td>{expense.expensedate}</td>
+              <td>
+                {expense.expensedate ||
+                 expense.expense_date ||
+                 expense.expenseDate ||
+                 expense.date ||
+                 expense.created_at}
+              </td>
               <td>
                 <button onClick={() => onEdit(expense)}>Edit</button>
                 <button onClick={() => onDelete(expense.expenseid)}>Delete</button>

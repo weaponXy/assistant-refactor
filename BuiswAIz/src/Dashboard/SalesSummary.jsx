@@ -40,8 +40,6 @@ const SalesSummary = () => {
       const startOfMonth = new Date(currentYear, currentMonth - 1, 1).toISOString().split('T')[0];
       const endOfMonth = new Date(currentYear, currentMonth, 0).toISOString().split('T')[0];
 
-
-
       // Method 1: Try using orderitems table (like your Dashboard does)
       let todaysSale = 0;
       let yesterdaysSale = 0;
@@ -145,22 +143,67 @@ const SalesSummary = () => {
         }
       }
 
-      // Fetch this month's expenses
+      // ================================
+      // ✅ Fixed: robust expense lookup (no 400 spam)
+      // ================================
       let monthlyExpensesTotal = 0;
       try {
-        const { data: monthlyExpenses, error: expensesError } = await supabase
+        // 1) Probe once to detect the actual date column
+        const { data: probeRows, error: probeError } = await supabase
           .from('expenses')
-          .select('amount')
-          .gte('expensedate', startOfMonth)
-          .lte('expensedate', endOfMonth);
+          .select('*')
+          .limit(1);
 
-        if (!expensesError && monthlyExpenses) {
-          monthlyExpensesTotal = monthlyExpenses.reduce((sum, expense) => sum + (parseFloat(expense.amount) || 0), 0);
+        if (probeError) {
+          // If even probing fails, bail to client-side fallback below
+          throw probeError;
+        }
+
+        // Prefer these common keys in order; pick the first one that exists on the row
+        const CANDIDATE_KEYS = ['expense_date', 'expensedate', 'expenseDate', 'date', 'created_at'];
+        const dateKey = (probeRows?.[0]
+          ? CANDIDATE_KEYS.find(k => k in probeRows[0])
+          : undefined) || 'expensedate'; // harmless default
+
+        // 2) Try ONE server-side filtered query using the detected key
+        try {
+          const { data: ranged, error: rangedErr } = await supabase
+            .from('expenses')
+            .select(`amount, ${dateKey}`)
+            .gte(dateKey, startOfMonth)
+            .lte(dateKey, endOfMonth);
+
+          if (rangedErr) throw rangedErr;
+
+          monthlyExpensesTotal = (ranged || []).reduce(
+            (sum, e) => sum + (parseFloat(e.amount) || 0),
+            0
+          );
+        } catch (rangeFail) {
+          // 3) Fallback: fetch all and filter client-side (uses the same dateKey)
+          const { data: allExpenses, error: allErr } = await supabase
+            .from('expenses')
+            .select('*');
+
+          if (!allErr && allExpenses) {
+            const inRange = allExpenses.filter(e => {
+              const raw = e[dateKey] ?? e.expense_date ?? e.expensedate ?? e.expenseDate ?? e.date ?? e.created_at;
+              if (!raw) return false;
+              const d = new Date(raw);
+              if (isNaN(d)) return false;
+              return d >= new Date(startOfMonth) && d <= new Date(endOfMonth);
+            });
+
+            monthlyExpensesTotal = inRange.reduce(
+              (sum, e) => sum + (parseFloat(e.amount) || 0),
+              0
+            );
+          }
         }
       } catch (expensesError) {
-        console.warn('Expenses table might not exist:', expensesError);
-        // Expenses table might not exist, continue without it
+        console.warn('Expenses lookup failed:', expensesError);
       }
+
 
       const netIncome = monthlyTotalSales - monthlyExpensesTotal;
 

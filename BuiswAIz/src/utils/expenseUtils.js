@@ -1,13 +1,13 @@
 export const getDailyTotal = (expenses, date = new Date()) => {
   const selectedDateStr = date.toLocaleDateString("en-CA");
   return expenses
-    .filter(e => e.expensedate?.startsWith(selectedDateStr))
+    .filter(e => (e.expensedate ?? e.expense_date ?? e.expenseDate ?? e.date ?? e.created_at)?.startsWith(selectedDateStr))
     .reduce((acc, curr) => acc + Number(curr.amount), 0);
 };
 
 export const getMonthlyTotal = (expenses, month = new Date().getMonth()) => {
   return expenses
-    .filter(e => new Date(e.expensedate).getMonth() === month)
+    .filter(e => new Date(e.expensedate ?? e.expense_date ?? e.expenseDate ?? e.date ?? e.created_at).getMonth() === month)
     .reduce((sum, e) => sum + Number(e.amount), 0);
 };
 
@@ -27,7 +27,10 @@ export const getWeeklyBarData = (expenses) => {
     date.setDate(monday.getDate() + i);
     const dayLabel = date.toLocaleDateString("default", { weekday: "short" });
     const total = expenses
-      .filter(e => new Date(e.expensedate).toDateString() === date.toDateString())
+      .filter(e => {
+        const d = new Date(e.expensedate ?? e.expense_date ?? e.expenseDate ?? e.date ?? e.created_at);
+        return d.toDateString() === date.toDateString();
+      })
       .reduce((sum, e) => sum + Number(e.amount), 0);
     return { day: dayLabel, total };
   });

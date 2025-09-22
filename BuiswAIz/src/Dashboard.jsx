@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import React, { useState, useEffect } from "react";
+import { formatDistanceToNow } from "date-fns";
 import { supabase } from "./supabase"; 
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar, ResponsiveContainer,
@@ -10,7 +11,7 @@ import DailyGrossSales from "./Dashboard/DailyGrossSales";
 import Notifications from "./Dashboard/Notifications";
 import UploadSheets from "./components/UploadSheets";
 
-import "./stylecss/Dashboard/dashboard.css";
+import "./stylecss/Dashboard/Dashboard.css";
 
 const Dashboard = () => {
   const navigate = useNavigate(); 
@@ -22,42 +23,105 @@ const Dashboard = () => {
   const [productsLoading, setProductsLoading] = useState(true);
   const [productsError, setProductsError] = useState(null);
   const [expenseChartData, setExpenseChartData] = useState([]);
+  const [activityLogs, setActivityLogs] = useState([]);
 
-useEffect(() => {
-  const loadChartData = async () => {
-    const { data, error } = await supabase
-      .from("expenses")
-      .select("amount, expensedate");
+  useEffect(() => {
+    const loadChartData = async () => {
+      const { data, error } = await supabase.from("expenses").select("*");
+      if (error) {
+        console.error("Failed to fetch expenses for chart:", error);
+        setExpenseChartData([]);
+        return;
+      }
 
-    if (error) {
-      console.error("Failed to fetch expenses for chart:", error);
-      setExpenseChartData([]); // show empty state if needed
-      return;
-    }
+      // Heuristics: pick amount + date from whatever your schema actually has
+      const totals = new Array(12).fill(0);
 
-    // Sum totals per month (0–11)
-    const totals = new Array(12).fill(0);
-    data.forEach(({ amount, expensedate }) => {
-      if (!expensedate) return;
-      const m = new Date(expensedate).getMonth();
-      totals[m] += Number(amount) || 0;
-    });
+      data.forEach((row, idx) => {
+        // amount variants
+        const amt =
+          Number(row.amount) ??
+          Number(row.expense_amount) ??
+          Number(row.total) ??
+          0;
 
-    const months = Array.from({ length: 12 }, (_, m) =>
-      new Date(0, m).toLocaleString("default", { month: "short" })
-    );
+        // date variants
+        const expDate =
+          row.expensedate ??
+          row.expense_date ??
+          row.expenseDate ??
+          row.date ??
+          row.created_at;
 
-    const chart = months.map((label, m) => ({
-      month: label,
-      total: Number(totals[m].toFixed(2)),
-    }));
+        if (!expDate) return;
 
-    setExpenseChartData(chart);
-  };
+        const d = new Date(expDate);
+        if (isNaN(d)) {
+          // useful debug to find the real key/format
+          console.warn("Bad date @ row", idx, expDate, row);
+          return;
+        }
 
-  loadChartData();
-}, []);
+        const m = d.getMonth(); // 0..11
+        totals[m] += Number.isFinite(amt) ? amt : 0;
+      });
 
+      const months = Array.from({ length: 12 }, (_, m) =>
+        new Date(0, m).toLocaleString("default", { month: "short" })
+      );
+
+      const chart = months.map((label, m) => ({
+        month: label,
+        total: Number((totals[m] || 0).toFixed(2)),
+      }));
+
+      // Debug: verify we actually have nonzero totals
+      console.log("Expense chart preview:", chart);
+
+      setExpenseChartData(chart);
+    };
+
+    loadChartData();
+  }, []);
+
+
+     const loadActivityLogs = async () => {
+      // Align table and relationship names with what your API logs show
+        const { data, error } = await supabase
+         .from("activitylog") // <- match your working Inventory page
+         .select("*, systemuser(username)")
+         .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Failed to fetch activity logs:", error);
+        return;
+      }
+
+      setActivityLogs(data.slice(0, 50)); 
+
+      
+      if (data.length > 50) {
+        const logsToDelete = data.slice(50); 
+        const idsToDelete = logsToDelete.map(log => log.activity_id); 
+
+        const { error: deleteError } = await supabase
+          .from("activitylog")
+          .delete()
+          .in("activity_id", idsToDelete);
+
+        if (deleteError) {
+          console.error("Failed to delete old logs:", deleteError);
+        } else {
+          console.log(`Deleted ${idsToDelete.length} old logs.`);
+        }
+      }
+    };
+  // actually run it
+  useEffect(() => {
+   loadActivityLogs();
+    const id = setInterval(loadActivityLogs, 5000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const getUser = async () => {
@@ -205,7 +269,8 @@ useEffect(() => {
                     <ResponsiveContainer width="100%" height={300}>
                       <LineChart data={expenseChartData}>
                         <XAxis dataKey="month" />
-                        <YAxis />
+                        <YAxis domain={[0, (dataMax) => (dataMax && dataMax > 0 ? dataMax : 1)]} />
+
                         <Tooltip />
                         <CartesianGrid strokeDasharray="5 5" />
                         <Line
@@ -275,9 +340,29 @@ useEffect(() => {
               </button>
             </div>
 
-            <div className="dashboard-panel transaction-history">
-              <h3>Transaction History</h3>
-              <div className="panel-content"></div>
+            <div className="activity-panel">
+              <h3>Recent Activity</h3>
+              <div className="activity-container">
+                <ul>
+                  {activityLogs.length === 0 ? (
+                    <li className="activity-item">No recent activity</li>
+                  ) : (
+                    activityLogs.map((log, i) => (
+                      <li key={i} className="activity-item">
+                        <span>
+                          <span className="log-username">
+                            {log.systemuser?.username ? log.systemuser.username : "Someone"}
+                          </span>{" "}
+                          {log.action_desc}
+                        </span>
+                        <span className="time">
+                          {formatDistanceToNow(new Date(log.created_at), { addSuffix: true })}
+                        </span>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              </div>
             </div>
           </div>
         </div>
