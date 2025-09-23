@@ -114,6 +114,32 @@ const ViewProduct = ({ product, onClose, onProductUpdated, user }) => {
     }
   };
 
+   const handleDeleteClick = async () => {
+    setDeleteError("");
+    setIsLoading(true);
+
+    try {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/check-product-deletable`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productid: currentProduct.productid }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Unable to check product deletability.");
+
+      if (data.canDelete) {
+        setShowConfirm(true);
+      } else {
+        setDeleteError("This product cannot be deleted because it has linked items or orders.");
+      }
+    } catch (err) {
+      console.error(err);
+      setDeleteError(err.message || "Failed to check product status.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleDelete = async () => {
     setDeleteError("");
@@ -171,7 +197,7 @@ const ViewProduct = ({ product, onClose, onProductUpdated, user }) => {
               <>
                 <button
                   className="delete-button"
-                  onClick={() => setShowConfirm(true)}
+                  onClick={handleDeleteClick}
                   disabled={isLoading}
                 >
                   🗑 Delete
@@ -306,9 +332,9 @@ const ViewProduct = ({ product, onClose, onProductUpdated, user }) => {
           }}
           productName={currentProduct.productname}
         />
-
+        {formError && <div className="productForm-warning">{formError}</div>}
         {deleteError && <div className="delete-warning">{deleteError}</div>}
-
+          
         {showAddCategory && (
           <AddCategory
             productId={currentProduct.productid}
