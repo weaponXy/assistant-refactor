@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
 import '../stylecss/Dashboard/Notifications.css';
 
 const Notifications = () => {
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -25,6 +27,9 @@ const Notifications = () => {
             productid,
             currentstock,
             reorderpoint,
+            updatedstock,
+            color,
+            agesize,
             products (productname)
           `);
 
@@ -39,14 +44,26 @@ const Notifications = () => {
           );
           
           filteredLowStock.forEach((item, index) => {
+            // Create variant display for color and agesize
+            const variants = [];
+            if (item.color && item.color.trim()) {
+              variants.push(`C: ${item.color}`);
+            }
+            if (item.agesize && item.agesize.trim()) {
+              variants.push(`S: ${item.agesize}`);
+            }
+            const variantInfo = variants.length > 0 ? variants.join(', ') : null;
+
             allNotifications.push({
               id: `stock-${item.productcategoryid}-${index}-${Date.now()}`,
               type: 'low-stock',
               title: 'Low Stock Alert',
               message: `${item.products?.productname || 'Unknown Product'}`,
+              variantInfo: variantInfo,
               details: `Stock: ${item.currentstock}`,
               priority: 'high',
-              timestamp: new Date() // Current date when detected
+              timestamp: item.updatedstock ? new Date(item.updatedstock) : new Date(),
+              navigationPath: '/inventory'
             });
           });
         }
@@ -76,7 +93,8 @@ const Notifications = () => {
               message: `Order ID: ${order.orderid}`,
               details: `Order Date: ${new Date(order.orderdate).toLocaleDateString()}`,
               priority: 'medium',
-              timestamp: new Date(order.orderdate)
+              timestamp: new Date(order.orderdate),
+              navigationPath: '/TablePage'
             });
           });
         }
@@ -92,7 +110,13 @@ const Notifications = () => {
             productid,
             reporteddate,
             status,
-            products (productname)
+            products (
+              productname,
+              productcategory (
+                color,
+                agesize
+              )
+            )
           `)
           .order('reporteddate', { ascending: false })
           .limit(10);
@@ -103,14 +127,40 @@ const Notifications = () => {
           }
         } else if (defectiveItems && defectiveItems.length > 0) {
           defectiveItems.forEach((item, index) => {
+            // Get all product categories for this product to show variants
+            const productCategories = item.products?.productcategory || [];
+            
+            // Create variant info for each category
+            let variantInfo = null;
+            if (Array.isArray(productCategories) && productCategories.length > 0) {
+              const variants = [];
+              productCategories.forEach(category => {
+                const categoryVariants = [];
+                if (category.color && category.color.trim()) {
+                  categoryVariants.push(`C: ${category.color}`);
+                }
+                if (category.agesize && category.agesize.trim()) {
+                  categoryVariants.push(`S: ${category.agesize}`);
+                }
+                if (categoryVariants.length > 0) {
+                  variants.push(categoryVariants.join(', '));
+                }
+              });
+              if (variants.length > 0) {
+                variantInfo = variants.join(' | ');
+              }
+            }
+
             allNotifications.push({
               id: `defective-${item.productid}-${item.reporteddate}-${index}-${Date.now()}`,
               type: 'defective-item',
               title: 'Defective Item Report',
               message: `${item.products?.productname || 'Unknown Product'}`,
+              variantInfo: variantInfo,
               details: `Status: ${item.status} | Reported: ${new Date(item.reporteddate).toLocaleDateString()}`,
               priority: 'high',
-              timestamp: new Date(item.reporteddate)
+              timestamp: new Date(item.reporteddate),
+              navigationPath: '/inventory'
             });
           });
         }
@@ -134,6 +184,12 @@ const Notifications = () => {
       setError(`Failed to load notifications: ${error.message}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleNotificationClick = (notification) => {
+    if (notification.navigationPath) {
+      navigate(notification.navigationPath);
     }
   };
 
@@ -192,12 +248,24 @@ const Notifications = () => {
           notifications.map((notification) => (
             <div
               key={notification.id}
-              className={getPriorityClass(notification.priority)}
+              className={`${getPriorityClass(notification.priority)} clickable-notification`}
+              onClick={() => handleNotificationClick(notification)}
+              style={{ cursor: 'pointer' }}
             >
               <div className="notification-content">
                 <div className="notification-header">
                   <span className="notification-title">{notification.title}</span>
                   <div className="notification-message">{notification.message}</div>
+                  {notification.variantInfo && (
+                    <div className="notification-variant-info" style={{ 
+                      fontSize: '12px', 
+                      color: '#666', 
+                      fontStyle: 'italic',
+                      marginTop: '2px'
+                    }}>
+                      {notification.variantInfo}
+                    </div>
+                  )}
                 </div>
                 {notification.details && (
                   <div className="notification-details">{notification.details}</div>

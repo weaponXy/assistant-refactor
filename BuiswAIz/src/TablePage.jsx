@@ -16,7 +16,6 @@ import './stylecss/Sales/AddSaleModal.css';
 import './stylecss/Sales/Bestseller.css';
 import './stylecss/Sales/PeakHours.css';
 
-
 const TablePage = () => {
   const navigate = useNavigate();
   const [orderData, setOrderData] = useState([]);
@@ -30,30 +29,29 @@ const TablePage = () => {
   const [showSalesSuccessModal, setShowSalesSuccessModal] = useState(false);
   const [salesSuccessData, setSalesSuccessData] = useState(null);
   const [user, setUser] = useState(null);
+  const [isSavingSale, setIsSavingSale] = useState(false);
 
-  // Memoize bestsellers calculation to prevent unnecessary recalculations
+  // Updated bestsellers calculation to group by product name instead of productcategoryid
   const bestsellers = useMemo(() => {
     if (!orderData.length) return [];
 
     const summary = {};
     orderData.forEach(item => {
-      // Use productcategoryid as the unique identifier
-      const id = item.productcategoryid;
-      const name = item.products?.productname || 'Unknown';
+      // Use product name as the unique identifier instead of productcategoryid
+      const productName = item.products?.productname || 'Unknown';
       const imageUrl = item.products?.image_url || '';
 
-      if (!summary[id]) {
-        summary[id] = {
-          productcategoryid: id,
-          productname: name,
+      if (!summary[productName]) {
+        summary[productName] = {
+          productname: productName,
           image_url: imageUrl,
           totalQuantity: 0,
           timesBought: new Set(),
         };
       }
 
-      summary[id].totalQuantity += item.quantity;
-      summary[id].timesBought.add(item.orderid);
+      summary[productName].totalQuantity += item.quantity;
+      summary[productName].timesBought.add(item.orderid);
     });
 
     return Object.values(summary)
@@ -459,8 +457,9 @@ const TablePage = () => {
     }
   }, []);
 
-  // Enhanced handleSaveSale with productcategoryid validation
+  // Enhanced handleSaveSale with productcategoryid validation and loading state
   const handleSaveSale = useCallback(async (orderWithPayment) => {
+    setIsSavingSale(true);
     try {
       const salesDataArray = orderWithPayment.salesData;
       
@@ -518,7 +517,6 @@ const TablePage = () => {
         return;
       }
       const orderItemsToInsert = [];
-      let newProductsCreated = false;
 
       for (const saleData of updatedSalesData) {
         let productCategoryId;
@@ -567,7 +565,6 @@ const TablePage = () => {
           }
 
           productCategoryId = newProductCategory.productcategoryid;
-          newProductsCreated = true;
         } else {
           // For existing products, use the productcategoryid directly from saleData
           productCategoryId = saleData.productcategoryid;
@@ -617,9 +614,11 @@ const TablePage = () => {
         return; // Don't continue if inventory update failed
       }
 
+      // FIXED: Always refresh products data after any sale, not just when new products are created
+      // This ensures the dropdown shows updated stock levels
       const refreshPromises = [
         fetchOrderData(),
-        newProductsCreated ? fetchProducts() : Promise.resolve()
+        fetchProducts() // Always fetch products to get updated stock levels
       ];
       
       await Promise.all(refreshPromises);
@@ -639,6 +638,8 @@ const TablePage = () => {
       console.error('UNEXPECTED ERROR in sale save process:', error);
       console.error('Error stack:', error.stack);
       alert(`Unexpected error occurred: ${error.message}\n\nPlease check the console for details.`);
+    } finally {
+      setIsSavingSale(false);
     }
   }, [checkStockAvailability, generateUniqueOrderId, updateInventoryStock, fetchOrderData, fetchProducts, products]);
 
@@ -838,6 +839,7 @@ const TablePage = () => {
         onClose={handleCloseAddSaleModal}
         onSave={handleSaveSale}
         products={products}
+        isLoading={isSavingSale}
       />
 
       <SalesSuccessModal 

@@ -79,15 +79,6 @@ const AddProduct = ({ onClose, user }) => {
     }
   };
 
-  // Convert file to Base64
-  const convertToBase64 = (file) =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result.split(",")[1]);
-      reader.onerror = (err) => reject(err);
-    });
-
   const handleSubmit = async () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
@@ -106,25 +97,21 @@ const AddProduct = ({ onClose, user }) => {
     }
 
     try {
-      let imageBase64 = null;
-      let imageName = null;
-      if (imageFile) {
-        imageBase64 = await convertToBase64(imageFile);
-        imageName = imageFile.name;
-      }
+      const form = new FormData();
+      form.append("productname", formData.productname);
+      form.append("description", formData.description);
+      form.append("suppliername", formData.suppliername);
+      form.append("userid", user.userid);
+
+      // categories as JSON string
+      form.append("categories", JSON.stringify(categories));
+
+      // Append image if selected
+      if (imageFile) form.append("image", imageFile);
 
       const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/add-product`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          productname: formData.productname,
-          description: formData.description,
-          suppliername: formData.suppliername,
-          categories,
-          userid: user.userid,
-          imageBase64,
-          imageName,
-        }),
+        body: form,
       });
 
       const data = await response.json();
@@ -140,6 +127,7 @@ const AddProduct = ({ onClose, user }) => {
       setIsSubmitting(false);
     }
   };
+
 
   return (
     <div className="modal-overlay">

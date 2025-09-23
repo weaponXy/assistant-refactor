@@ -1,83 +1,90 @@
 .restock-form-container {
-  padding: 1.5rem;
+  padding: 2rem;
   background: #ffffff;
-  border-radius: 12px;
-  box-shadow: 0px 4px 12px rgba(0,0,0,0.1);
-  max-width: 1000px;
-  margin: 0 auto;
+  border-radius: 16px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+  max-width: 900px;
+  margin: 2rem auto;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.restock-form-container:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
 }
 
 .restock-form-container h3 {
-  font-size: 1.3rem;
-  font-weight: 600;
-  margin-bottom: 3rem;
-  color: #333;
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 2rem;
+  color: #222;
   text-align: center;
-  height: calc(10vh - 30px);
-  overflow: hidden; /* or auto / scroll depending on need */
+  letter-spacing: -0.5px;
 }
 
 .restock-form {
   display: grid;
-  padding: 5%;
   grid-template-columns: 1fr 1fr;
-  gap: 1rem;
+  gap: 1.2rem 1.5rem;
 }
 
 .restock-form input,
 .restock-form select {
-  padding: 0.6rem 0.8rem;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  font-size: 0.95rem;
-  transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid #e0e6ed;
+  border-radius: 10px;
+  font-size: 1rem;
+  background: #fafbfc;
+  color: #333;
+  transition: all 0.2s ease-in-out;
 }
 
 .restock-form input:focus,
 .restock-form select:focus {
   border-color: #04B4FC;
+  background: #fff;
   outline: none;
-  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+  box-shadow: 0 0 0 3px rgba(4, 180, 252, 0.2);
 }
 
-/* Make the cost input span both columns */
+/* Make cost input span both columns */
 .restock-form .full-width {
   grid-column: span 2;
 }
 
 .form-buttons {
   display: flex;
-  justify-content: space-between;
-  margin-top: 1.2rem;
+  justify-content: flex-end;
+  gap: 0.8rem;
+  margin-top: 2rem;
 }
 
 .form-buttons button {
-  flex: 1;
-  padding: 0.6rem 1rem;
+  padding: 0.7rem 1.4rem;
   border: none;
-  border-radius: 8px;
+  border-radius: 10px;
   font-size: 0.95rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s ease-in-out;
+  transition: all 0.2s ease-in-out;
 }
 
 .form-buttons button:first-child {
   background: #04B4FC;
   color: #fff;
-  margin-right: 0.5rem;
 }
 
 .form-buttons button:first-child:hover {
   background: #91c3d7;
+  transform: translateY(-1px);
 }
 
 .form-buttons button:last-child {
-  background: #f3f4f6;
-  color: #333;
+  background: #f5f7fa;
+  color: #444;
 }
 
 .form-buttons button:last-child:hover {
-  background: #e5e7eb;
+  background: #e5e8ec;
+  transform: translateY(-1px);
 }
-

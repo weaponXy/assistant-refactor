@@ -82,34 +82,20 @@ const ViewProduct = ({ product, onClose, onProductUpdated, user }) => {
     setFormError("");
 
     try {
-      let imageBase64 = null;
-      let imageName = null;
+      const formData = new FormData();
+      formData.append("productid", currentProduct.productid);
+      formData.append("productname", form.productname.trim());
+      formData.append("description", form.description.trim());
+      formData.append("supplierid", form.supplierid);
+      formData.append("userid", user.userid);
 
       if (newImageFile) {
-        const reader = new FileReader();
-        reader.readAsDataURL(newImageFile);
-        await new Promise((resolve, reject) => {
-          reader.onload = () => {
-            imageBase64 = reader.result.split(",")[1];
-            imageName = newImageFile.name;
-            resolve();
-          };
-          reader.onerror = reject;
-        });
+        formData.append("image", newImageFile); // must match multer.single("image")
       }
 
       const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/update-product`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          productid: currentProduct.productid,
-          productname: form.productname.trim(),
-          description: form.description.trim(),
-          supplierid: form.supplierid,
-          userid: user.userid,
-          imageBase64,
-          imageName,
-        }),
+        body: formData, // no JSON headers
       });
 
       const data = await res.json();
@@ -127,6 +113,7 @@ const ViewProduct = ({ product, onClose, onProductUpdated, user }) => {
       setIsLoading(false);
     }
   };
+
 
   const handleDelete = async () => {
     setDeleteError("");
