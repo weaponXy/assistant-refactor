@@ -11,7 +11,7 @@ import BudgetHistory from '../budget/BudgetHistory';
 import { fetchMainCategories, fetchSubcategories, getCategoryById } from '../api/categories';
 import { listLabels, createLabel } from '../api/labels';
 import { listContacts, createContact } from '../api/contacts';
-import { listExpensesByMonth, createExpense, updateExpense } from '../api/expenses';
+import { listExpensesByMonth, createExpense, updateExpense, listExpensesByYear, listExpensesBetween, deleteExpense } from '../api/expenses';
 import { AttachmentsPanel } from '../components/AttachmentsPanel';
 import { uploadAttachments } from '../api/attachments';
 
@@ -35,6 +35,48 @@ function monthBounds(yyyyMM) {
   return { start, end };
 }
 
+function startOfTodayISO() {
+  const d = new Date();
+  d.setHours(0,0,0,0);
+  return d.toISOString().slice(0,10);
+}
+function addDaysISO(iso, days) {
+  const [y,m,dd] = iso.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m-1, dd));
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0,10);
+}
+function isoRangeForPreset(preset) {
+  const today = startOfTodayISO();
+  switch (preset) {
+    case 'last7':   return { start: addDaysISO(today, -7),  end: addDaysISO(today, 1) };
+    case 'last30':  return { start: addDaysISO(today, -30), end: addDaysISO(today, 1) };
+    case 'last12w': return { start: addDaysISO(today, -84), end: addDaysISO(today, 1) };
+    case 'last6m':  return { start: addDaysISO(today, -183), end: addDaysISO(today, 1) };
+    case 'last1y':  return { start: addDaysISO(today, -365), end: addDaysISO(today, 1) };
+    case 'thisWeek': {
+      const d = new Date(); // assume week starts Monday; tweak if needed
+      const day = (d.getDay() + 6) % 7; // 0..6 Monday..Sunday
+      const start = addDaysISO(startOfTodayISO(), -day);
+      const end   = addDaysISO(startOfTodayISO(), 1);
+      return { start, end };
+    }
+    case 'thisMonth': {
+      const now = new Date();
+      const start = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1)).toISOString().slice(0,10);
+      const end   = new Date(Date.UTC(now.getFullYear(), now.getMonth()+1, 1)).toISOString().slice(0,10);
+      return { start, end };
+    }
+    case 'thisYear': {
+      const now = new Date();
+      const start = new Date(Date.UTC(now.getFullYear(), 0, 1)).toISOString().slice(0,10);
+      const end   = new Date(Date.UTC(now.getFullYear()+1, 0, 1)).toISOString().slice(0,10);
+      return { start, end };
+    }
+    default: return null;
+  }
+}
+
 const ExpenseDashboard = () => {
   const navigate = useNavigate();
 
@@ -54,6 +96,15 @@ const ExpenseDashboard = () => {
     () => monthBounds(selectedMonth),
     [selectedMonth]
   );
+  // year rows for chart, independent of month
+  const [yearRows, setYearRows] = useState([]);
+
+  // range filtering state
+  const [rangeMode, setRangeMode] = useState('month'); // 'month' | 'preset' | 'custom'
+  const [rangePreset, setRangePreset] = useState('thisMonth');
+  const [rangeFrom, setRangeFrom] = useState('');
+  const [rangeTo, setRangeTo] = useState('');
+
 
   // ======== NEW: Phase 1 state ========
   const [rows, setRows] = useState([]);        // fetched expense rows with category_path, labels, attachments_count
@@ -109,14 +160,34 @@ const ExpenseDashboard = () => {
 
   // ======== Load table data for month (Phase 1) ========
   async function refresh() {
-    const [y, m] = selectedMonth.split('-').map(Number);
-    const data = await listExpensesByMonth(y, m);
-    setRows(data);
+    if (rangeMode === 'month') {
+      const [y, m] = selectedMonth.split('-').map(Number);
+      const data = await listExpensesByMonth(y, m);
+      setRows(data);
+    } else if (rangeMode === 'preset') {
+      const r = isoRangeForPreset(rangePreset);
+      if (r) {
+        const data = await listExpensesBetween(r.start, r.end);
+        setRows(data);
+      }
+    } else if (rangeMode === 'custom') {
+      if (rangeFrom && rangeTo) {
+        // treat `to` as exclusive end (+1 day)
+        const endExcl = addDaysISO(rangeTo, 1);
+        const data = await listExpensesBetween(rangeFrom, endExcl);
+        setRows(data);
+      } else {
+        setRows([]);
+      }
+    }
   }
-  useEffect(() => { refresh(); }, [selectedMonth]);
+  useEffect(() => { refresh(); }, [selectedMonth, rangeMode, rangePreset, rangeFrom, rangeTo]);
 
-  // ======== Budget (kept) ========
-  useEffect(() => { setCalendarDate(new Date(`${selectedMonth}-01`)); }, [selectedMonth]);
+  useEffect(() => {
+    const y = Number(selectedMonth.slice(0,4));
+    (async () => setYearRows(await listExpensesByYear(y)))();
+  }, [selectedMonth]);
+
 
   useEffect(() => {
     setBudget(0);
@@ -203,18 +274,36 @@ const ExpenseDashboard = () => {
     ? rows
     : rows.filter(e => (e.category_path || '').startsWith(selectedCategory));
 
-  const visibleExpenses = [...filteredByCategory].sort((a, b) => {
-    if (sortMode === 'date_desc') {
-      return new Date(b.occurred_on) - new Date(a.occurred_on);
-    } else if (sortMode === 'date_asc') {
-      return new Date(a.occurred_on) - new Date(b.occurred_on);
-    } else if (sortMode === 'amount_desc') {
-      return Number(b.amount) - Number(a.amount);
-    } else if (sortMode === 'amount_asc') {
-      return Number(a.amount) - Number(b.amount);
+const visibleExpenses = useMemo(() => {
+  const arr = [...filteredByCategory];
+  arr.sort((a, b) => {
+    switch (sortMode) {
+      case 'date_desc':
+        return new Date(b.occurred_on) - new Date(a.occurred_on);
+      case 'date_asc':
+        return new Date(a.occurred_on) - new Date(b.occurred_on);
+      case 'amount_desc':
+        return Number(b.amount) - Number(a.amount);
+      case 'amount_asc':
+        return Number(a.amount) - Number(b.amount);
+      case 'status_asc':
+        return (statusOrder[a.status] ?? 99) - (statusOrder[b.status] ?? 99)
+            || new Date(b.occurred_on) - new Date(a.occurred_on);
+      case 'status_desc':
+        return (statusOrder[b.status] ?? -1) - (statusOrder[a.status] ?? -1)
+            || new Date(b.occurred_on) - new Date(a.occurred_on);
+      case 'label_asc':
+        return primaryLabel(a).localeCompare(primaryLabel(b))
+            || new Date(b.occurred_on) - new Date(a.occurred_on);
+      case 'label_desc':
+        return primaryLabel(b).localeCompare(primaryLabel(a))
+            || new Date(b.occurred_on) - new Date(a.occurred_on);
+      default:
+        return 0;
     }
-    return 0;
   });
+  return arr;
+}, [filteredByCategory, sortMode]);
 
   const selectedDateStr = calendarDate.toLocaleDateString('en-CA');
   const dailyTotal = rows
@@ -226,11 +315,16 @@ const ExpenseDashboard = () => {
   const chartData = Array.from({ length: 12 }, (_, month) => {
     const monthName = new Date(0, month).toLocaleString('default', { month: 'short' });
     // naive example based on all rows (you can refine later per year)
-    const total = rows
+    const total = yearRows
       .filter((e) => new Date(e.occurred_on).getMonth() === month)
       .reduce((sum, e) => sum + Number(e.amount), 0);
     return { month: monthName, total };
   });
+
+  const statusOrder = { uncleared: 0, cleared: 1, reconciled: 2 };
+  const primaryLabel = (e) => (e?.label_badges?.[0]?.name || '').toLowerCase();
+
+  
 
   // ======== Create expense (Phase 1) ========
   const category_id = subCatId || mainCatId || null;
@@ -288,6 +382,30 @@ const ExpenseDashboard = () => {
 
  
 
+  async function handleDeleteExpense(id) {
+    if (!window.confirm('Delete this expense permanently?')) return;
+    try {
+      await deleteExpense(id);
+      await refresh();
+      // If you also want to refresh the year chart immediately:
+      const y = Number(selectedMonth.slice(0,4));
+      setYearRows(await listExpensesByYear(y));
+    } catch (e) {
+      alert(`Failed to delete: ${e?.message || 'Unknown error'}`);
+    }
+  }
+
+
+    function onCalendarStartDateChange({ activeStartDate, view }) {
+    if (view === 'month') {
+      const yymm = formatYYYYMM(activeStartDate);
+      setSelectedMonth(yymm);
+      // clamp selected value to the shown month if it's out of range
+      const ms = new Date(`${yymm}-01`);
+      const me = new Date(ms.getFullYear(), ms.getMonth()+1, 0);
+      if (calendarDate < ms || calendarDate > me) setCalendarDate(ms); // or choose `new Date()` if same month as today
+    }
+  }
 
 
 
@@ -485,13 +603,19 @@ const ExpenseDashboard = () => {
 
         {/* Controls */}
         <section className="table-controls">
+         {/* Month (guard against empty clearing) */}
           <div className="control">
             <label>Month</label>
             <input
               type="month"
               className="control-input"
               value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (!v) return; // prevent "white page" from clearing
+                setRangeMode('month');
+                setSelectedMonth(v);
+              }}
             />
           </div>
 
@@ -525,28 +649,29 @@ const ExpenseDashboard = () => {
         </section>
 
         {/* Table switched to Phase-1 fields */}
-        <section className="expense-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Category</th>
-                <th>Notes</th>
-                <th>Labels</th>
-                <th>Amount</th>
-                <th>Status</th>
-                <th>Attach</th>
-                <th className="col-actions">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
+
+          <div className="table-scroll-box">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Category</th>
+                  <th>Notes</th>
+                  <th>Labels</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Attach</th>
+                  <th className="col-actions">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
                 {visibleExpenses.map((r) => (
                   <tr
                     key={r.id}
                     className="clickable-row"
-                    onClick={() => openEdit(r)}               // ← open editor
+                    onClick={() => openEdit(r)}
                     tabIndex={0}
-                    onKeyDown={(e) => { if (e.key === 'Enter') openEdit(r); }}  // a11y: Enter to edit
+                    onKeyDown={(e) => { if (e.key === 'Enter') openEdit(r); }}
                     role="button"
                     aria-label="Edit expense"
                   >
@@ -568,12 +693,18 @@ const ExpenseDashboard = () => {
                     <td>📎 {r.attachments_count ?? 0}</td>
                     <td className="col-actions">
                       <div className="table-actions">
-                        {/* prevent row click when pressing the button */}
                         <button
                           className="btn xs outline"
                           onClick={(e) => { e.stopPropagation(); setSelectedId(r.id); }}
                         >
                           Attachments
+                        </button>
+                        <button
+                          className="btn xs danger"
+                          onClick={(e) => { e.stopPropagation(); handleDeleteExpense(r.id); }}
+                          title="Delete expense"
+                        >
+                          Delete
                         </button>
                       </div>
                     </td>
@@ -582,20 +713,20 @@ const ExpenseDashboard = () => {
                 {visibleExpenses.length === 0 && (
                   <tr>
                     <td colSpan={8} style={{ padding: '20px', color: '#64748b' }}>
-                      No expenses for {selectedMonth}
-                      {selectedCategory !== 'all' ? ` in “${selectedCategory}”` : ''}.
+                      No expenses in the selected range.
                     </td>
                   </tr>
                 )}
               </tbody>
+            </table>
+          </div>
+   
 
-          </table>
-        </section>
-
+        
         {/* Chart + Calendar (kept) */}
         <div className="chart-and-calendar">
           <div className="chart-container">
-            <h3>Monthly Expenses Trend</h3>
+            <h3>Yearly Expenses Trend</h3>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={chartData}>
                 <XAxis dataKey="month" />
@@ -614,9 +745,7 @@ const ExpenseDashboard = () => {
               minDetail="month"
               maxDetail="month"
               activeStartDate={monthStart}
-              onActiveStartDateChange={({ activeStartDate, view }) => {
-                if (view === 'month') setSelectedMonth(formatYYYYMM(activeStartDate));
-              }}
+              onActiveStartDateChange={onCalendarStartDateChange}
               minDate={monthStart}
               maxDate={monthEnd}
               tileDisabled={({ date, view }) =>
