@@ -315,6 +315,51 @@ app.post("/api/delete-product", async (req, res) => {
   }
 });
 
+
+app.post("/api/check-product-deletable", async (req, res) => {
+  try {
+    const { productid } = req.body;
+    if (!productid) {
+      return res.status(400).json({ error: "Missing product ID." });
+    }
+
+    // Check if product exists
+    const { data: productData, error: productError } = await supabase
+      .from("products")
+      .select("productid, productname")
+      .eq("productid", productid)
+      .single();
+
+    if (productError || !productData) {
+      return res.status(404).json({ error: "Product not found." });
+    }
+
+    // Example: Check if product is referenced elsewhere (categories, defects, restock)
+    const { data: categories, error: catError } = await supabase
+      .from("productcategory")
+      .select("productcategoryid")
+      .eq("productid", productid);
+
+    if (catError) {
+      console.error(catError);
+      return res.status(500).json({ error: "Failed to check categories." });
+    }
+
+    if (categories.length > 0) {
+      return res.status(200).json({
+        canDelete: false,
+        reason: "Product has categories linked. Please delete categories first.",
+      });
+    }
+
+    // If no references found, it's safe to delete
+    res.status(200).json({ canDelete: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error." });
+  }
+});
+
 app.get("/api/categories/:productid", async (req, res) => {
   try {
     const productid = parseInt(req.params.productid);

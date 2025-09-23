@@ -21,46 +21,55 @@ const AddSupplier = ({ onClose, user }) => {
 
   const handleSubmit = async () => {
     setFormError("");
+
     const validateForm = () => {
-            const requiredFields = [
-                "suppliername",
-                "contactperson",
-                "phonenumber",
-                "supplieremail",
-                "address",
-                "supplierstatus",
-            ];
+      const requiredFields = [
+        "suppliername",
+        "contactperson",
+        "phonenumber",
+        "supplieremail",
+        "address",
+        "supplierstatus",
+      ];
 
-            // Check if any field is empty or invalid
-            const isEmpty = requiredFields.some((field) => {
-                const value = formData[field];
-                if (value === undefined || value === null) return true;
-                if (typeof value === "string" && value.trim() === "") return true;
-                    return false;
-            });
+      // ✅ Clean phone number before validation
+      const cleanPhone = formData.phonenumber.replace(/-/g, "");
 
-            if (isEmpty) {
-                setFormError("Please fill in all required fields.");
-                return false;
-            }
+      // Check if any field is empty or invalid
+      const isEmpty = requiredFields.some((field) => {
+        const value = formData[field];
+        if (value === undefined || value === null) return true;
+        if (typeof value === "string" && value.trim() === "") return true;
+        return false;
+      });
 
-            if (!/\S+@\S+\.\S+/.test(formData.supplieremail)) {
-                setFormError("Invalid email format.");
-                return false;
-            }
+      if (isEmpty) {
+        setFormError("Please fill in all required fields.");
+        return false;
+      }
 
-            if (!/^\d{7,}$/.test(formData.phonenumber)) {
-              setFormError("Phone number must only be contain of number by atleast 7");
-              return false;
-            }
-            return true;
-        };
+      if (!/\S+@\S+\.\S+/.test(formData.supplieremail)) {
+        setFormError("Invalid email format.");
+        return false;
+      }
+
+      if (!/^\d{7,}$/.test(cleanPhone)) {
+        setFormError("Phone number must only contain numbers with at least 7 digits.");
+        return false;
+      }
+
+      return true;
+    };
 
     if (!validateForm()) return;
     if (isSubmitting) return;
+
     setIsSubmitting(true);
+
+    // ✅ Insert cleaned phone number (no dashes) to Supabase
     const { error } = await supabase.from("suppliers").insert({
       ...formData,
+      phonenumber: formData.phonenumber.replace(/-/g, ""),
     });
 
     if (error) {
@@ -79,6 +88,7 @@ const AddSupplier = ({ onClose, user }) => {
       onClose();
     }
   };
+
 
   return (
     <div className="modal-overlay">
@@ -112,10 +122,22 @@ const AddSupplier = ({ onClose, user }) => {
                 onChange={handleChange}
               />
               <input
+                type="tel"
                 name="phonenumber"
                 placeholder="Phone Number"
                 value={formData.phonenumber}
-                onChange={handleChange}
+                onChange={(e) => {
+                  let value = e.target.value.replace(/\D/g, ""); // keep only digits
+
+                  // ✅ Format for PH mobile numbers (11 digits): 0927-538-7129
+                  if (value.length > 4 && value.length <= 7) {
+                    value = `${value.slice(0, 4)}-${value.slice(4)}`;
+                  } else if (value.length > 7) {
+                    value = `${value.slice(0, 4)}-${value.slice(4, 7)}-${value.slice(7, 11)}`;
+                  }
+
+                  handleChange({ target: { name: "phonenumber", value } });
+                }}
               />
             </div>
 
