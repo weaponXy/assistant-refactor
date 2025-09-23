@@ -10,13 +10,13 @@
   gap: 15px;
   overflow: hidden;
   border-radius: 20px;
-  min-width: 280px; /* Prevent shrinking below this width */
-  width: 100%; /* Maintain full width within grid */
+  min-width: 280px;
+  width: 100%; 
 }
 
 .bestseller-table-wrapper h3 {
-  margin: 0 0 15px 0;
-  flex-shrink: 0; /* Prevent header from shrinking */
+  margin: 0 0 0.1px 0;
+  flex-shrink: 0;
 }
 
 /* FIXED: Scrollable container for bestseller table */
@@ -28,6 +28,8 @@
   background-color: #fff;
   scrollbar-width: thin;
   scrollbar-color: #04B4FC #f1f1f1;
+  max-height: 280px;
+  min-height: 203px;
 }
 
 /* Webkit scrollbar styling for bestseller */
