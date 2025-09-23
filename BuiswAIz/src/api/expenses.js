@@ -15,10 +15,9 @@ export async function listExpensesByMonth(yyyy, mm) {
   const baseSelect = `id, ${DATE_COL}, amount, notes, status, category_id, contact_id`;
 
   // Expenses for this user + month
-  const baseRes = await supabase
+    const baseRes = await supabase
     .from('expenses')
     .select(baseSelect)
-    .eq('user_id', u.user.id)
     .gte(DATE_COL, from)
     .lt(DATE_COL, to)
     .order(DATE_COL, { ascending: false });
@@ -160,8 +159,7 @@ export async function updateExpense(expenseId, input) {
   const upd = await supabase
     .from('expenses')
     .update(payload)
-    .eq('id', expenseId)
-    .eq('user_id', u.user.id)                     // ensure you own it
+    .eq('id', expenseId)               
     .select('*')
     .single();
 

@@ -222,3 +222,8 @@ csharp-backend/obj/Debug/net9.0/csharp-backend.AssemblyInfoInputs.cache
 *.cs
 csharp-backend/obj/Debug/net9.0/csharp-backend.AssemblyInfoInputs.cache
 csharp-backend/obj/Debug/net9.0/csharp-backend.AssemblyInfo.cs
+
+
+# .gitignore
+.env.local
+.env.*.local
