@@ -15,10 +15,9 @@ export async function listExpensesByMonth(yyyy, mm) {
   const baseSelect = `id, ${DATE_COL}, amount, notes, status, category_id, contact_id`;
 
   // Expenses for this user + month
-  const baseRes = await supabase
+    const baseRes = await supabase
     .from('expenses')
     .select(baseSelect)
-    .eq('user_id', u.user.id)
     .gte(DATE_COL, from)
     .lt(DATE_COL, to)
     .order(DATE_COL, { ascending: false });
@@ -160,8 +159,7 @@ export async function updateExpense(expenseId, input) {
   const upd = await supabase
     .from('expenses')
     .update(payload)
-    .eq('id', expenseId)
-    .eq('user_id', u.user.id)                     // ensure you own it
+    .eq('id', expenseId)               
     .select('*')
     .single();
 
@@ -182,4 +180,91 @@ export async function updateExpense(expenseId, input) {
   }
 
   return upd.data;
+}
+
+
+// NEW: fetch between arbitrary dates (inclusive start, exclusive end)
+export async function listExpensesBetween(startISO, endISO) {
+  const { data: u } = await supabase.auth.getUser();
+  if (!u?.user) return [];
+
+  const baseSelect = `id, ${DATE_COL}, amount, notes, status, category_id, contact_id`;
+
+  const baseRes = await supabase
+    .from('expenses')
+    .select(baseSelect)
+    .gte(DATE_COL, startISO)
+    .lt(DATE_COL, endISO)
+    .order(DATE_COL, { ascending: false });
+
+  if (baseRes.error) throw baseRes.error;
+  const rows = baseRes.data ?? [];
+  if (!rows.length) return [];
+
+  const ids = rows.map(r => r.id);
+
+  const [labelsJoinRes, catsRes, consRes, attsRes] = await Promise.all([
+    supabase.from('expense_labels').select('expense_id, labels:label_id(id,name,color)').in('expense_id', ids),
+    supabase.from('categories').select('id,name,parent_id'),
+    supabase.from('contacts').select('id,name'),
+    supabase.from('attachments').select('id, expense_id').in('expense_id', ids),
+  ]);
+  if (labelsJoinRes.error) throw labelsJoinRes.error;
+  if (catsRes.error) throw catsRes.error;
+  if (consRes.error) throw consRes.error;
+  if (attsRes.error) throw attsRes.error;
+
+  const cats = catsRes.data ?? [];
+  const cons = consRes.data ?? [];
+  const atts = attsRes.data ?? [];
+  const catById = new Map(cats.map(c => [c.id, c]));
+  const conById = new Map(cons.map(c => [c.id, c]));
+  const lblByExp = new Map();
+  (labelsJoinRes.data ?? []).forEach(row => {
+    const list = lblByExp.get(row.expense_id) ?? [];
+    if (row.labels) list.push(row.labels);
+    lblByExp.set(row.expense_id, list);
+  });
+  const attCount = new Map();
+  atts.forEach(a => attCount.set(a.expense_id, (attCount.get(a.expense_id) || 0) + 1));
+
+  const path = (catId) => {
+    if (!catId) return null;
+    const c = catById.get(catId);
+    if (!c) return null;
+    const p = c.parent_id ? catById.get(c.parent_id) : null;
+    return p ? `${p.name} / ${c.name}` : c.name;
+  };
+
+  return rows.map(r => ({
+    ...r,
+    occurred_on: r[DATE_COL],
+    category_path: path(r.category_id),
+    contact_name: r.contact_id ? (conById.get(r.contact_id)?.name ?? null) : null,
+    label_badges: lblByExp.get(r.id) ?? [],
+    attachments_count: attCount.get(r.id) ?? 0,
+  }));
+}
+
+// NEW: convenience for a whole calendar year
+export async function listExpensesByYear(year) {
+  const start = new Date(Date.UTC(year, 0, 1)).toISOString().slice(0, 10);
+  const end   = new Date(Date.UTC(year + 1, 0, 1)).toISOString().slice(0, 10);
+  return listExpensesBetween(start, end);
+}
+
+// NEW: delete an expense (also clears labels and attachments metadata first)
+export async function deleteExpense(expenseId) {
+  // best-effort cleanup: joins first, then attachments meta, then expense
+  const delLabels = await supabase.from('expense_labels').delete().eq('expense_id', expenseId);
+  if (delLabels.error) console.warn('deleteExpense: label cleanup warning:', delLabels.error);
+
+  const delAtts = await supabase.from('attachments').delete().eq('expense_id', expenseId);
+  if (delAtts.error) console.warn('deleteExpense: attachments cleanup warning:', delAtts.error);
+
+  const delExp = await supabase.from('expenses').delete().eq('id', expenseId);
+  if (delExp.error) throw delExp.error;
+
+  // NOTE: If files are stored in a storage bucket, we can wire deletion there too.
+  return true;
 }

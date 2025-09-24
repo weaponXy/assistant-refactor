@@ -46,7 +46,7 @@ const Login = () => {
     }
 
     // 4. Redirect
-    navigate('/inventory');
+    navigate('/Dashboard');
   };
 
   return (

@@ -18,6 +18,34 @@ body {
   width: 100vw;
 }
 
+/* Fixed-height, scrollable table wrapper */
+.table-scroll {
+  max-height: 420px;           /* adjust to your design */
+  overflow: auto;
+  border-radius: 12px;
+}
+
+/* Keep header visible while scrolling */
+.expense-table thead th {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 1;
+  border-bottom: 1px solid #eef2f7;
+}
+
+/* Slightly denser rows to fit more in the viewport */
+.expense-table td { border-bottom: 1px solid #f1f5f9; }
+
+/* Tiny buttons already present; ensure danger variant for delete */
+.btn.danger {
+  background: #ef4444;
+  color: #fff;
+  border: 1px solid #ef4444;
+}
+.btn.danger:hover { background: #dc2626; border-color: #dc2626; }
+
+
 /* Header Bar */
 .header-bar {
   height: 60px;
@@ -383,6 +411,100 @@ body {
   margin: 14px 0 22px;
 }
 
+
+
+
+
+/* Make the actions row stick to the top of the scrolling main pane */
+.toolbar.sticky {
+  position: sticky;
+  top: 0;                    /* sticks within .main (which is the scroll container) */
+  z-index: 20;               /* above cards/table */
+  background: #f6f9ff;       /* match page background so it blends */
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  padding-block: 10px;
+  margin-top: 0;             /* avoid extra gap when stuck */
+  border-bottom: 1px solid #e5e7eb;  /* subtle divider */
+}
+
+/* Optional: add a very light shadow so it reads as a pinned bar */
+.toolbar.sticky::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: -1px; height: 1px;
+  box-shadow: 0 6px 12px rgba(2, 6, 23, 0.06);
+}
+
+
+/* expense dashboard table */
+.table-scroll {
+  height: 420px;        /* force an inner scroll area */
+  overflow: auto;       /* vertical scroll lives here */
+  border-radius: 12px;
+}
+
+.table-scroll table {
+  width: 100%;
+  border-collapse: separate;  /* needed for sticky header reliability */
+  border-spacing: 0;
+}
+
+
+/* keep header visible while the tbody scrolls */
+.expense-table .table-scroll thead th {
+  position: sticky;
+  top: 0;                 /* stick to the top of .table-scroll */
+  z-index: 2;             /* above rows */
+  background: #fff;       /* cover rows passing underneath */
+  border-bottom: 1px solid #eef2f7;
+}
+
+
+/* --- Make the Expenses table behave like Sales --- */
+
+/* Same scroll container as Sales */
+.expense-table .table-scroll-box {
+  overflow-y: auto;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #04B4FC #f1f1f1;
+  max-height: 500px;       /* same vertical height */
+  background-color: #fff;  /* same background */
+}
+
+/* Match Sales header style + stickiness */
+.expense-table table {
+  width: 100%;
+  border-collapse: collapse;
+  color: black;
+  font-family: 'Montserrat', sans-serif; /* visually match Sales */
+}
+
+.expense-table th,
+.expense-table td {
+  padding: 12px;
+  text-align: center;
+  font-size: 14px;
+  border-bottom: 1px solid #fff;
+}
+
+.expense-table thead th {
+  background-color: rgb(214, 241, 251); /* same pale blue */
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+/* Keep first column left-aligned like Sales product name */
+.expense-table table th:first-child,
+.expense-table table td:first-child {
+  text-align: left;
+}
+
+
+
+
 .toolbar-left,
 .toolbar-right {
   display: flex;
@@ -533,3 +655,8 @@ body {
   align-items: center;
   justify-content: center;
 }
+
+
+/* Override older scroll + sticky rules to avoid conflicts */
+.table-scroll { height: auto; max-height: none; overflow: visible; }
+.expense-table .table-scroll thead th { position: static; top: auto; }

@@ -1,12 +1,9 @@
 import { supabase } from '../supabase';
 
 export async function listContacts() {
-  const { data: u } = await supabase.auth.getUser();
-  if (!u?.user) return [];
   const { data, error } = await supabase
     .from('contacts')
     .select('id,name,email,phone')
-    .eq('user_id', u.user.id)   // ← only my contacts
     .order('name');
   if (error) throw error;
   return data ?? [];
