@@ -168,13 +168,18 @@ const Notifications = () => {
         // Continue without defective items data if there's an error
       }
 
-      // Sort notifications by priority and timestamp
+      // Sort notifications by timestamp first (newest first), then by priority
       allNotifications.sort((a, b) => {
-        const priorityOrder = { 'high': 3, 'medium': 2, 'low': 1 };
-        if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
+        // First sort by timestamp (newest first)
+        const timeDiff = new Date(b.timestamp) - new Date(a.timestamp);
+        
+        // If timestamps are the same (within 1 minute), then sort by priority
+        if (Math.abs(timeDiff) < 60000) { // 60000ms = 1 minute
+          const priorityOrder = { 'high': 3, 'medium': 2, 'low': 1 };
           return priorityOrder[b.priority] - priorityOrder[a.priority];
         }
-        return new Date(b.timestamp) - new Date(a.timestamp);
+        
+        return timeDiff;
       });
 
       setNotifications(allNotifications);
