@@ -186,8 +186,8 @@ app.post("/api/update-product", upload.single("image"), async (req, res) => {
 
       // 3. Compress and upload new image
       const compressedBuffer = await sharp(req.file.buffer)
-        .resize(800, null, { fit: "inside" }) // resize width max 800px
-        .jpeg({ quality: 60 }) // compress to reduce size
+        .resize(800, null, { fit: "inside" })
+        .jpeg({ quality: 60 })
         .toBuffer();
 
       const filePath = `${Date.now()}_${req.file.originalname}`;
@@ -213,6 +213,8 @@ app.post("/api/update-product", upload.single("image"), async (req, res) => {
         description,
         supplierid,
         ...(imageUrl && { image_url: imageUrl }),
+        updatedat: new Date().toISOString(),   // 👈 update timestamp
+        updatedbyuserid: userid || null,       // 👈 log who updated
       })
       .eq("productid", productid);
 
@@ -235,6 +237,7 @@ app.post("/api/update-product", upload.single("image"), async (req, res) => {
     res.status(500).json({ error: "Server error." });
   }
 });
+
 
 
 
@@ -487,6 +490,7 @@ app.post("/api/restock", async (req, res) => {
         new_price,
         batchCode,
         datereceived,
+        created_at: new Date().toISOString()
       },
     ]);
 
@@ -509,7 +513,7 @@ app.post("/api/restock", async (req, res) => {
     // Add log
     await supabase.from("activitylog").insert([
       {
-        action_desc: `Stored productid ${productid} to the storage`,
+        action_desc: `Stored product ${productid} to the storage`,
         done_user: user?.userid || null,
       },
     ]);
