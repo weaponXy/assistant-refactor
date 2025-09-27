@@ -127,20 +127,6 @@ export async function createExpense(input) {
   return exp;
 }
 
-export async function setExpenseLabels(expenseId, labelIds) {
-  // Clear existing links for this expense
-  const del = await supabase.from('expense_labels').delete().eq('expense_id', expenseId);
-  if (del.error) throw del.error;
-
-  // Nothing else to do if empty
-  if (!labelIds || !labelIds.length) return;
-
-  // Re-insert links (use the correct variable: expenseId)
-  const rows = labelIds.map(id => ({ expense_id: expenseId, label_id: id }));
-  const ins = await supabase.from('expense_labels').insert(rows);
-  if (ins.error) throw ins.error;
-}
-
 
 export async function updateExpense(expenseId, input) {
   const { data: u } = await supabase.auth.getUser();
