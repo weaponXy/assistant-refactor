@@ -140,7 +140,7 @@ const StatsContainer = ({ totalEarnings, totalCustomers, statsFilter, onStatsFil
   return (
     <div className="stats-container">
       <div className="stats-container-header">
-        <h3>Current Balance</h3>
+        <h3>Summary Panel</h3>
         <select 
           className="stats-container-filter" 
           value={statsFilter} 
