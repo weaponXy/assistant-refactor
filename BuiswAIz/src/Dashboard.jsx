@@ -90,17 +90,18 @@ const Dashboard = () => {
       const y = now.getFullYear();
       const m = now.getMonth(); // 0..11
 
-      const start = new Date(y, m, 1);
-      const next  = new Date(y, m + 1, 1);
+      // first day of current month, and first day of next month (exclusive upper bound)
+      const startStr = `${y}-${String(m + 1).padStart(2, "0")}-01`;
+      const nextMonth = m === 11 ? 0 : m + 1;
+      const nextYear  = m === 11 ? y + 1 : y;
+      const nextStr = `${nextYear}-${String(nextMonth + 1).padStart(2, "0")}-01`;
 
-      const toISO = (dt) => dt.toISOString().slice(0, 10); // YYYY-MM-DD
-
+      // ✅ use the correct column: occurred_on
       const { data, error } = await supabase
         .from("expenses")
-        .select("*")
-        // use the name your table actually has; try occured_on first
-        .gte("occured_on", toISO(start))
-        .lt("occured_on", toISO(next));
+        .select("id, occurred_on, amount") // only what you need
+        .gte("occurred_on", startStr)      // inclusive
+        .lt("occurred_on", nextStr);       // exclusive
 
       if (error) {
         console.error("Failed to fetch expenses for chart:", error);
@@ -108,11 +109,13 @@ const Dashboard = () => {
         return;
       }
 
-      setExpenseChartData(buildDailySeries(data, { year: y, monthIndex: m }));
+      const daily = buildDailySeries(data, { year: y, monthIndex: m });
+      setExpenseChartData(daily);
     };
 
     loadChartData();
   }, []);
+
 
 
 
