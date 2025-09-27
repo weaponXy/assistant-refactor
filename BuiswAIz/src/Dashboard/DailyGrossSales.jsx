@@ -32,7 +32,7 @@ const DailyGrossSales = () => {
       const salesPromises = days.map(async (day) => {
         const nextDay = new Date(day.date);
         nextDay.setDate(nextDay.getDate() + 1);
-        const nextDayString = nextDay.toISOString().split('T')[0];
+        const nextDayString = nextDay.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
 
         const { data, error } = await supabase
           .from('orders')
@@ -44,7 +44,7 @@ const DailyGrossSales = () => {
           return { ...day, totalSales: 0, transactionCount: 0 };
         }
 
-        const totalSales = data.reduce((sum, order) => sum + (parseFloat(order.totalamount) || 0), 0);
+        const totalSales = data.reduce((sum, order) => sum + (Number(String(order.totalamount).replace(/,/g, '')) || 0), 0);
         const transactionCount = data.length;
 
         return { ...day, totalSales, transactionCount };
