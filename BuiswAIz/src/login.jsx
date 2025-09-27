@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from './supabase';
+import rightImage from './assets/rightimage.jpg'; // Import the image
 import './stylecss/login.css';
 
 const Login = () => {
@@ -49,17 +50,17 @@ const Login = () => {
   };
 
   return (
-    <div className="login-container">
+    <div className="login-container page-enter-active">
       <div className="login-left">
         <form onSubmit={handleLogin} className="login-form">
           <h2 className="login-title">Sign In</h2>
-          <p className="login-subtitle">Enter your Email and password to sign in!</p>
+          <p className="login-subtitle">Enter your email and password to sign in!</p>
 
           <label className="login-label">Email*</label>
           <input
             type="email"
             required
-            placeholder="Enter Your Email"
+            placeholder="mail@simmmple.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="login-input"
@@ -85,12 +86,10 @@ const Login = () => {
               Keep me logged in
             </label>
 
-            <p className="forgot-password">
-              <span onClick={() => navigate('/forgot-password')}>Forgot password?</span>
-            </p>
+            <span className="forgot-password" onClick={() => navigate('/forgot-password')}>
+              Forgot password?
+            </span>
           </div>
-
-         
 
           {error && <p className="error-message">{error}</p>}
 
@@ -99,7 +98,13 @@ const Login = () => {
       </div>
 
       <div className="login-right">
-        <h1 className="login-logo">BuisWaiz</h1>
+        <div className="login-logo-container">
+          <img 
+            src={rightImage} 
+            alt="BuisWaiz Logo" 
+            className="login-logo-image"
+          />
+        </div>
       </div>
     </div>
   );

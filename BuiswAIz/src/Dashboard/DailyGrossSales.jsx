@@ -22,10 +22,11 @@ const DailyGrossSales = () => {
         const date = new Date(today);
         date.setDate(date.getDate() - i);
         days.push({
-          date: date,
-          dateString: date.toISOString().split('T')[0],
-          dayName: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        date: date, 
+          dateString: date.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }), 
+          dayName: date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', timeZone: 'Asia/Manila' })
         });
+
       }
 
       const salesPromises = days.map(async (day) => {
