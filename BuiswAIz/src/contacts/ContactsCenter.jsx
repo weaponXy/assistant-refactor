@@ -374,6 +374,7 @@ export default function ContactsCenter({
               {loading ? (
                 <p>Loading contacts…</p>
               ) : (
+                <div className="logs-scroll">  
                 <table>
                   <thead>
                     <tr>
@@ -429,6 +430,7 @@ export default function ContactsCenter({
                     )}
                   </tbody>
                 </table>
+                </div>
               )}
             </div>
 
@@ -494,6 +496,8 @@ export default function ContactsCenter({
                               <button className="btn xs" onClick={downloadCSV}>Export CSV</button>
                             </div>
                           </div>
+
+                          <div className="logs-scroll">  
                           <table>
                             <thead>
                               <tr>
@@ -527,6 +531,7 @@ export default function ContactsCenter({
                               )}
                             </tbody>
                           </table>
+                          </div>
                         </>
                       )}
                     </div>

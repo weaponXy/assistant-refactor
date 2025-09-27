@@ -200,3 +200,39 @@
 .toast.success { border-color: #16a34a; background: #ecfdf5; color:#065f46; }
 .toast.error   { border-color: #ef4444; background: #fef2f2; color:#7f1d1d; }
 .toast.info    { border-color: #3b82f6; background: #eff6ff; color:#1e3a8a; }
+
+.bh-scroll {
+  max-height: 35vh;
+  overflow-y: auto;
+  padding-right: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+@media (min-width: 768px) {
+  .bh-scroll { max-height: 35vh; }
+}
+
+/* grid stays grid; now it scrolls */
+.bh-grid.scrollable {
+  max-height: 35vh;
+  overflow: auto;
+  padding-right: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+
+
+/* Fixed-height scroll for tab contents (Expenses / Budget change log / Pie) */
+.logs-scroll {
+  max-height: 60vh;
+  overflow: auto;
+  padding-right: 6px;
+}
+@media (min-width: 768px) {
+  .logs-scroll { max-height: 60vh; }
+}
+
+
+/* optional: make grid items consistent height */
+.bh-card { min-height: 96px; }
+
+/* filter dropdown style helper */
+.bh-filter .input { font-size: 14px; }

@@ -65,3 +65,12 @@
   box-shadow: 0 0 0 3px rgba(59,130,246,.15);
 }
 
+/* Fixed-height scroll for tab contents (Expenses / Budget change log / Pie) */
+.logs-scroll {
+  max-height: 30vh;
+  overflow: auto;
+  padding-right: 6px;
+}
+@media (min-width: 768px) {
+  .logs-scroll { max-height: 30vh; }
+}

@@ -36,26 +36,23 @@ export async function createBudget(monthYYYYMM, amount) {
 }
 
 /** Upsert a month (DB trigger logs INSERT or UPDATE) */
-export async function upsertBudget(monthYYYYMM, amount) {
-  const iso = `${monthYYYYMM}-01`;
+export async function upsertBudget(payload) {
+  // payload.month_year should be an ISO date like "YYYY-MM-01"
   const { data, error } = await supabase
-    .from('budget')
-    .upsert(
-      { month_year: iso, monthly_budget_amount: Number(amount || 0) },
-      { onConflict: ['month_year'] }
-    )
-    .select('id, month_year, monthly_budget_amount')
-    .single();
+    .from("budgets") // <-- fix here
+    .upsert(payload, { onConflict: "month_year" })
+    .select("id, month_year, monthly_budget_amount");
+
   if (error) throw error;
-  return data;
+  return data?.[0];
 }
 
 /** Edit existing budget by id (DB trigger logs UPDATE if amount changed) */
-export async function updateBudgetById(budgetId, monthYYYYMM, amount) {
-  const iso = `${monthYYYYMM}-01`;
+export async function updateBudgetById(budgetId, amount) {
+
   const { data, error } = await supabase
     .from('budget')
-    .update({ month_year: iso, monthly_budget_amount: Number(amount || 0) })
+    .update({ monthly_budget_amount: Number(amount || 0) })
     .eq('id', budgetId)
     .select('id, month_year, monthly_budget_amount')
     .single();
@@ -83,3 +80,5 @@ export async function getExpensesForBudgetMonth(isoMonth) {
   const mm = Number(mmStr);
   return await listExpensesByMonth(yyyy, mm);
 }
+
+

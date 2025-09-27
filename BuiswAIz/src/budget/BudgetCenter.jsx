@@ -5,7 +5,7 @@ import { listExpensesByMonth } from "../api/expenses";
 import {
   listBudgets,
   getBudgetHistory,
-  upsertBudget,
+  upsertBudget as _unusedUpsertBudget,
   updateBudgetById,
 } from "../services/budgetService";
 import BudgetCategoryPie from "./BudgetCategoryPie";
@@ -52,6 +52,12 @@ function useToasts() {
 export default function BudgetCenter({
   triggerLabel = "Budget",
   triggerClass = "btn primary", // you can override from expenses.jsx
+  /**
+   * Optional: parent can pass an opener for the Expense edit modal.
+   * If provided, clicking a row in the Expenses tab will call this.
+   * onOpenExpense(rowOrId: Expense | string)
+   */
+  onOpenExpense,
 }) {
   const [open, setOpen] = useState(false);
 
@@ -69,7 +75,6 @@ export default function BudgetCenter({
   // edit budget controls
   const [editOpen, setEditOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState(null);
-  const [editMonth, setEditMonth] = useState(""); // YYYY-MM
   const [editAmount, setEditAmount] = useState("");
 
   // detail data
@@ -80,6 +85,42 @@ export default function BudgetCenter({
 
   // toasts
   const [toasts, toast] = useToasts();
+
+  // Year filter for budgets
+  const currentYear = new Date().getFullYear();
+  const years = useMemo(() => {
+    const ys = Array.from(
+      new Set(
+        (budgets || []).map((b) => {
+          const d = new Date(b.month_year);
+          return Number.isFinite(d.getFullYear()) ? d.getFullYear() : null;
+        }).filter(Boolean)
+      )
+    );
+    ys.sort((a, b) => b - a); // newest year first
+    return ys;
+  }, [budgets]);
+
+  const [yearFilter, setYearFilter] = useState(() =>
+    years.includes(currentYear) ? currentYear : (years[0] ?? "All")
+  );
+
+  useEffect(() => {
+    // Keep selection valid when budgets change
+    if (!years.length) {
+      setYearFilter("All");
+    } else if (yearFilter !== "All" && !years.includes(yearFilter)) {
+      setYearFilter(years[0]);
+    }
+  }, [years]);
+
+  const filteredBudgets = useMemo(() => {
+    if (yearFilter === "All") return budgets;
+    return (budgets || []).filter((b) => {
+      const d = new Date(b.month_year);
+      return d.getFullYear() === yearFilter;
+    });
+  }, [budgets, yearFilter]);
 
   async function refreshBudgets() {
     setLoading(true);
@@ -135,84 +176,92 @@ export default function BudgetCenter({
     if (error) throw error;
   }
 
-    async function onAddSubmit(e) {
+  async function onAddSubmit(e) {
     e.preventDefault();
     try {
-        if (!addMonth) throw new Error("Select a month");
-        await upsertBudget(addMonth, addAmount || 0); // trigger logs
-        setAddOpen(false);
-        setAddMonth("");
-        setAddAmount("");
-        await refreshBudgets();
-        toast.success("Budget added");
+      if (!addMonth) throw new Error("Select a month");
+      await upsertBudget(addMonth, addAmount || 0); // trigger logs
+      setAddOpen(false);
+      setAddMonth("");
+      setAddAmount("");
+      await refreshBudgets();
+      toast.success("Budget added");
     } catch (e2) {
-        toast.error(e2.message || "Failed to add budget");
+      toast.error(e2.message || "Failed to add budget");
     }
-    }
-
+  }
 
   function openEdit(b) {
     setEditingBudget(b);
     setEditOpen(true);
-    setEditMonth(String(b.month_year).slice(0, 7)); // YYYY-MM
     setEditAmount(String(b.monthly_budget_amount ?? ""));
   }
 
-    async function onEditSubmit(e) {
+  async function onEditSubmit(e) {
     e.preventDefault();
     if (!editingBudget) return;
     try {
-        await updateBudgetById(editingBudget.id, editMonth, editAmount || 0); // trigger logs
-        setEditOpen(false);
-        setEditingBudget(null);
-        await refreshBudgets();
-        toast.success("Budget updated");
+      await updateBudgetById(editingBudget.id, editAmount || 0); // trigger logs
+      setEditOpen(false);
+      setEditingBudget(null);
+      await refreshBudgets();
+      toast.success("Budget updated");
     } catch (e2) {
-        toast.error(e2.message || "Failed to update budget");
+      toast.error(e2.message || "Failed to update budget");
     }
-    }
-
-    async function onDelete(b) {
-    if (!window.confirm(`Delete budget for ${fmtMonthLabel(b.month_year)}? This will also remove its history.`)) return;
-
-    try {
-        // 1) delete children first (workaround for missing CASCADE)
-        const delHist = await supabase.from("budgethistory").delete().eq("budget_id", b.id);
-        if (delHist.error) {
-        console.error("Delete history failed:", delHist.error);
-        toast.error(delHist.error.message || "Failed to delete budget history");
-        return;
-        }
-
-        // 2) delete parent
-        const delBud = await supabase.from("budget").delete().eq("id", b.id);
-        if (delBud.error) {
-        console.error("Delete budget failed:", delBud.error);
-        toast.error(delBud.error.message || "Failed to delete budget");
-        return;
-        }
-
-        // clear detail if needed
-        if (active?.id === b.id) {
-        setActive(null);
-        setExpenses([]);
-        setHistory([]);
-        }
-
-        await refreshBudgets();
-        toast.success("Budget deleted");
-    } catch (e) {
-        console.error(e);
-        toast.error(e.message || "Failed to delete");
-    }
-    }
-
+  }
 
   const totals = useMemo(() => {
     const used = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
     const budgetAmt = Number(active?.monthly_budget_amount || 0);
-    return { used, budgetAmt, remaining: Math.max(0, budgetAmt - used) };
+    return { used, budgetAmt, remaining: Math.max(0, budgetAmt - used), count: expenses.length };
   }, [expenses, active]);
+
+  /* ---------- NEW: open record in parent (edit) ---------- */
+  async function openRecordInParent(row) {
+    if (!onOpenExpense) return;
+    try {
+      const { data, error } = await supabase
+        .from("expenses")
+        .select("id, occurred_on, amount, notes, status, contact_id, category_id")
+        .eq("id", row.id)
+        .maybeSingle();
+      if (error) throw error;
+      onOpenExpense(data || row);
+      setOpen(false); // optional: close after handing off
+    } catch (e) {
+      console.error(e);
+      onOpenExpense(row.id); // at least pass the id
+      setOpen(false);
+    }
+  }
+
+  /* ---------- NEW: CSV export for month expenses ---------- */
+  function exportMonthCSV() {
+    if (!active) return;
+    const header = ["Date", "Category", "Notes", "Amount"];
+    const lines = [header.join(",")];
+    for (const r of expenses) {
+      const row = [
+        r.occurred_on ? new Date(r.occurred_on).toLocaleDateString() : "",
+        r.category_path || "Uncategorized",
+        (r.notes || "").replaceAll('"', '""'),
+        Number(r.amount || 0).toFixed(2),
+      ];
+      lines.push(row.map((v) => `"${String(v)}"`).join(","));
+    }
+    const csv = lines.join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const nameSafe = (fmtMonthLabel(active.month_year) || "month").replace(/[^a-z0-9-_]+/gi, "_");
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `expenses_${nameSafe}_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
 
   return (
     <>
@@ -224,81 +273,149 @@ export default function BudgetCenter({
       {!open ? null : (
         <div className="modal-overlay" style={{ zIndex: 50 }}>
           <div className="modal" style={{ width: "min(980px, 94vw)", maxHeight: "90vh", overflow: "auto" }}>
+            
             <div className="header-bar" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <h2 style={{ margin: 0 }}>Budgets</h2>
               <button className="btn icon" onClick={() => setOpen(false)} aria-label="Close">✕</button>
             </div>
 
-            {/* Add Budget */}
-            <div className="add-budget-bar">
-              {!addOpen ? (
-                <button className="btn primary" onClick={() => setAddOpen(true)}>+ Add budget</button>
-              ) : (
-                <form onSubmit={onAddSubmit} className="add-budget-form">
-                  <label className="stack">
-                    <span className="muted">Month</span>
-                    <input type="month" value={addMonth} onChange={(e) => setAddMonth(e.target.value)} required />
-                  </label>
-                  <label className="stack">
-                    <span className="muted">Amount</span>
-                    <input type="number" min="0" step="0.01" value={addAmount} onChange={(e) => setAddAmount(e.target.value)} required />
-                  </label>
-                  <div className="actions">
-                    <button type="submit" className="btn primary">Save</button>
-                    <button type="button" className="btn outline" onClick={() => { setAddOpen(false); setAddMonth(""); setAddAmount(""); }}>Cancel</button>
-                  </div>
-                </form>
-              )}
+            {/* Controls row: Year (left) + Add budget (right) */}
+            <div
+              className="controls-row"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                flexWrap: "wrap",
+                marginTop: 8,
+                marginBottom: 8,
+              }}
+            >
+              {/* Left: Year filter */}
+              <div className="bh-filter" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <label htmlFor="year-filter" className="muted" style={{ fontSize: 12 }}>
+                  Year
+                </label>
+                <select
+                  id="year-filter"
+                  className="input"
+                  value={yearFilter}
+                  onChange={(e) =>
+                    setYearFilter(e.target.value === "All" ? "All" : Number(e.target.value))
+                  }
+                  style={{ padding: "6px 8px", borderRadius: 8, border: "1px solid #e5e7eb" }}
+                >
+                  <option value="All">All</option>
+                  {years.map((y) => (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Right: Add budget / form */}
+              <div className="add-budget-bar" style={{ marginLeft: "auto" }}>
+                {!addOpen ? (
+                  <button className="btn primary" onClick={() => setAddOpen(true)}>
+                    + Add budget
+                  </button>
+                ) : (
+                  <form
+                    onSubmit={onAddSubmit}
+                    className="add-budget-form"
+                    style={{ display: "flex", alignItems: "end", gap: 8 }}
+                  >
+                    <label className="stack">
+                      <span className="muted">Month</span>
+                      <input
+                        type="month"
+                        value={addMonth}
+                        onChange={(e) => setAddMonth(e.target.value)}
+                        required
+                      />
+                    </label>
+                    <label className="stack">
+                      <span className="muted">Amount</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={addAmount}
+                        onChange={(e) => setAddAmount(e.target.value)}
+                        required
+                      />
+                    </label>
+                    <div className="actions" style={{ display: "flex", gap: 8 }}>
+                      <button type="submit" className="btn primary">Save</button>
+                      <button
+                        type="button"
+                        className="btn outline"
+                        onClick={() => { setAddOpen(false); setAddMonth(""); setAddAmount(""); }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
             </div>
+
 
             {/* List of months with budgets */}
             <div className="history-wrap" style={{ marginBottom: 16 }}>
               {loading ? (
                 <p>Loading budgets…</p>
               ) : (
-                <table>
-                  <thead>
-                    <tr>
-                      <th style={{ textAlign: "left" }}>Month</th>
-                      <th style={{ textAlign: "right" }}>Budget</th>
-                      <th style={{ textAlign: "right" }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {budgets.map((b) => (
-                      <tr
+                <div className="log-scroll">    
+                  <div className="bh-grid scrollable">
+                    {filteredBudgets.map((b) => (
+                      <div
                         key={b.id}
+                        className="bh-card bh-item"
+                        role="button"
+                        tabIndex={0}
                         onClick={() => { setActive(b); setTab("expenses"); }}
-                        style={{ cursor: "pointer" }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setActive(b); setTab("expenses");
+                          }
+                        }}
                         title="Open"
                       >
-                        <td>{fmtMonthLabel(b.month_year)}</td>
-                        <td style={{ textAlign: "right" }}>{currency(b.monthly_budget_amount)}</td>
-                        <td style={{ textAlign: "right" }}>
+                        <div className="bh-row">
+                          <div className="bh-col">
+                            <div className="bh-label">Month</div>
+                            <div className="bh-strong">{fmtMonthLabel(b.month_year)}</div>
+                          </div>
+                          <div className="bh-col" style={{ textAlign: "right" }}>
+                            <div className="bh-label">Budget</div>
+                            <div className="bh-strong">{currency(b.monthly_budget_amount)}</div>
+                          </div>
+                        </div>
+
+                        <div className="bh-foot">
                           <button
                             onClick={(e) => { e.stopPropagation(); openEdit(b); }}
-                            className="btn xs"
+                            className="btn primary"
                             title="Edit"
                           >
                             Edit
                           </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); onDelete(b); }}
-                            className="btn xs danger"
-                            style={{ marginLeft: 8 }}
-                            title="Delete"
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
+                        </div>
+                      </div>
                     ))}
-                    {!budgets.length && (
-                      <tr><td colSpan="3" className="muted">No budgets yet. Add one above.</td></tr>
+                    {!filteredBudgets.length && (
+                      <div className="bh-card">
+                        <div className="muted">No budgets yet. Add one above.</div>
+                      </div>
                     )}
-                  </tbody>
-                </table>
+                  </div>
+                </div> 
               )}
+
             </div>
 
             {/* Detail for selected month */}
@@ -322,9 +439,22 @@ export default function BudgetCenter({
 
                 <div className="tab-body" style={{ marginTop: 12 }}>
                   {detailLoading && <p>Loading…</p>}
-
+                  
                   {!detailLoading && tab === "expenses" && (
                     <div className="table-wrap">
+                      {/* NEW: summary + Export */}
+                      <div className="records-summary muted" style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 8 }}>
+                        <span>
+                          Total records: <strong>{totals.count}</strong>
+                        </span>
+                        <span>
+                          Sum: <strong>{currency(totals.used)}</strong>
+                        </span>
+                        <div style={{ marginLeft: "auto" }}>
+                          <button className="btn xs" onClick={exportMonthCSV}>Export CSV</button>
+                        </div>
+                      </div>
+                      <div className="logs-scroll">
                       <table>
                         <thead>
                           <tr>
@@ -336,7 +466,13 @@ export default function BudgetCenter({
                         </thead>
                         <tbody>
                           {expenses.map((e) => (
-                            <tr key={e.id}>
+                            <tr
+                              key={e.id}
+                              className={onOpenExpense ? "clickable-row" : ""}
+                              style={{ cursor: onOpenExpense ? "pointer" : "default" }}
+                              onClick={() => onOpenExpense && openRecordInParent(e)}
+                              title={onOpenExpense ? "Open in editor" : ""}
+                            >
                               <td>{new Date(e.occurred_on).toLocaleDateString()}</td>
                               <td>{e.category_path || "Uncategorized"}</td>
                               <td>{e.notes || ""}</td>
@@ -348,6 +484,7 @@ export default function BudgetCenter({
                           )}
                         </tbody>
                       </table>
+                      </div>
                     </div>
                   )}
 
@@ -400,10 +537,6 @@ export default function BudgetCenter({
               <button type="button" className="btn icon" onClick={()=>setEditOpen(false)} aria-label="Close">✕</button>
             </div>
             <div className="modal-body edit-budget-grid">
-              <label className="stack">
-                <span className="muted">Month</span>
-                <input type="month" value={editMonth} onChange={(e)=>setEditMonth(e.target.value)} required />
-              </label>
               <label className="stack">
                 <span className="muted">Amount</span>
                 <input type="number" min="0" step="0.01" value={editAmount} onChange={(e)=>setEditAmount(e.target.value)} required />

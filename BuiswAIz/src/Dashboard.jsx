@@ -25,64 +25,96 @@ const Dashboard = () => {
   const [expenseChartData, setExpenseChartData] = useState([]);
   const [activityLogs, setActivityLogs] = useState([]);
 
+  function getExpenseDate(row) {
+    // Prefer your domain date fields
+    const raw =
+      row.occured_on ??           // common misspelling in schemas
+      row.occurred_on ??          // correct spelling
+      row.expensedate ??
+      row.expense_date ??
+      row.expenseDate ??
+      row.date ??
+      row.created_at;             // LAST resort fallback
+
+    if (!raw) return null;
+
+    // If it's a DATE like "YYYY-MM-DD", build a local date to avoid timezone shifts
+    if (typeof raw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      const [y, m, d] = raw.split("-").map(Number);
+      return new Date(y, m - 1, d); // local time
+    }
+
+    const d = new Date(raw);
+    return isNaN(d) ? null : d;
+  }
+
+
+
+  function buildDailySeries(rows, opts = {}) {
+    const now = new Date();
+    const year = opts.year ?? now.getFullYear();
+    const monthIndex = opts.monthIndex ?? now.getMonth(); // 0..11
+
+    const lastDay = new Date(year, monthIndex + 1, 0);
+    const daysInMonth = lastDay.getDate();
+
+    const byDay = Array.from({ length: daysInMonth }, () => 0);
+
+    for (const row of rows) {
+      const amt =
+        Number(row.amount) ??
+        Number(row.expense_amount) ??
+        Number(row.total) ?? 0;
+
+      const d = getExpenseDate(row);
+      if (!d) continue;
+
+      if (d.getFullYear() === year && d.getMonth() === monthIndex) {
+        const dayIdx = d.getDate() - 1;
+        byDay[dayIdx] += Number.isFinite(amt) ? amt : 0;
+      }
+    }
+
+    return byDay.map((total, i) => ({
+      day: i + 1,
+      total: Number(total.toFixed(2)),
+    }));
+  }
+
+
+
+
   useEffect(() => {
     const loadChartData = async () => {
-      const { data, error } = await supabase.from("expenses").select("*");
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = now.getMonth(); // 0..11
+
+      const start = new Date(y, m, 1);
+      const next  = new Date(y, m + 1, 1);
+
+      const toISO = (dt) => dt.toISOString().slice(0, 10); // YYYY-MM-DD
+
+      const { data, error } = await supabase
+        .from("expenses")
+        .select("*")
+        // use the name your table actually has; try occured_on first
+        .gte("occured_on", toISO(start))
+        .lt("occured_on", toISO(next));
+
       if (error) {
         console.error("Failed to fetch expenses for chart:", error);
         setExpenseChartData([]);
         return;
       }
 
-      // Heuristics: pick amount + date from whatever your schema actually has
-      const totals = new Array(12).fill(0);
-
-      data.forEach((row, idx) => {
-        // amount variants
-        const amt =
-          Number(row.amount) ??
-          Number(row.expense_amount) ??
-          Number(row.total) ??
-          0;
-
-        // date variants
-        const expDate =
-          row.expensedate ??
-          row.expense_date ??
-          row.expenseDate ??
-          row.date ??
-          row.created_at;
-
-        if (!expDate) return;
-
-        const d = new Date(expDate);
-        if (isNaN(d)) {
-          // useful debug to find the real key/format
-          console.warn("Bad date @ row", idx, expDate, row);
-          return;
-        }
-
-        const m = d.getMonth(); // 0..11
-        totals[m] += Number.isFinite(amt) ? amt : 0;
-      });
-
-      const months = Array.from({ length: 12 }, (_, m) =>
-        new Date(0, m).toLocaleString("default", { month: "short" })
-      );
-
-      const chart = months.map((label, m) => ({
-        month: label,
-        total: Number((totals[m] || 0).toFixed(2)),
-      }));
-
-      // Debug: verify we actually have nonzero totals
-      console.log("Expense chart preview:", chart);
-
-      setExpenseChartData(chart);
+      setExpenseChartData(buildDailySeries(data, { year: y, monthIndex: m }));
     };
 
     loadChartData();
   }, []);
+
+
 
 
      const loadActivityLogs = async () => {
@@ -268,9 +300,8 @@ const Dashboard = () => {
                     ) : (
                     <ResponsiveContainer width="100%" height={300}>
                       <LineChart data={expenseChartData}>
-                        <XAxis dataKey="month" />
+                        <XAxis dataKey="day" />
                         <YAxis domain={[0, (dataMax) => (dataMax && dataMax > 0 ? dataMax : 1)]} />
-
                         <Tooltip />
                         <CartesianGrid strokeDasharray="5 5" />
                         <Line
@@ -282,6 +313,7 @@ const Dashboard = () => {
                         />
                       </LineChart>
                     </ResponsiveContainer>
+
                   )}
                 </div>
               </div>
