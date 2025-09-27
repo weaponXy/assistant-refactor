@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { listBudgets, getExpensesForBudgetMonth, getBudgetHistory } from "../services/budgetService";
 import "./budget-history.css";
+import BudgetCategoryPie from "./BudgetCategoryPie";
 
 function currency(n) {
   if (n === null || n === undefined || Number.isNaN(n)) return "₱0.00";
@@ -142,7 +143,10 @@ function BudgetHistory() {
               Expenses
             </button>
             <button className={activeTab === "history" ? "active" : ""} onClick={() => setActiveTab("history")}>
-              Budget change log
+              Budget Change Log
+            </button>
+            <button className={activeTab === "pie" ? "active" : ""} onClick={() => setActiveTab("pie")}>
+              Category Breakdown
             </button>
           </div>
 
@@ -217,6 +221,16 @@ function BudgetHistory() {
                   </table>
                 )}
               </div>
+            )}
+
+
+
+                        {activeTab === "pie" && (
+              <BudgetCategoryPie
+                expenses={expenses}
+                budgetAmount={activeBudget?.monthly_budget_amount}
+                monthLabel={formatMonth(activeBudget?.month_year)}
+              />
             )}
           </div>
         </div>
