@@ -19,11 +19,14 @@ const ViewSupplier = ({ supplier, onClose, onSupplierUpdated }) => {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const { error } = await supabase.from("suppliers").update({
+      const { error } = await supabase
+        .from("suppliers")
+        .update({
           suppliername: form.suppliername,
           contactperson: form.contactperson,
           supplieremail: form.supplieremail,
-          phonenumber: form.phonenumber,
+          // ✅ Remove dashes before saving
+          phonenumber: form.phonenumber.replace(/-/g, ""),
           address: form.address,
           supplierstatus: form.supplierstatus,
         })
@@ -39,6 +42,7 @@ const ViewSupplier = ({ supplier, onClose, onSupplierUpdated }) => {
       setIsSaving(false);
     }
   };
+
 
   const handleDelete = async () => {
     setDeleteError(""); // reset previous error
@@ -116,10 +120,23 @@ const ViewSupplier = ({ supplier, onClose, onSupplierUpdated }) => {
 
           <label>Phone Number</label>
           <input
-            type="text"
+            type="tel"
             name="phonenumber"
             value={form.phonenumber}
-            onChange={handleChange}
+            onChange={(e) => {
+              if (!isEditing) return;
+
+              let value = e.target.value.replace(/\D/g, ""); // keep only digits
+
+              // ✅ Format for PH mobile numbers (11 digits): 0927-538-7129
+              if (value.length > 4 && value.length <= 7) {
+                value = `${value.slice(0, 4)}-${value.slice(4)}`;
+              } else if (value.length > 7) {
+                value = `${value.slice(0, 4)}-${value.slice(4, 7)}-${value.slice(7, 11)}`;
+              }
+
+              setForm((prev) => ({ ...prev, phonenumber: value }));
+            }}
             disabled={!isEditing}
           />
 
