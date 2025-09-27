@@ -96,7 +96,6 @@ const Dashboard = () => {
       const nextYear  = m === 11 ? y + 1 : y;
       const nextStr = `${nextYear}-${String(nextMonth + 1).padStart(2, "0")}-01`;
 
-      // ✅ use the correct column: occurred_on
       const { data, error } = await supabase
         .from("expenses")
         .select("id, occurred_on, amount") // only what you need
@@ -287,7 +286,7 @@ const Dashboard = () => {
                 <h3>Daily Gross Sales</h3>
 
                 <div className="panel-content">
-                  <DailyGrossSales />
+                  <DailyGrossSales/>
                 </div>
                 <button className="add-product-button" onClick={() => setShowUploadModal(true)}>Upload Sheets
                 </button>
