@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from './supabase';
-import rightImage from './assets/rightimage.jpg'; // Import the image
+import rightImage from './assets/rightimage.jpg';
 import './stylecss/login.css';
 
 const ForgotPassword = () => {
@@ -47,7 +47,7 @@ const ForgotPassword = () => {
           <input
             type="email"
             required
-            placeholder="mail@simmmple.com"
+            placeholder="Enter your email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="login-input"
