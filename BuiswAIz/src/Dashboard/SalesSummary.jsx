@@ -8,7 +8,7 @@ const SalesSummary = () => {
     yesterdaysSale: 0,
     percentageChange: 0,
     monthlyTotalSales: 0,
-    netIncome: 0,
+    monthlyNetIncome: 0,
     dailyTransactions: 0
   });
   const [loading, setLoading] = useState(true);
@@ -43,7 +43,6 @@ const SalesSummary = () => {
       // Method 1: Try using orderitems table (like your Dashboard does)
       let todaysSale = 0;
       let yesterdaysSale = 0;
-      let monthlyTotalSales = 0;
       let dailyTransactions = 0;
 
       try {
@@ -72,21 +71,10 @@ const SalesSummary = () => {
           yesterdaysSale = yesterdaysOrderItems.reduce((sum, item) => sum + (parseFloat(item.subtotal) || 0), 0);
         }
 
-        // Fetch this month's sales from orderitems
-        const { data: monthlyOrderItems, error: monthlyError } = await supabase
-          .from('orderitems')
-          .select('subtotal')
-          .gte('createdat', startOfMonth)
-          .lte('createdat', endOfMonth);
-
-        if (!monthlyError && monthlyOrderItems) {
-          monthlyTotalSales = monthlyOrderItems.reduce((sum, item) => sum + (parseFloat(item.subtotal) || 0), 0);
-        }
-
       } catch (orderitemsError) {
         console.warn('Failed to fetch from orderitems table:', orderitemsError);
         
-        // Method 2: Fallback to orders table
+        // Method 2: Fallback to orders table for daily sales
         const { data: todaysOrders, error: todaysOrdersError } = await supabase
           .from('orders')
           .select('totalamount, orderdate, orderid')
@@ -107,20 +95,10 @@ const SalesSummary = () => {
         if (!yesterdaysOrdersError && yesterdaysOrders) {
           yesterdaysSale = yesterdaysOrders.reduce((sum, order) => sum + (parseFloat(order.totalamount) || 0), 0);
         }
-
-        const { data: monthlyOrders, error: monthlyOrdersError } = await supabase
-          .from('orders')
-          .select('totalamount')
-          .gte('orderdate', startOfMonth)
-          .lte('orderdate', endOfMonth);
-
-        if (!monthlyOrdersError && monthlyOrders) {
-          monthlyTotalSales = monthlyOrders.reduce((sum, order) => sum + (parseFloat(order.totalamount) || 0), 0);
-        }
       }
 
       // Method 3: If both methods give us zero, try a broader query to see if there's any data
-      if (todaysSale === 0 && monthlyTotalSales === 0) {
+      if (todaysSale === 0) {
         const { data: allRecentData, error: recentError } = await supabase
           .from('orderitems')
           .select('subtotal, createdat, orderid')
@@ -144,68 +122,77 @@ const SalesSummary = () => {
       }
 
       // ================================
-      // ✅ Fixed: robust expense lookup (no 400 spam)
+      // Updated: Monthly Sales and Expenses calculation for Net Income
       // ================================
+      let monthlyTotalSales = 0;
       let monthlyExpensesTotal = 0;
-      try {
-        // 1) Probe once to detect the actual date column
-        const { data: probeRows, error: probeError } = await supabase
-          .from('expenses')
-          .select('*')
-          .limit(1);
 
-        if (probeError) {
-          // If even probing fails, bail to client-side fallback below
-          throw probeError;
+      // Get monthly sales from orders table using orderdate and totalamount
+      try {
+        const { data: monthlyOrders, error: monthlyOrdersError } = await supabase
+          .from('orders')
+          .select('totalamount, orderdate')
+          .gte('orderdate', startOfMonth)
+          .lte('orderdate', endOfMonth);
+
+        if (!monthlyOrdersError && monthlyOrders) {
+          monthlyTotalSales = monthlyOrders.reduce((sum, order) => sum + (parseFloat(order.totalamount) || 0), 0);
         }
 
-        // Prefer these common keys in order; pick the first one that exists on the row
-        const CANDIDATE_KEYS = ['expense_date', 'expensedate', 'expenseDate', 'date', 'created_at'];
-        const dateKey = (probeRows?.[0]
-          ? CANDIDATE_KEYS.find(k => k in probeRows[0])
-          : undefined) || 'expensedate'; // harmless default
+        // If orders table query fails or gives zero, try fallback with orderitems
+        if (monthlyTotalSales === 0) {
+          const { data: monthlyOrderItems, error: monthlyOrderItemsError } = await supabase
+            .from('orderitems')
+            .select('subtotal, createdat')
+            .gte('createdat', startOfMonth)
+            .lte('createdat', endOfMonth);
 
-        // 2) Try ONE server-side filtered query using the detected key
-        try {
-          const { data: ranged, error: rangedErr } = await supabase
-            .from('expenses')
-            .select(`amount, ${dateKey}`)
-            .gte(dateKey, startOfMonth)
-            .lte(dateKey, endOfMonth);
-
-          if (rangedErr) throw rangedErr;
-
-          monthlyExpensesTotal = (ranged || []).reduce(
-            (sum, e) => sum + (parseFloat(e.amount) || 0),
-            0
-          );
-        } catch (rangeFail) {
-          // 3) Fallback: fetch all and filter client-side (uses the same dateKey)
-          const { data: allExpenses, error: allErr } = await supabase
-            .from('expenses')
-            .select('*');
-
-          if (!allErr && allExpenses) {
-            const inRange = allExpenses.filter(e => {
-              const raw = e[dateKey] ?? e.expense_date ?? e.expensedate ?? e.expenseDate ?? e.date ?? e.created_at;
-              if (!raw) return false;
-              const d = new Date(raw);
-              if (isNaN(d)) return false;
-              return d >= new Date(startOfMonth) && d <= new Date(endOfMonth);
-            });
-
-            monthlyExpensesTotal = inRange.reduce(
-              (sum, e) => sum + (parseFloat(e.amount) || 0),
-              0
-            );
+          if (!monthlyOrderItemsError && monthlyOrderItems) {
+            monthlyTotalSales = monthlyOrderItems.reduce((sum, item) => sum + (parseFloat(item.subtotal) || 0), 0);
           }
         }
-      } catch (expensesError) {
-        console.warn('Expenses lookup failed:', expensesError);
+      } catch (salesError) {
+        console.warn('Monthly sales lookup failed:', salesError);
       }
 
+      // Get monthly expenses from expenses table using occurred_on and amount
+      try {
+        const { data: monthlyExpenses, error: monthlyExpensesError } = await supabase
+          .from('expenses')
+          .select('amount, occurred_on')
+          .gte('occurred_on', startOfMonth)
+          .lte('occurred_on', endOfMonth);
 
-      const netIncome = monthlyTotalSales - monthlyExpensesTotal;
+        if (!monthlyExpensesError && monthlyExpenses) {
+          monthlyExpensesTotal = monthlyExpenses.reduce((sum, expense) => sum + (parseFloat(expense.amount) || 0), 0);
+        }
+      } catch (expensesError) {
+        console.warn('Monthly expenses lookup failed:', expensesError);
+        
+        // Fallback: try client-side filtering if server-side query fails
+        try {
+          const { data: allExpenses, error: allExpensesError } = await supabase
+            .from('expenses')
+            .select('amount, occurred_on');
+
+          if (!allExpensesError && allExpenses) {
+            const monthlyFilteredExpenses = allExpenses.filter(expense => {
+              if (!expense.occurred_on) return false;
+              const expenseDate = new Date(expense.occurred_on);
+              if (isNaN(expenseDate)) return false;
+              const expenseDateString = expenseDate.toISOString().split('T')[0];
+              return expenseDateString >= startOfMonth && expenseDateString <= endOfMonth;
+            });
+
+            monthlyExpensesTotal = monthlyFilteredExpenses.reduce((sum, expense) => sum + (parseFloat(expense.amount) || 0), 0);
+          }
+        } catch (fallbackError) {
+          console.warn('Fallback expenses lookup also failed:', fallbackError);
+        }
+      }
+
+      // Calculate Monthly Net Income
+      const monthlyNetIncome = monthlyTotalSales - monthlyExpensesTotal;
 
       // Calculate percentage change
       let percentageChange = 0;
@@ -220,7 +207,7 @@ const SalesSummary = () => {
         yesterdaysSale,
         percentageChange,
         monthlyTotalSales,
-        netIncome,
+        monthlyNetIncome,
         dailyTransactions
       });
       
@@ -315,10 +302,10 @@ const SalesSummary = () => {
             <span>💰</span>
           </div>
           <div className="sales-info">
-            <div className={`sales-amount ${salesData.netIncome < 0 ? 'negative' : 'positive'}`}>
-              ₱{salesData.netIncome.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+            <div className={`sales-amount ${salesData.monthlyNetIncome < 0 ? 'negative' : 'positive'}`}>
+              ₱{salesData.monthlyNetIncome.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
             </div>
-            <div className="sales-label">Net Income</div>
+            <div className="sales-label">Monthly Net Income</div>
           </div>
         </div>
 
