@@ -130,7 +130,7 @@ const AddProduct = ({ onClose, user }) => {
 
 
   return (
-    <div className="modal-overlay">
+    <div className="Addmodal-overlay">
       <div className="Addmodal-content slide-up">
         <div className="modal-header">
           <button className="back-btn" onClick={onClose}>
