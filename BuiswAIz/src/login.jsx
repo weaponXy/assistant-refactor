@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+// src/login.jsx
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from './supabase';
-import rightImage from './assets/rightimage.jpg'; // Import the image
+import rightImage from './assets/rightimage.jpg';
 import './stylecss/login.css';
 
 const Login = () => {
@@ -11,24 +12,59 @@ const Login = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
 
+  // ---- AUTO-REDIRECT AND 5-MINUTE AUTO-LOGOUT ----
+  useEffect(() => {
+    const checkSessionTimeout = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!data?.session) return; // not logged in
+
+      const lastActive = localStorage.getItem('lastActive');
+      const fiveMinutes = 5 * 60 * 1000;
+
+      if (lastActive && Date.now() - parseInt(lastActive) > fiveMinutes) {
+        // more than 5 minutes passed → logout
+        await supabase.auth.signOut();
+        localStorage.removeItem('userProfile');
+        localStorage.removeItem('lastActive');
+        navigate('/login');
+      } else {
+        // session is valid → update lastActive and redirect
+        localStorage.setItem('lastActive', Date.now());
+        navigate('/Dashboard');
+      }
+    };
+
+    checkSessionTimeout();
+  }, [navigate]);
+
+  // ---- OPTIONAL: reset lastActive on user activity ----
+  useEffect(() => {
+    const resetTimer = () => localStorage.setItem('lastActive', Date.now());
+
+    window.addEventListener('click', resetTimer);
+    window.addEventListener('keydown', resetTimer);
+
+    return () => {
+      window.removeEventListener('click', resetTimer);
+      window.removeEventListener('keydown', resetTimer);
+    };
+  }, []);
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
 
-    // 1. Sign in via Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
-    if (authError || !authData.user) {
+    if (authError || !authData?.user) {
       setError('Invalid email or password.');
       return;
     }
 
     const userId = authData.user.id;
-
-    // 2. Get matching user row from systemuser using auth.user.id
     const { data: userProfile, error: userError } = await supabase
       .from('systemuser')
       .select('*')
@@ -40,12 +76,13 @@ const Login = () => {
       return;
     }
 
-    // 3. Save to localStorage if needed
     if (rememberMe) {
-      localStorage.setItem('user', JSON.stringify(userProfile));
+      localStorage.setItem('userProfile', JSON.stringify(userProfile));
     }
 
-    // 4. Redirect
+    // ---- SAVE LOGIN TIMESTAMP ----
+    localStorage.setItem('lastActive', Date.now());
+
     navigate('/Dashboard');
   };
 

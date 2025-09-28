@@ -153,7 +153,8 @@ const Assistant = () => {
                                 className="logout-button"
                                 onClick={async () => {
                                     await supabase.auth.signOut();
-                                    localStorage.clear();
+                                    localStorage.removeItem("userProfile");
+                                    localStorage.removeItem('lastActive');
                                     navigate("/"); // redirect to login
                                 }}
                             >

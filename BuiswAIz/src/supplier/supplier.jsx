@@ -136,13 +136,17 @@ const Supplier = () => {
                     {user ? user.username : "Loading..."}
                   </div>
               </div>
-              <button className="logout-button"
-                onClick={async () => {
-                  await supabase.auth.signOut();
-                  localStorage.clear();
-                  window.location.href = '/'; // redirect to login
-                }}
-              >Logout</button>
+                <button
+                  className="logout-button"
+                  onClick={async () => {
+                    await supabase.auth.signOut();
+                    localStorage.removeItem("userProfile"); // optional
+                    localStorage.removeItem('lastActive');
+                    window.location.href = "/login"; // send back to login
+                  }}
+                >
+                  Logout
+              </button>
             </div>
 
             <div className="supply-returned-panel">
