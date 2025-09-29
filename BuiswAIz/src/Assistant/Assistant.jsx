@@ -118,7 +118,7 @@ const Assistant = () => {
                             <li onClick={() => navigate("/inventory")}>Inventory</li>
                             <li onClick={() => navigate("/supplier")}>Supplier</li>
                             <li onClick={() => navigate("/TablePage")}>Sales</li>
-                            <li>Expenses</li>
+                            <li onClick={() => navigate("/expenses")}>Expenses</li>
                             <li className="active">AI Assistant</li>
                         </ul>
                         <p className="nav-header">SUPPORT</p>
