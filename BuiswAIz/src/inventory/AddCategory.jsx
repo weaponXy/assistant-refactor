@@ -141,7 +141,9 @@ const AddCategory = ({ productId, onClose, onCategoryAdded }) => {
                 <option value="3-6 Months">3-6 Months</option>
                 <option value="6-9 Months">6-9 Months</option>
                 <option value="9-12 Months">9-12 Months</option>
-                <option value="12-18 Months">12-18 Months</option>
+                <option value="1-2 Years Old">1-2 Years Old</option>
+                <option value="3-4 Years Old">3-4 Years Old</option>
+                <option value="5 Years Old">5 years Old</option>
               </select>
             </div>
 

@@ -746,7 +746,8 @@ const TablePage = () => {
   const handleLogout = useCallback(async () => {
     try {
       await supabase.auth.signOut();
-      localStorage.clear();
+      localStorage.removeItem("userProfile");
+      localStorage.removeItem('lastActive');
       window.location.href = '/';
     } catch (error) {
       console.error('Error during logout:', error);
