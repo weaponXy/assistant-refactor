@@ -370,7 +370,7 @@ const Dashboard = () => {
                   window.location.href = "/";
                 }}
               >
-                Logout
+                ⏻
               </button>
             </div>
 

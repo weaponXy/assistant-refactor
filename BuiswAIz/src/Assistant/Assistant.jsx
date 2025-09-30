@@ -158,7 +158,7 @@ const Assistant = () => {
                                     navigate("/"); // redirect to login
                                 }}
                             >
-                                Logout
+                                ⏻
                             </button>
                         </div>
                         <AssistantChat />

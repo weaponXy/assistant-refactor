@@ -162,6 +162,8 @@ tbody td {
   flex: 1;
   min-height: 0;
   border-radius: 20px;
+  border: 1px solid #eaedf1;
+  width: 100%;
 }
 
 .activity-container {
