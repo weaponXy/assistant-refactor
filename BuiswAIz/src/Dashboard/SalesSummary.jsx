@@ -51,10 +51,6 @@ const SalesSummary = () => {
       const currentDay = parseInt(phTimeParts.find(p => p.type === 'day').value);
       
       const phTime = new Date(currentYear, currentMonth, currentDay);
-      
-      const tomorrow = new Date(phTime);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const tomorrowString = tomorrow.toISOString().split('T')[0];
 
       const yesterday = new Date(phTime);
       yesterday.setDate(yesterday.getDate() - 1);
@@ -78,17 +74,6 @@ const SalesSummary = () => {
       // Create datetime ranges for accurate filtering
       const todayStart = `${todayString} 00:00:00`;
       const todayEnd = `${todayString} 23:59:59`;
-      const yesterdayStart = `${yesterdayString} 00:00:00`;
-      const yesterdayEnd = `${yesterdayString} 23:59:59`;
-
-      console.log('Debug - Date Ranges:', {
-        today: todayString,
-        todayStart,
-        todayEnd,
-        yesterday: yesterdayString,
-        yesterdayStart,
-        yesterdayEnd
-      });
 
       // Fetch today's sales from orders table
       const { data: todaysOrders, error: todaysError } = await supabase
@@ -96,12 +81,6 @@ const SalesSummary = () => {
         .select('totalamount, orderdate, orderid')
         .gte('orderdate', todayStart)
         .lte('orderdate', todayEnd);
-
-      console.log('Debug - Today\'s Orders:', {
-        count: todaysOrders?.length || 0,
-        orders: todaysOrders,
-        error: todaysError
-      });
 
       if (todaysError) {
         console.warn('Failed to fetch today\'s orders:', todaysError);
@@ -117,12 +96,6 @@ const SalesSummary = () => {
         .select('totalamount, orderdate')
         .gte('orderdate', yesterdayString)
         .lt('orderdate', todayString);
-
-      console.log('Debug - Yesterday\'s Orders:', {
-        count: yesterdaysOrders?.length || 0,
-        orders: yesterdaysOrders,
-        error: yesterdaysError
-      });
 
       if (yesterdaysError) {
         console.warn('Failed to fetch yesterday\'s orders:', yesterdaysError);
