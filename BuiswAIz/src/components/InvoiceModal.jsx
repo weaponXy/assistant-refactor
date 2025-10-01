@@ -195,8 +195,8 @@ const InvoiceModal = ({ invoice, onClose, onUpdateOrder }) => {
             
             doc.text(lines, 20, yPosition);
             doc.text(item.quantity.toString(), 80, yPosition);
-            doc.text(`₱${formatCurrency(item.unitprice)}`, 110, yPosition);
-            doc.text(`₱${formatCurrency(item.subtotal)}`, 150, yPosition);
+            doc.text(`P${formatCurrency(item.unitprice)}`, 110, yPosition);
+            doc.text(`P${formatCurrency(item.subtotal)}`, 150, yPosition);
             
             // Adjust yPosition based on number of lines
             yPosition += Math.max(10, lines.length * 5);
@@ -212,8 +212,8 @@ const InvoiceModal = ({ invoice, onClose, onUpdateOrder }) => {
           const lines = doc.splitTextToSize(fullProductName, 55);
           doc.text(lines, 20, yPosition);
           doc.text(invoice.quantity.toString(), 80, yPosition);
-          doc.text(`₱${formatCurrency(invoice.unitprice)}`, 110, yPosition);
-          doc.text(`₱${formatCurrency(invoice.subtotal)}`, 150, yPosition);
+          doc.text(`P${formatCurrency(invoice.unitprice)}`, 110, yPosition);
+          doc.text(`P${formatCurrency(invoice.subtotal)}`, 150, yPosition);
           yPosition += Math.max(10, lines.length * 5);
           totalAmount = invoice.subtotal;
         }
@@ -221,15 +221,15 @@ const InvoiceModal = ({ invoice, onClose, onUpdateOrder }) => {
         doc.line(20, yPosition + 5, 190, yPosition + 5);
         doc.setFontSize(14);
         doc.text('TOTAL:', 110, yPosition + 20);
-        doc.text(`₱${formatCurrency(totalAmount)}`, 150, yPosition + 20);
+        doc.text(`P${formatCurrency(totalAmount)}`, 150, yPosition + 20);
 
         // Add payment information if available
         if (amountPaid !== null && amountPaid !== undefined) {
           doc.text('AMOUNT PAID:', 110, yPosition + 35);
-          doc.text(`₱${formatCurrency(amountPaid)}`, 150, yPosition + 35);
+          doc.text(`P${formatCurrency(amountPaid)}`, 150, yPosition + 35);
           
           doc.text('CHANGE:', 110, yPosition + 50);
-          doc.text(`₱${formatCurrency(change)}`, 150, yPosition + 50);
+          doc.text(`P${formatCurrency(change)}`, 150, yPosition + 50);
         }
 
         // Add footer

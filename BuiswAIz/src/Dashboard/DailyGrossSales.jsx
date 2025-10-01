@@ -116,7 +116,7 @@ const DailyGrossSales = () => {
   return (
     <div className="daily-sales-container">
       <div className="daily-sales-header">
-        <h4>Last 10 Days Performance</h4>
+        <h4>Last 10 Days </h4>
         <div className="sales-legend">
           <span className="legend-item">
             <div className="legend-color primary"></div>
