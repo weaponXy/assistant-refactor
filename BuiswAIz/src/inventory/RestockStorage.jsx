@@ -43,7 +43,6 @@ const RestockStorage = ({ onClose, user }) => {
                 .update({
                     currentstock: restock.new_stock,
                     updatedstock: new Date(),
-                    supplierid: restock.suppliers?.supplierid,
                     cost: restock.new_cost,
                     price: restock.new_price
                 })
@@ -53,7 +52,7 @@ const RestockStorage = ({ onClose, user }) => {
                 console.error("Error updating stock:", updateError);
                 return alert("Failed to inherit batch");
             }
-
+            
             // Mark batch as inherited
             const { error: batchError } = await supabase
                 .from("restockstorage")

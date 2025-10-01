@@ -36,7 +36,7 @@
   width: 6px;
 }
 .availability-container::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.2);
+  background: #04B4FC;
   border-radius: 4px;
 }
 .availability-container::-webkit-scrollbar-track {

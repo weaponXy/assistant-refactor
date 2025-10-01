@@ -94,6 +94,7 @@ table {
 }
 
 thead th {
+  width: 150px; 
   text-align: left;
   font-size: 13px;
   color: #666;
@@ -103,6 +104,7 @@ thead th {
 }
 
 tbody td {
+  height: 50px;
   text-align: center;
   vertical-align: middle;
   background-color: #f0f4fa;
@@ -112,11 +114,49 @@ tbody td {
   color: #444;
 }
 
-tbody tr:hover td {
-  background-color: #e8f0fe;
-  transition: background-color 0.2s ease;
-  cursor: pointer;
+tbody tr {
+  height: 50px; /* fixed row height */
 }
+
+tbody tr td {
+  background: #f0f4fa;
+  position: relative;
+  overflow: hidden;
+  transition: background 0.3s ease;
+}
+
+tbody tr:hover td {
+  background: linear-gradient(270deg, #e6f4ff, #b3e0ff, #e6f4ff);
+  background-size: 200% 100%;
+  animation: gradientMove 1.5s linear infinite;
+}
+
+@keyframes gradientMove {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+
+.status-active {
+  color: #22543d;
+  background-color: #c6f6d5;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+.status-inactive {
+  color: #742a2a;
+  background-color: #fed7d7;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
 
 /* Placeholder rows */
 .table-placeholder {
@@ -197,6 +237,7 @@ tbody tr:hover td {
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
   flex: 1;
   min-height: 0;
+  max-height: 50%;
 }
 
 .returned-container {
@@ -204,6 +245,17 @@ tbody tr:hover td {
   overflow-y: auto;
   border-radius: 8px;
   max-height: 100%;
+}
+
+.returned-container::-webkit-scrollbar {
+  width: 6px;
+}
+.returned-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+.returned-container::-webkit-scrollbar-thumb {
+  background: #04B4FC;
+  border-radius: 3px;
 }
 
 .returned-card {
@@ -253,4 +305,94 @@ tbody tr:hover td {
   border-radius: 6px;
   width: 0; /* set dynamically with JS */
   transition: width 0.4s ease-in-out;
+}
+
+.supplier-stats-panel {
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
+  flex: 1;
+  min-height: 0;
+  max-height: 50%;
+}
+
+.supplier-stats-panel:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.08);
+}
+
+.S-stats-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;    /* adds vertical scroll when content exceeds height */
+  overflow-x: hidden;  /* prevent horizontal scroll */
+  max-width: 100%;
+  height: 400px;
+}
+
+.S-stats-container::-webkit-scrollbar {
+  width: 6px;
+}
+.S-stats-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+.S-stats-container::-webkit-scrollbar-thumb {
+  background: #04B4FC;
+  border-radius: 3px;
+}
+
+.S-stats-row {
+  display: grid;
+   grid-template-columns: 1fr 150px 60px;
+  align-items: center;
+  padding: 10px 12px;
+  background: #f9fafb;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: background 0.2s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.S-stats-row:hover {
+  background: #edf2f7;
+}
+
+.S-stats-row .supplier-name {
+  font-weight: 500;
+  color: #1a202c;
+  overflow: hidden;          /* ✅ no spill */
+  text-overflow: ellipsis;   /* ✅ adds "..." for long names */
+  white-space: nowrap;
+}
+
+.S-stats-row .supplier-status {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-weight: 500;
+  text-transform: capitalize;
+  margin-left: 10px;
+  white-space: nowrap;
+}
+
+.S-stats-row .supplier-status.Active {
+  background: #c6f6d5;
+  color: #22543d;
+}
+
+.S-stats-row .supplier-status.Inactive {
+  background: #fed7d7;
+  color: #742a2a;
+}
+
+.S-stats-row .product-count {
+  font-weight: 600;
+  color: #2b6cb0;
+  margin-left: 10px;
+  white-space: nowrap;
 }
