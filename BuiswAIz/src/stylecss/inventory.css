@@ -202,24 +202,24 @@ tbody td {
 .add-product-button,
 .restock-storage-button,
 .panel-action-button {  padding: 6px 12px;
-  border: 2px solid #04B4FC;
-  border-radius: 8px;
   background-color: #04B4FC;
-  color: white;
-  cursor: pointer;
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 12px;
+  font-size: 13px;
   font-weight: 600;
-  font-size: 14px;
-  font-family: 'Montserrat', sans-serif;
-  box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3);
-  margin-top: -4px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 12px rgba(4, 180, 252, 0.2);
 }
 
 .add-product-button:hover,
 .restock-storage-button:hover,
 .panel-action-button:hover {
-  background-color: #0290c4;
-  border-color: #0290c4;
-  transform: translateY(-1px);
+  background-color: #91c3d7;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(4, 180, 252, 0.25);
 }
 
 

@@ -200,7 +200,7 @@ body {
   display: inline-block;
   margin-left: 10px;
 }
-.upload-btn:hover { background-color: #2563eb; }
+.upload-btn:hover { background-color: #6185d3; }
 .chart-container, .calendar-container {
   background-color: white;
   border-radius: 18px;
