@@ -219,7 +219,7 @@ const Inventory = () => {
                     window.location.href = "/login"; // send back to login
                   }}
                 >
-                  Logout
+                  ⏻
               </button>
             </div>
 

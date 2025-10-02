@@ -158,7 +158,7 @@ const loadSupplierStats = async () => {
                     window.location.href = "/login"; // send back to login
                   }}
                 >
-                  Logout
+                  ⏻
               </button>
             </div>
 

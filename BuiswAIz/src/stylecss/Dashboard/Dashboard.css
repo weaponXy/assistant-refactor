@@ -8,17 +8,21 @@
 
 body {
   background-color: #f6f9ff;
+  overflow-x: hidden;
 }
 
 .dashboard-page {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 /* Header Bar */
 .header-bar {
   height: 60px;
+  min-height: 60px;
   background-color: #fff;
   display: flex;
   align-items: center;
@@ -33,6 +37,7 @@ body {
   animation: borderFlow 4s linear infinite;
   position: relative;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .header-bar::before {
@@ -95,21 +100,26 @@ body {
   }
 }
 
-/* Main Layout */
+/* Main Layout - KEY CHANGES HERE */
 .main-section {
   display: flex;
   flex: 1;
-  height: calc(100vh - 60px);
+  min-height: 0;
+  overflow: hidden;
 }
 
-/* Modern Sidebar */
+/* Modern Sidebar - FLEXIBLE WIDTH */
 .sidebar {
   width: 260px;
+  min-width: 220px;
+  max-width: 300px;
   background: #fff;
   padding: 32px 20px;
   border-right: none;
   position: relative;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex-shrink: 0;
 }
 
 .sidebar::before {
@@ -249,33 +259,38 @@ body {
   z-index: 2;
 }
 
-/* Main Content */
+/* Main Content - FULLY FLEXIBLE */
 .main-content {
   flex: 1;
   display: flex;
   padding: 24px;
-  gap: 1px;
+  gap: 16px;
   overflow: hidden;
-  height: calc(100vh - 60px);
+  min-width: 0;
+  min-height: 0;
 }
 
-/* Dashboard Content */
+/* Dashboard Content - EXPANDABLE */
 .dashboard-content {
   flex: 2;
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 16px;
   overflow-y: auto;
+  overflow-x: hidden;
+  min-width: 0;
+  min-height: 0;
 }
 
 .dashboard-panel {
   background: white;
-  border-radius: 0;
+  border-radius: 12px;
   padding: 20px;
   border: 1px solid #e1e4ea;
-  min-height: 200px;
   display: flex;
   flex-direction: column;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  flex-shrink: 0;
 }
 
 .dashboard-panel h3 {
@@ -293,109 +308,126 @@ body {
   justify-content: center;
   color: #888;
   font-style: italic;
+  min-height: 0;
 }
 
-/* Sales Summary - Full Width */
+/* Sales Summary - FLEXIBLE HEIGHT */
 .sales-summary {
-  min-height: 150px;
+  min-height: 120px;
+  height: auto;
 }
 
-/* Charts Section - Two columns */
+/* Charts Section - EXPANDABLE */
 .charts-section {
   display: flex;
-  gap: 0px;
-  height: 450px;
+  gap: 16px;
+  min-height: 400px;
+  flex: 1;
+  overflow-y: hidden;
 }
 
 .daily-sales {
   flex: 1.3;
-  min-height: 350px;
+  min-height: 300px;
+  min-width: 500px;
+  display: flex;
+  flex-direction: column;
 }
 
 .monthly-expense {
   flex: 0.7;
   min-height: 300px;
+  min-width: 300px;
+  display: flex;
+  flex-direction: column;
 }
 
-/* Bottom Section - Two columns */
+/* Bottom Section - EXPANDABLE */
 .bottom-section {
   display: flex;
-  gap: 0px;
-  max-height: 250px;
-  height: 100%;
+  gap: 16px;
+  min-height: 200px;
+  max-height: 280px;
+  flex: 0.8;
 }
 
 .notifications {
   flex: 1.3;
-  max-height: 350px;
-  height: 100%;
   display: flex;
   flex-direction: column;
-  width: 80px;
+  min-height: 200px;
+  max-height: 280px;
+  overflow: hidden;
 }
 
 .notifications .panel-content {
   flex: 1;
   overflow-y: auto;
+  min-height: 0;
 }
 
-/* TOP SELLING PRODUCTS - FIXED CONTAINER */
+/* TOP SELLING PRODUCTS - EXPANDABLE */
 .top-selling {
   flex: 0.7;
-  max-height: 290px;
-  height: 100%;
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* Prevent any overflow from parent */
+  min-height: 200px;
+  max-height: 280px;
+  overflow: hidden;
 }
 
-/* IMPORTANT: The panel-content should allow the child component to handle scrolling */
 .top-selling .panel-content {
   flex: 1;
-  overflow: hidden; /* Hide any overflow - let child handle scrolling */
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  /* Remove the center alignment for top selling products */
   align-items: stretch;
   justify-content: stretch;
   color: inherit;
   font-style: normal;
   padding: 0;
   margin: 0;
+  min-height: 0;
 }
 
-/* Right Panel */
+/* Right Panel - EXPANDABLE */
 .right-panel {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  max-height: calc(100vh - 60px);
+  gap: 16px;
   overflow-y: auto;
+  overflow-x: hidden;
   padding-right: 10px;
+  min-width: 0;
+  min-height: 0;
 }
 
 .transaction-history {
   flex: 1;
   min-height: 400px;
+  display: flex;
+  flex-direction: column;
 }
 
-/* User Info Card */
+/* User Info Card - FIXED HEIGHT */
 .user-info-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
   background-color: #ffffff;
-  border-radius: 0;
+  border-radius: 12px;
   border: 1px solid #e1e4ea;
   padding: 12px 18px;
   margin-bottom: 0px;
   height: 64px;
+  min-height: 64px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  flex-shrink: 0;
 }
 
 .user-info-card, .transaction-history {
   float: right;
-  
 }
 
 .user-left {
@@ -418,20 +450,37 @@ body {
 }
 
 .logout-button {
-  background-color: #04B4FC;
+  background: red;
+  border-radius: 100%;
   color: white;
+  padding: 10px;
+  padding-left: 15px;
+  padding-right: 15px;
+  padding-bottom: 12px;
   border: none;
-  font-size: 13px;
-  font-weight: 500;
   cursor: pointer;
-  padding: 6px 12px;
-  border-radius: 8px;
-  transition: background-color 0.2s;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.123);
 }
 
 .logout-button:hover {
-  background-color: #0299D9;
+  background: #fc040488;
+  border-radius: 100%;
+  color: white;
+  padding: 10px;
+  padding-left: 15px;
+  padding-right: 15px;
+  padding-bottom: 12px;
+  border: none;
+  cursor: pointer;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.123);
 }
+
 
 /* Responsive Design */
 @media (max-width: 1200px) {
@@ -440,28 +489,49 @@ body {
     flex-direction: column;
   }
   
+  .daily-sales,
+  .monthly-expense,
+  .notifications,
   .top-selling {
-    max-height: none; /* Allow full height on smaller screens */
+    flex: 1;
+    min-height: 250px;
   }
 }
 
 @media (max-width: 768px) {
+  .main-section {
+    flex-direction: column;
+  }
+
   .main-content {
     flex-direction: column;
+    gap: 12px;
+    padding: 16px;
   }
 
   .sidebar {
     width: 100%;
+    max-width: 100%;
     height: auto;
     background: linear-gradient(135deg, #04B4FC, #0299D9);
   }
 
   .dashboard-content {
     flex: none;
+    gap: 12px;
   }
 
   .right-panel {
     flex: none;
+    gap: 12px;
+  }
+
+  .dashboard-panel {
+    border-radius: 8px;
+  }
+
+  .user-info-card {
+    border-radius: 8px;
   }
 }
 
@@ -472,13 +542,70 @@ body {
 }
 
 .modal-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,.4);
-  display: flex; align-items: center; justify-content: center; z-index: 1000;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
 }
+
 .modal {
-  background: #fff; width: 600px; max-width: 95vw;
-  border-radius: 12px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,.2);
+  background: #fff;
+  width: 600px;
+  max-width: 95vw;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
 }
-.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.close-btn { background: transparent; border: 0; font-size: 20px; cursor: pointer; }
-.modal-actions { display: flex; justify-content: flex-end; margin-top: 16px; gap: 8px; }
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.close-btn {
+  background: transparent;
+  border: 0;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+  gap: 8px;
+}
+
+.dashboard-panel,
+.user-info-card {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.notifications-container {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.notification-item {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.daily-sales-container {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.sales-card {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.top-selling-wrapper {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.top-selling-item {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}

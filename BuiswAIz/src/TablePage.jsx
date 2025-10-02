@@ -804,7 +804,7 @@ const TablePage = () => {
                         </div>
                       </div>
                       <button className="logout-button" onClick={handleLogout}>
-                        Logout
+                        ⏻
                       </button>
                     </div>
                     <Bestseller bestsellers={bestsellers} />
