@@ -1,10 +1,11 @@
 .daily-sales-container {
-  width: 100%;
+  width: 110%;
   height: 100%;
   padding: 16px;
   display: flex;
   flex-direction: column;
   background-color: #ffffff;
+  position: relative;
 }
 
 .daily-sales-header {
@@ -12,6 +13,7 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+  gap: 12px;
 }
 
 .daily-sales-header h4 {
@@ -19,6 +21,38 @@
   font-size: 14px;
   font-weight: 600;
   color: #374151;
+}
+
+.daily-sales-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.upload-sheet-button {
+  background-color: #04B4FC;
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 12px rgba(4, 180, 252, 0.2);
+  margin: 0;
+  white-space: nowrap;
+}
+
+.upload-sheet-button:hover {
+  background-color: #0299D9;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(4, 180, 252, 0.3);
+}
+
+.upload-sheet-button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(4, 180, 252, 0.2);
 }
 
 .sales-legend {
@@ -52,6 +86,8 @@
   align-items: stretch;
   gap: 8px;
   min-height: 200px;
+  min-width: 500px;
+  width: 100%;
   position: relative;
 }
 
@@ -82,6 +118,8 @@
   border-left: 1px solid #e5e7eb;
   border-bottom: 1px solid #e5e7eb;
   position: relative;
+  height: 100%;
+  padding-bottom: 60px;
 }
 
 .chart-bars-container::before {
@@ -104,11 +142,13 @@
   flex-direction: column;
   align-items: center;
   min-width: 45px;
+  height: 100%;
+  position: relative;
 }
 
 .bar-container {
   width: 100%;
-  height: 180px;
+  height: 100%;
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -152,13 +192,17 @@
 }
 
 .bar-label {
-  margin-top: 8px;
+  position: absolute;
+  bottom: -60px;
+  left: 50%;
+  transform: translateX(-50%);
   text-align: center;
   min-height: 50px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
+  width: 100%;
 }
 
 .day-name {
@@ -273,10 +317,6 @@
     padding: 12px;
   }
   
-  .bar-container {
-    height: 150px;
-  }
-  
   .summary-stats {
     flex-direction: column;
     gap: 8px;
@@ -289,6 +329,16 @@
   
   .change-indicator {
     display: none;
+  }
+  
+  .daily-sales-header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  
+  .upload-sheet-button {
+    padding: 6px 12px;
+    font-size: 12px;
   }
 }
 
@@ -305,5 +355,16 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
+  }
+  
+  .daily-sales-header-left {
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+  }
+  
+  .upload-sheet-button {
+    width: 100%;
+    text-align: center;
   }
 }

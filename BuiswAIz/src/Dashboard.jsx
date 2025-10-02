@@ -9,15 +9,12 @@ import TopSellingProducts from "./Dashboard/TopSellingProducts";
 import SalesSummary from "./Dashboard/SalesSummary";
 import DailyGrossSales from "./Dashboard/DailyGrossSales";
 import Notifications from "./Dashboard/Notifications";
-import UploadSheets from "./components/UploadSheets";
-
 import "./stylecss/Dashboard/Dashboard.css";
 
 const Dashboard = () => {
   const navigate = useNavigate(); 
 
   const [user, setUser] = useState(null);
-  const [showUploadModal, setShowUploadModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [topSellingProducts, setTopSellingProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(true);
@@ -114,10 +111,6 @@ const Dashboard = () => {
 
     loadChartData();
   }, []);
-
-
-
-
 
      const loadActivityLogs = async () => {
       // Align table and relationship names with what your API logs show
@@ -288,8 +281,6 @@ const Dashboard = () => {
                 <div className="panel-content">
                   <DailyGrossSales/>
                 </div>
-                <button className="add-product-button" onClick={() => setShowUploadModal(true)}>Upload Sheets
-                </button>
 
               </div>
 
@@ -401,30 +392,6 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
-      {showUploadModal && (
-  <div className="modal-overlay">
-    <div className="modal">
-      <div className="modal-header">
-        <h2>Upload Sales Spreadsheet</h2>
-        <button
-          className="close-btn"
-          onClick={() => setShowUploadModal(false)}
-          aria-label="Close"
-        >
-          ✕
-        </button>
-      </div>
-
-      {/* The uploader */}
-      <UploadSheets />
-
-      <div className="modal-actions">
-        <button onClick={() => setShowUploadModal(false)}>Close</button>
-      </div>
-    </div>
-  </div>
-)}
-
     </div>
   );
 };
