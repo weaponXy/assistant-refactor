@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { fetchSupplier } from "../supplier/fetchsuppliertable";
+import { fetchSupplier, fetchSupplierWithProducts } from "../supplier/fetchsuppliertable";
 import { supabase } from "../supabase";
 import "../stylecss/supplier.css";
 import AddSupplier from "../supplier/AddSupplier";
@@ -13,6 +13,7 @@ const Supplier = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState(null);
+  const [supplierStats, setSupplierStats] = useState([]);
 
   const loadSupplier = async () => {
   try {
@@ -21,6 +22,15 @@ const Supplier = () => {
     setSuppliers(data);
   } catch (err) {
     console.error("Error loading Supplies", err);
+  }
+};
+
+const loadSupplierStats = async () => {
+  try {
+    const data = await fetchSupplierWithProducts();
+    setSupplierStats(data);
+  } catch (err) {
+    console.error("Error loading supplier stats", err);
   }
 };
 
@@ -47,6 +57,7 @@ const Supplier = () => {
     };
       getUser();
       loadSupplier();
+      loadSupplierStats();
   }, []);
 
   const filteredSuppliers = suppliers.filter((supplier) =>
@@ -121,7 +132,9 @@ const Supplier = () => {
                       <td>{supplier.phonenumber}</td>
                       <td>{supplier.supplieremail}</td>
                       <td>{supplier.address}</td>
-                      <td>{supplier.supplierstatus}</td>
+                      <td className={supplier.supplierstatus === "Active" ? "status-active" : "status-inactive"}>
+                        {supplier.supplierstatus}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -170,6 +183,20 @@ const Supplier = () => {
                 ))}
               </div>
             </div>
+
+            <div className="supplier-stats-panel">
+              <h3>Supplier Product Stats</h3>
+              <div className="S-stats-container">
+                {supplierStats.map((s, i) => (
+                  <div key={i} className="S-stats-row">
+                    <span className="supplier-name">{s.suppliername}</span>
+                    <span className="supplier-status">{s.supplierstatus}</span>
+                    <span className="product-count">{s.totalproducts}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
@@ -178,6 +205,7 @@ const Supplier = () => {
           onClose={() => {
             setShowModal(false);
             loadSupplier();
+            loadSupplierStats();
           }}
            user={user}
         />  
@@ -189,6 +217,7 @@ const Supplier = () => {
           onClose={() => {
             setSelectedSupplier(null);
             loadSupplier();
+            loadSupplierStats();
           }}
           user={user}
         />
