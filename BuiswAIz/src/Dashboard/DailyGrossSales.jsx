@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
+import UploadSheets from '../components/UploadSheets';
 import '../stylecss/Dashboard/DailyGrossSales.css';
 
 const DailyGrossSales = () => {
@@ -7,6 +8,7 @@ const DailyGrossSales = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [maxSaleValue, setMaxSaleValue] = useState(0);
+  const [showUploadModal, setShowUploadModal] = useState(false);
 
   useEffect(() => {
     fetchDailySales();
@@ -114,67 +116,101 @@ const DailyGrossSales = () => {
   }
 
   return (
-    <div className="daily-sales-container">
-      <div className="daily-sales-header">
-        <h4>Last 10 Days </h4>
-        <div className="sales-legend">
-          <span className="legend-item">
-            <div className="legend-color primary"></div>
-            Daily Sales
-          </span>
-        </div>
-      </div>
-
-      <div className="daily-sales-chart">
-        <div className="chart-y-axis">
-          {maxSaleValue > 0 && (
-            <>
-              <span className="y-axis-label">{formatCurrency(maxSaleValue)}</span>
-              <span className="y-axis-label">{formatCurrency(maxSaleValue * 0.75)}</span>
-              <span className="y-axis-label">{formatCurrency(maxSaleValue * 0.5)}</span>
-              <span className="y-axis-label">{formatCurrency(maxSaleValue * 0.25)}</span>
-              <span className="y-axis-label">₱0</span>
-            </>
-          )}
+    <>
+      <div className="daily-sales-container">
+        <div className="daily-sales-header">
+          <div className="daily-sales-header-left">
+            <h4>Last 10 Days Performance</h4>
+            <div className="sales-legend">
+              <span className="legend-item">
+                <div className="legend-color primary"></div>
+                Daily Sales
+              </span>
+            </div>
+          </div>
+          <button 
+            className="upload-sheet-button" 
+            onClick={() => setShowUploadModal(true)}
+          >
+             Upload Sheet
+          </button>
         </div>
 
-        <div className="chart-bars-container">
-          {dailySales.map((day, index) => (
-            <div key={index} className="bar-group">
-              <div className="bar-container">
-                <div
-                  className="bar primary-bar"
-                  style={{ height: `${getBarHeight(day.totalSales)}%` }}
-                  title={`${day.dayName}: ${formatCurrency(day.totalSales)}`}
-                >
-                  <div className="bar-value">
-                    {day.totalSales > 0 ? formatCurrency(day.totalSales) : ''}
+        <div className="daily-sales-chart">
+          <div className="chart-y-axis">
+            {maxSaleValue > 0 && (
+              <>
+                <span className="y-axis-label">{formatCurrency(maxSaleValue)}</span>
+                <span className="y-axis-label">{formatCurrency(maxSaleValue * 0.75)}</span>
+                <span className="y-axis-label">{formatCurrency(maxSaleValue * 0.5)}</span>
+                <span className="y-axis-label">{formatCurrency(maxSaleValue * 0.25)}</span>
+                <span className="y-axis-label">₱0</span>
+              </>
+            )}
+          </div>
+
+          <div className="chart-bars-container">
+            {dailySales.map((day, index) => (
+              <div key={index} className="bar-group">
+                <div className="bar-container">
+                  <div
+                    className="bar primary-bar"
+                    style={{ height: `${getBarHeight(day.totalSales)}%` }}
+                    title={`${day.dayName}: ${formatCurrency(day.totalSales)}`}
+                  >
+                    <div className="bar-value">
+                      {day.totalSales > 0 ? formatCurrency(day.totalSales) : ''}
+                    </div>
                   </div>
                 </div>
+                <div className="bar-label">
+                  <div className="day-name">{day.dayName}</div>
+                  {index > 0 && day.changeAmount !== 0 && (
+                    <div className={`change-indicator ${day.changeDirection}`}>
+                      <span className={`change-icon ${day.changeDirection}`}>
+                        {day.changeDirection === 'up' ? '↗️' : day.changeDirection === 'down' ? '↘️' : '➖'}
+                      </span>
+                      <span className="change-text">
+                        {formatChange(day.changeAmount)}
+                      </span>
+                    </div>
+                  )}
+                  {index === 0 && (
+                    <div className="change-indicator baseline">
+                      <span className="change-text">Baseline</span>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="bar-label">
-                <div className="day-name">{day.dayName}</div>
-                {index > 0 && day.changeAmount !== 0 && (
-                  <div className={`change-indicator ${day.changeDirection}`}>
-                    <span className={`change-icon ${day.changeDirection}`}>
-                      {day.changeDirection === 'up' ? '↗️' : day.changeDirection === 'down' ? '↘️' : '➖'}
-                    </span>
-                    <span className="change-text">
-                      {formatChange(day.changeAmount)}
-                    </span>
-                  </div>
-                )}
-                {index === 0 && (
-                  <div className="change-indicator baseline">
-                    <span className="change-text">Baseline</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* Upload Modal */}
+      {showUploadModal && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <div className="modal-header">
+              <h2>Upload Sales Spreadsheet</h2>
+              <button
+                className="close-btn"
+                onClick={() => setShowUploadModal(false)}
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            <UploadSheets />
+
+            <div className="modal-actions">
+              <button onClick={() => setShowUploadModal(false)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 
