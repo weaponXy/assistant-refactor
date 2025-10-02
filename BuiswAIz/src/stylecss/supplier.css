@@ -126,20 +126,10 @@ tbody tr td {
 }
 
 tbody tr:hover td {
-  background: linear-gradient(270deg, #e6f4ff, #b3e0ff, #e6f4ff);
-  background-size: 200% 100%;
-  animation: gradientMove 1.5s linear infinite;
+  background-color: #e8f0fe;
+  transition: background-color 0.2s ease;
+  cursor: pointer;
 }
-
-@keyframes gradientMove {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
-}
-
 
 .status-active {
   color: #22543d;
