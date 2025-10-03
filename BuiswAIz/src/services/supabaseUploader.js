@@ -255,6 +255,16 @@ export async function uploadValidatedData(report) {
       const { error: orderErr } = await supabase.from('orders').insert([orderPayload]);
       if (orderErr) throw orderErr;
 
+
+      // Decrement stock for each item (atomic on the DB side)
+     for (const it of group.items) {
+       const { error: decErr } = await supabase.rpc('decrement_stock', {
+          p_productcategoryid: it.productcategoryid,
+          p_qty: it.quantity,
+        });
+        if (decErr) throw decErr; // stop if any item can't be decremented
+      }
+
       // Insert orderitems
       const itemsPayload = group.items.map(it => ({
         orderid: nextOrderId,

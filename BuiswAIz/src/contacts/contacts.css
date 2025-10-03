@@ -74,3 +74,59 @@
 @media (min-width: 768px) {
   .logs-scroll { max-height: 30vh; }
 }
+
+
+.contact-edit-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+@media (min-width: 640px) {
+  .contact-edit-grid { grid-template-columns: 1fr 1fr; }
+}
+
+/* --- Contact modal input polish --- */
+.modal .input,
+.modal input[type="text"],
+.modal input[type="email"],
+.modal input[type="tel"] {
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;           /* rounded corners */
+  background: #fff;
+  font-size: 14px;
+  outline: none;
+  transition: box-shadow .15s ease, border-color .15s ease;
+}
+.modal .input:focus,
+.modal input[type="text"]:focus,
+.modal input[type="email"]:focus,
+.modal input[type="tel"]:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59,130,246,.15);
+}
+
+/* Edit/Add Contact form should span the full modal width */
+.contact-edit-grid {
+  display: grid;
+  grid-template-columns: 1fr;   /* one full-width column */
+  gap: 12px;
+  width: 100%;
+}
+
+/* Each field spans the whole grid, even if parent gets multi-col later */
+.contact-edit-grid > .stack {
+  grid-column: 1 / -1;
+}
+
+/* Ensure inputs actually stretch edge-to-edge nicely */
+.contact-edit-grid .input,
+.contact-edit-grid input[type="text"],
+.contact-edit-grid input[type="email"],
+.contact-edit-grid input[type="tel"] {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+
+

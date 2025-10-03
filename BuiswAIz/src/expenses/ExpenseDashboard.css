@@ -241,8 +241,11 @@ body {
 
 /* Card-like modal sheet with header/body/footer */
 .modal.sheet {
+  display: flex;
+  flex-direction: column;
+  max-height: min(86vh, 820px); /* limit total height to viewport */
   width: 100%;
-  max-width: 520px;
+  max-width: 800px;
   padding: 0; /* sections handle padding */
   border-radius: 16px;
   box-shadow: 0 30px 80px rgba(2, 6, 23, 0.25);
@@ -276,7 +279,11 @@ body {
 }
 .icon-btn:hover { background: #e2e8f0; }
 
-.modal-body { padding: 16px 18px; background: #fff; }
+.modal-body { 
+  padding: 16px 18px; 
+  background: #fff;
+  overflow: auto;  
+}
 
 .modal-footer {
   display: flex;
@@ -314,6 +321,60 @@ body {
   box-shadow: 0 0 0 3px rgba(4, 180, 252, .15);
 }
 .hint { font-size: 12px; color: #94a3b8; }
+
+.field select,
+.field textarea {
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 14px;
+  color: #0f172a;
+  outline: none;
+  transition: box-shadow .15s ease, border-color .15s ease;
+}
+.field select:focus,
+.field textarea:focus {
+  border-color: #04B4FC;
+  box-shadow: 0 0 0 3px rgba(4, 180, 252, .15);
+}
+
+/* Nicer native select with custom caret */
+.field select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 20 20'><path fill='%2364748b' d='M5.8 7.5l4.2 4.2 4.2-4.2 1.4 1.4-5.6 5.6-5.6-5.6z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 12px;
+  padding-right: 36px;
+}
+
+/* Better file input styling */
+.field input[type="file"] {
+  border: 1px dashed #cbd5e1;
+  background: #f8fafc;
+  padding: 10px;
+  border-radius: 12px;
+}
+.field input[type="file"]::file-selector-button {
+  border: none;
+  background: #0ea5e9;
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin-right: 10px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.field input[type="file"]::file-selector-button:hover {
+  background: #0284c7;
+}
+
+
+
+
 
 /* Buttons (shared) */
 .btn {
@@ -636,3 +697,53 @@ body {
 /* Override older scroll + sticky rules to avoid conflicts */
 .table-scroll { height: auto; max-height: none; overflow: visible; }
 .expense-table .table-scroll thead th { position: static; top: auto; }
+
+
+
+/* === Labels: chips + inline add UI === */
+.label-cloud { display:flex; flex-wrap:wrap; gap:8px; padding:6px; background:#f8fafc; border:1px solid #e5e7eb; border-radius:10px; }
+.chip { display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border:1px solid #e2e8f0; border-radius:999px; background:#fff; font-size:13px; cursor:pointer; transition:box-shadow .15s, border-color .15s; }
+.chip__main { border: none; background: transparent; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+
+.chip:hover { border-color:#94a3b8; }
+.chip--selected { border-color:#0ea5e9; box-shadow:0 0 0 3px rgba(14,165,233,.15); }
+.chip__dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
+.chip__text { line-height:1; }
+.chip--manageable { cursor:default; }
+.chip__delete {
+  margin-left: 2px;
+  border: none;
+  background: transparent;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  color: #94a3b8;
+  opacity: 0.0;
+  transition: opacity .15s ease, color .15s ease;
+}
+.chip:hover .chip__delete { opacity: 1; }
+.chip__delete:hover { color:#dc2626; }
+
+.inline-add .btn.link { padding:0; color:#0ea5e9; background:transparent; border:none; }
+.inline-card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:12px; margin-top:8px; }
+.input-group { display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; }
+.color-picker { width:46px; height:38px; padding:4px; border:1px solid #e2e8f0; border-radius:10px; background:#fff; }
+.actions { display:flex; gap:8px; }
+
+.hint { font-size: 12px; color: #64748b; margin-top: 4px; }
+.hint.error { color: #dc2626; }
+
+/* === Status badges === */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  font-size: 12px;
+  border-radius: 999px;
+  text-transform: capitalize;
+  border: 1px solid transparent;
+}
+.status--cleared    { background: #ecfdf5; color: #065f46; border-color: #a7f3d0; }   /* green */
+.status--uncleared  { background: #fef2f2; color: #991b1b; border-color: #fecaca; }   /* red */
+.status--reconciled { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }   /* blue */

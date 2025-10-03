@@ -1,7 +1,10 @@
 // src/contacts/ContactsCenter.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabase";
+import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import "./contacts.css";
+
+
 
 /* ------------ tiny toast (no deps) ------------ */
 function useToasts() {
@@ -29,6 +32,9 @@ const peso = (n) =>
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+
+
+
 
 /**
  * Props:
@@ -64,6 +70,9 @@ export default function ContactsCenter({
   const [tab, setTab] = useState("details");
   const [records, setRecords] = useState([]);
   const [recordsLoading, setRecordsLoading] = useState(false);
+
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const confirmRef = useRef({}); // { name, onConfirm }
 
   const [toasts, toast] = useToasts();
 
@@ -199,21 +208,44 @@ export default function ContactsCenter({
     }
   }
 
-  async function onDelete(row) {
-    if (!window.confirm(`Delete contact "${row.name}"? This will not delete expenses.`)) return;
-    try {
-      const { error } = await supabase.from("contacts").delete().eq("id", row.id);
-      if (error) throw error;
-      toast.success("Contact deleted");
-      if (active?.id === row.id) {
-        setActive(null);
-        setRecords([]);
+  function onDelete(row) {
+    setConfirmOpen(true);
+    confirmRef.current = {
+      name: row.name,
+      onConfirm: async () => {
+        setConfirmOpen(false);
+        try {
+          // (optional) show how many will be affected
+          const { count } = await supabase
+            .from("expenses")
+            .select("id", { count: "exact", head: true })
+            .eq("contact_id", row.id);
+
+          // 1) Unlink expenses first (avoid FK conflict)
+          const upd = await supabase
+            .from("expenses")
+            .update({ contact_id: null })
+            .eq("contact_id", row.id);
+          if (upd.error) throw upd.error;
+
+          // 2) Now delete the contact
+          const del = await supabase
+            .from("contacts")
+            .delete()
+            .eq("id", row.id);
+          if (del.error) throw del.error;
+
+          // 3) Update UI
+          setRows(prev => prev.filter(r => r.id !== row.id));
+          toast.success(count ? `Deleted contact. Unlinked ${count} expense(s).` : "Deleted contact.");
+        } catch (e) {
+          toast.error(e?.message || "Failed to delete contact");
+        }
       }
-      await refresh();
-    } catch (e) {
-      toast.error(e.message || "Failed to delete contact");
-    }
+    };
   }
+
+
 
   const totals = useMemo(() => {
     const sum = records.reduce((s, r) => s + Number(r.amount || 0), 0);
@@ -314,60 +346,14 @@ export default function ContactsCenter({
                 )}
               </div>
 
+              {/* Right: Only the trigger now */}
               <div>
-                {!addOpen ? (
-                  <button className="btn primary" onClick={() => setAddOpen(true)}>
-                    + Add contact
-                  </button>
-                ) : (
-                  <form onSubmit={onAdd} className="add-contact-form">
-                    <label className="stack">
-                      <span className="muted">Name</span>
-                      <input
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        required
-                        placeholder="Juan Dela Cruz"
-                      />
-                    </label>
-                    <label className="stack">
-                      <span className="muted">Email</span>
-                      <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="juan@example.com"
-                      />
-                    </label>
-                    <label className="stack">
-                      <span className="muted">Phone</span>
-                      <input
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        placeholder="+63…"
-                      />
-                    </label>
-                    <div className="actions">
-                      <button type="submit" className="btn primary">
-                        Save
-                      </button>
-                      <button
-                        type="button"
-                        className="btn outline"
-                        onClick={() => {
-                          setAddOpen(false);
-                          setName("");
-                          setEmail("");
-                          setPhone("");
-                        }}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </form>
-                )}
+                <button className="btn primary" onClick={() => setAddOpen(true)}>
+                  + Add contact
+                </button>
               </div>
             </div>
+
 
             {/* Contacts table */}
             <div className="history-wrap" style={{ marginBottom: 16 }}>
@@ -543,6 +529,45 @@ export default function ContactsCenter({
         </div>
       )}
 
+
+      {/* Add Contact Modal */}
+      {addOpen && (
+        <div
+          className="modal-overlay"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setAddOpen(false); }}
+        >
+          <form className="modal" onSubmit={onAdd}>
+            <div className="modal-header" style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <h3 style={{ margin: 0 }}>Add Contact</h3>
+              <button type="button" className="btn icon" onClick={() => setAddOpen(false)} aria-label="Close">✕</button>
+            </div>
+
+            <div className="modal-body contact-edit-grid">
+              <label className="stack">
+                <span className="muted">Name</span>
+                <input className="input" value={name} onChange={(e)=>setName(e.target.value)} required placeholder="Juan Dela Cruz" />
+              </label>
+              <label className="stack">
+                <span className="muted">Email</span>
+                <input className="input" type="email" value={email} onChange={(e)=>setEmail(e.target.value)} placeholder="juan@example.com" />
+              </label>
+              <label className="stack">
+                <span className="muted">Phone</span>
+                <input className="input" value={phone} onChange={(e)=>setPhone(e.target.value)} placeholder="+63…" />
+              </label>
+            </div>
+
+            <div className="modal-footer" style={{ display:'flex', justifyContent:'flex-end', gap:8 }}>
+              <button type="button" className="btn outline" onClick={() => { setAddOpen(false); setName(''); setEmail(''); setPhone(''); }}>
+                Cancel
+              </button>
+              <button type="submit" className="btn primary">Save</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+
       {/* Edit Modal */}
       {editOpen && (
         <div
@@ -564,15 +589,15 @@ export default function ContactsCenter({
             <div className="modal-body contact-edit-grid">
               <label className="stack">
                 <span className="muted">Name</span>
-                <input value={editName} onChange={(e) => setEditName(e.target.value)} required />
+                <input className="input" value={editName} onChange={(e) => setEditName(e.target.value)} required />
               </label>
               <label className="stack">
                 <span className="muted">Email</span>
-                <input type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} />
+                <input className="input" type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} />
               </label>
               <label className="stack">
                 <span className="muted">Phone</span>
-                <input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} />
+                <input className="input" value={editPhone} onChange={(e) => setEditPhone(e.target.value)} />
               </label>
             </div>
             <div className="modal-footer" style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
@@ -586,6 +611,14 @@ export default function ContactsCenter({
           </form>
         </div>
       )}
+
+      <ConfirmDeleteModal
+        isOpen={confirmOpen}
+        name={confirmRef.current.name}
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={confirmRef.current.onConfirm}
+      />
+
 
       {/* Toasts */}
       <div className="toast-stack">

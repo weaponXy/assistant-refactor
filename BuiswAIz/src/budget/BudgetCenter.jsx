@@ -299,7 +299,7 @@ export default function BudgetCenter({
                 </label>
                 <select
                   id="year-filter"
-                  className="input"
+                  className="input nice-select"
                   value={yearFilter}
                   onChange={(e) =>
                     setYearFilter(e.target.value === "All" ? "All" : Number(e.target.value))
@@ -322,42 +322,29 @@ export default function BudgetCenter({
                     + Add budget
                   </button>
                 ) : (
-                  <form
-                    onSubmit={onAddSubmit}
-                    className="add-budget-form"
-                    style={{ display: "flex", alignItems: "end", gap: 8 }}
-                  >
+                  <form className="add-budget-form inline-card compact-row" onSubmit={onAddSubmit}>
                     <label className="stack">
                       <span className="muted">Month</span>
-                      <input
-                        type="month"
-                        value={addMonth}
-                        onChange={(e) => setAddMonth(e.target.value)}
-                        required
-                      />
+                      <input className="input" type="month" value={addMonth} onChange={(e)=>setAddMonth(e.target.value)} required />
                     </label>
+
                     <label className="stack">
                       <span className="muted">Amount</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={addAmount}
-                        onChange={(e) => setAddAmount(e.target.value)}
-                        required
-                      />
+                    <div className="input-affix">
+                      <span className="affix">₱</span>
+                      <input type="number" min="0" step="0.01" value={editAmount} onChange={(e)=>setEditAmount(e.target.value)} required />
+                    </div>
+
                     </label>
-                    <div className="actions" style={{ display: "flex", gap: 8 }}>
+
+                    <div className="actions">
                       <button type="submit" className="btn primary">Save</button>
-                      <button
-                        type="button"
-                        className="btn outline"
-                        onClick={() => { setAddOpen(false); setAddMonth(""); setAddAmount(""); }}
-                      >
+                      <button type="button" className="btn outline" onClick={() => { setAddOpen(false); setAddMonth(''); setAddAmount(''); }}>
                         Cancel
                       </button>
                     </div>
                   </form>
+
                 )}
               </div>
             </div>
@@ -536,11 +523,9 @@ export default function BudgetCenter({
               <h3 style={{ margin:0 }}>Edit Budget</h3>
               <button type="button" className="btn icon" onClick={()=>setEditOpen(false)} aria-label="Close">✕</button>
             </div>
-            <div className="modal-body edit-budget-grid">
-              <label className="stack">
-                <span className="muted">Amount</span>
-                <input type="number" min="0" step="0.01" value={editAmount} onChange={(e)=>setEditAmount(e.target.value)} required />
-              </label>
+            <div className="input-affix">
+              <span className="affix">₱</span>
+              <input type="number" min="0" step="0.01" value={editAmount} onChange={(e)=>setEditAmount(e.target.value)} required />
             </div>
             <div className="modal-footer" style={{ display:'flex', justifyContent:'flex-end', gap:8 }}>
               <button type="button" className="btn outline" onClick={()=>setEditOpen(false)}>Cancel</button>
