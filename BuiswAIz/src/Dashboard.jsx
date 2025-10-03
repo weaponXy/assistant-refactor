@@ -26,9 +26,6 @@ const Dashboard = () => {
   const [activityLogs, setActivityLogs] = useState([]);
 
 
-  
-
-  // ⬇️ Put this INSIDE the Dashboard component, above `return ( ... )`
 function downloadTemplate() {
   const headers = [
     "orderid",
