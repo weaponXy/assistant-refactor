@@ -473,36 +473,6 @@ function downloadTemplate() {
           </div>
         </div>
       </div>
-      {showUploadModal && (
-  <div className="modal-overlay">
-    <div className="modal">
-      <div className="modal-header">
-        <h2>Upload Sales Spreadsheet</h2>
-        <button className="close-btn" onClick={() => setShowUploadModal(false)} aria-label="Close">✕</button>
-      </div>
-
-      {/* Sub-header actions (template download) */}
-      <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap', padding:'0 16px 10px' }}>
-        <button type="button" className="btn secondary" onClick={downloadTemplate}>
-          Download template
-        </button>
-        <small className="muted" style={{ lineHeight: 1.4 }}>
-          Columns: <code>orderid, orderdate, productname, color, agesize, quantity, unitprice, subtotal, amountpaid</code>.
-          Use <b>YYYY-MM-DD</b> for dates.
-        </small>
-      </div>
-
-      {/* The uploader */}
-      <UploadSheets />
-
-
-      <div className="modal-actions">
-        <button onClick={() => setShowUploadModal(false)}>Close</button>
-      </div>
-    </div>
-  </div>
-)}
-
     </div>
   );
 };
