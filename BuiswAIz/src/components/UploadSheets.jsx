@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import * as XLSX from "xlsx";
 import { toast } from "react-toastify";
 import { validateSpreadsheetRows, uploadValidatedData } from "../services/supabaseUploader";
+import "../stylecss/UploadSheets.css";
 
 const REQUIRED_COLUMNS = [
   "orderid",
@@ -141,7 +142,7 @@ function UploadSheets() {
           value={value}
           onChange={(e) => onCellChange(rowIdx, key, e.target.value)}
           className={hasError ? "border border-red-500" : "border border-gray-300"}
-          style={{ padding: 4, minWidth: 120 }}
+          style={{ padding: 10, minWidth: 120 }}
         />
       </td>
     );
@@ -149,13 +150,13 @@ function UploadSheets() {
 
   return (
     <div style={{ display: "grid", gap: 12 }}>
-      <div>
+      <div className="file-choose">
         <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} disabled={loading} />
         {fileName && <small style={{ marginLeft: 8 }}>Loaded: {fileName}</small>}
       </div>
 
       {warnings?.length > 0 && (
-        <div style={{ background: "#fffbe6", border: "1px solid #ffe58f", padding: 12, borderRadius: 8 }}>
+        <div style={{ color: "#fff", background: "#da02027c", padding: 12, borderRadius: 8 }}>
           <strong>Warnings:</strong>
           <ul style={{ marginTop: 6 }}>
             {warnings.map((w, i) => (<li key={i}>• {w}</li>))}

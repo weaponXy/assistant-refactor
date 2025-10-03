@@ -75,7 +75,7 @@ const ProductAvailability = ({ lowStockProducts }) => {
                     <img
                       src={product.image_url}
                       alt={product.productname || "Product"}
-                      className="product-thumbnail"
+                      className="I-product-thumbnail"
                     />
                   ) : (
                     <div className="img-placeholder">📦</div>

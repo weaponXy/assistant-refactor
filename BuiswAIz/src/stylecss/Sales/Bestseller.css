@@ -19,7 +19,6 @@
   flex-shrink: 0;
 }
 
-/* FIXED: Scrollable container for bestseller table */
 .table-scroll-box1 {
   flex: 1;
   overflow-y: auto;
@@ -32,7 +31,6 @@
   min-height: 203px;
 }
 
-/* Webkit scrollbar styling for bestseller */
 .table-scroll-box1::-webkit-scrollbar {
   width: 6px;
 }
@@ -51,7 +49,6 @@
   background: #0290c4;
 }
 
-/* FIXED: Bestseller table specific styling */
 .bestseller-table {
   table-layout: fixed;
   width: 100%;
@@ -60,11 +57,32 @@
 }
 
 .bestseller-table thead th {
-  padding: 15px 10px;
   position: sticky;
   top: 0;
   z-index: 1;
   background-color: rgb(214, 241, 251);
+  padding: 12px 10px; 
+}
+
+/* Define column widths */
+.bestseller-table thead th:nth-child(1),
+.bestseller-table tbody td:nth-child(1) {
+  width: 60px;
+}
+
+.bestseller-table thead th:nth-child(2),
+.bestseller-table tbody td:nth-child(2) {
+  width: auto; 
+}
+
+.bestseller-table thead th:nth-child(3),
+.bestseller-table tbody td:nth-child(3) {
+  width: 100px; 
+  text-align: center; 
+}
+
+.bestseller-table tbody td {
+  padding: 12px 10px;
 }
 
 .bestseller-table tbody td {

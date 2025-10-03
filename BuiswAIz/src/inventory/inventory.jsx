@@ -185,7 +185,7 @@ const Inventory = () => {
                             <img
                               src={product.image_url}
                               alt="Product"
-                              className="product-thumbnail"
+                              className="I-product-thumbnail"
                             />
                           ) : (
                             <div className="img-placeholder" />
