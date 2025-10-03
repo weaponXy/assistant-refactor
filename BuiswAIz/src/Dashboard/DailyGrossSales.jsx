@@ -9,6 +9,10 @@ const DailyGrossSales = () => {
   const [error, setError] = useState(null);
   const [maxSaleValue, setMaxSaleValue] = useState(0);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showSalesModal, setShowSalesModal] = useState(false);
+  const [selectedDaySales, setSelectedDaySales] = useState(null);
+  const [salesDetails, setSalesDetails] = useState([]);
+  const [loadingSalesDetails, setLoadingSalesDetails] = useState(false);
 
   useEffect(() => {
     fetchDailySales();
@@ -28,7 +32,6 @@ const DailyGrossSales = () => {
           dateString: date.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }), 
           dayName: date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', timeZone: 'Asia/Manila' })
         });
-
       }
 
       const salesPromises = days.map(async (day) => {
@@ -78,6 +81,102 @@ const DailyGrossSales = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchSalesDetails = async (dateString) => {
+    try {
+      setLoadingSalesDetails(true);
+      
+      const nextDay = new Date(dateString);
+      nextDay.setDate(nextDay.getDate() + 1);
+      const nextDayString = nextDay.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+
+      const { data: orders, error: ordersError } = await supabase
+        .from('orders')
+        .select('orderid, totalamount, orderdate')
+        .gte('orderdate', dateString)
+        .lt('orderdate', nextDayString);
+
+      if (ordersError) throw ordersError;
+
+      if (orders.length === 0) {
+        setSalesDetails([]);
+        return;
+      }
+
+      const orderIds = orders.map(o => o.orderid);
+
+      const { data: orderItems, error: itemsError } = await supabase
+        .from('orderitems')
+        .select(`
+          orderid,
+          productid,
+          productcategoryid,
+          quantity,
+          unitprice,
+          subtotal,
+          productcategory (
+            color,
+            agesize,
+            products (
+              productname,
+              image_url
+            )
+          )
+        `)
+        .in('orderid', orderIds);
+
+      if (itemsError) throw itemsError;
+
+      const itemsMap = {};
+      orderItems.forEach(item => {
+        const id = item.productcategoryid || item.productid;
+        const name = item.productcategory?.products?.productname || 'Unknown Product';
+        const imageUrl = item.productcategory?.products?.image_url || '';
+        const color = item.productcategory?.color || '';
+        const agesize = item.productcategory?.agesize || '';
+        
+        // Build category/variant display
+        const variantParts = [color, agesize].filter(v => v);
+        const category = variantParts.length > 0 ? variantParts.join(', ') : 'No Variant';
+        
+        const price = Number(String(item.unitprice).replace(/,/g, '')) || 0;
+
+        if (!itemsMap[id]) {
+          itemsMap[id] = {
+            productid: item.productid,
+            productcategoryid: id,
+            productname: name,
+            image_url: imageUrl,
+            category: category,
+            quantity: 0,
+            unitprice: price,
+            totalAmount: 0
+          };
+        }
+
+        itemsMap[id].quantity += item.quantity;
+        itemsMap[id].totalAmount += Number(String(item.subtotal).replace(/,/g, '')) || 0;
+      });
+
+      const detailsArray = Object.values(itemsMap);
+      detailsArray.sort((a, b) => b.totalAmount - a.totalAmount);
+
+      setSalesDetails(detailsArray);
+    } catch (err) {
+      console.error('Error fetching sales details:', err);
+      setSalesDetails([]);
+    } finally {
+      setLoadingSalesDetails(false);
+    }
+  };
+
+  const handleBarClick = async (day) => {
+    if (day.totalSales === 0) return;
+    
+    setSelectedDaySales(day);
+    setShowSalesModal(true);
+    await fetchSalesDetails(day.dateString);
   };
 
   const getBarHeight = (saleAmount) => {
@@ -155,8 +254,12 @@ const DailyGrossSales = () => {
                 <div className="bar-container">
                   <div
                     className="bar primary-bar"
-                    style={{ height: `${getBarHeight(day.totalSales)}%` }}
-                    title={`${day.dayName}: ${formatCurrency(day.totalSales)}`}
+                    style={{ 
+                      height: `${getBarHeight(day.totalSales)}%`,
+                      cursor: day.totalSales > 0 ? 'pointer' : 'default'
+                    }}
+                    title={`${day.dayName}: ${formatCurrency(day.totalSales)} - Click to view details`}
+                    onClick={() => handleBarClick(day)}
                   >
                     <div className="bar-value">
                       {day.totalSales > 0 ? formatCurrency(day.totalSales) : ''}
@@ -189,8 +292,8 @@ const DailyGrossSales = () => {
 
       {/* Upload Modal */}
       {showUploadModal && (
-        <div className="modal-overlay">
-          <div className="modal">
+        <div className="modal-overlay" onClick={() => setShowUploadModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>Upload Sales Spreadsheet</h2>
               <button
@@ -206,6 +309,80 @@ const DailyGrossSales = () => {
 
             <div className="modal-actions">
               <button onClick={() => setShowUploadModal(false)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sales Details Modal */}
+      {showSalesModal && selectedDaySales && (
+        <div className="modal-overlay" onClick={() => setShowSalesModal(false)}>
+          <div className="modal sales-details-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Sales Details - {selectedDaySales.dayName}</h2>
+              <button
+                className="close-btn"
+                onClick={() => setShowSalesModal(false)}
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="sales-summary-info">
+              <div className="summary-item">
+                <span className="summary-label">Total Sales:</span>
+                <span className="summary-value">{formatCurrency(selectedDaySales.totalSales)}</span>
+              </div>
+              <div className="summary-item">
+                <span className="summary-label">Transactions:</span>
+                <span className="summary-value">{selectedDaySales.transactionCount}</span>
+              </div>
+            </div>
+
+            <div className="sales-details-content">
+              {loadingSalesDetails ? (
+                <div className="loading-state">
+                  <p>Loading sales details...</p>
+                </div>
+              ) : salesDetails.length === 0 ? (
+                <div className="empty-state">
+                  <p>No items found for this date.</p>
+                </div>
+              ) : (
+                <div className="sales-items-list">
+                  <table className="sales-items-table">
+                    <thead>
+                      <tr>
+                        <th>Product</th>
+                        <th>Category</th>
+                        <th>Quantity</th>
+                        <th>Unit Price</th>
+                        <th>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {salesDetails.map((item) => (
+                        <tr key={item.productid}>
+                          <td>
+                            <span className="product-name">{item.productname}</span>
+                          </td>
+                          <td>
+                            <span className="product-category">{item.category}</span>
+                          </td>
+                          <td className="text-center">{item.quantity}</td>
+                          <td className="text-right">{formatCurrency(item.unitprice)}</td>
+                          <td className="text-right total-amount">{formatCurrency(item.totalAmount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="modal-actions">
+              <button onClick={() => setShowSalesModal(false)}>Close</button>
             </div>
           </div>
         </div>

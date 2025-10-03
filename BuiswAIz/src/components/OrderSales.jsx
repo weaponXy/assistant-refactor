@@ -19,7 +19,6 @@ const OrderSales = ({ orderData, onInvoiceSelect, onAddSale }) => {
     { value: 'date-asc', label: 'Date (Oldest)' }
   ];
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -196,6 +195,41 @@ const OrderSales = ({ orderData, onInvoiceSelect, onAddSale }) => {
     );
   };
 
+  const exportToCSV = () => {
+    // Create CSV headers
+    const headers = ['Product Name', 'Order Code', 'Status', 'Quantity', 'Price', 'Total Amount', 'Date'];
+    
+    // Create CSV rows from filtered data
+    const rows = filteredData.map(item => [
+      item.products?.productname || 'N/A',
+      item.orderid,
+      getOrderStatus(item),
+      item.quantity,
+      item.unitprice,
+      item.subtotal,
+      new Date(item.createdat).toLocaleString()
+    ]);
+    
+    // Combine headers and rows
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+    
+    // Create blob and download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `sales_orders_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="sales-table-wrapper">
       <div className="table-header">
@@ -204,6 +238,13 @@ const OrderSales = ({ orderData, onInvoiceSelect, onAddSale }) => {
           onClick={onAddSale}
         >
           + Add Sale
+        </button>
+        
+        <button 
+          className="export-csv-btn"
+          onClick={exportToCSV}
+        >
+        Export to CSV
         </button>
         
         <div className="custom-dropdown-wrapper" ref={dropdownRef}>
