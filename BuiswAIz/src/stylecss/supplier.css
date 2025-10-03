@@ -386,3 +386,219 @@ tbody tr:hover td {
   margin-left: 10px;
   white-space: nowrap;
 }
+
+/* Side-by-side layout */
+.orders-tables-grid {
+  display: flex;
+  gap: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Each table wrapper */
+.orders-table-wrapper {
+  flex: 1;
+  background-color: #ffffff;
+  border-radius: 12px;
+  padding: 10px;
+  min-height: 300px; /* fixed minimum height */
+  display: flex;
+  flex-direction: column;
+  border: none
+}
+
+/* Scrollable table inside wrapper */
+.table-scroll {
+  overflow-y: auto;
+  flex: 1;
+  border: 1px solid #ccc;
+}
+
+/* Table styles */
+.table-scroll table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+/* Remove borders for clean look */
+.table-scroll th,
+.table-scroll td,
+.table-scroll table {
+  padding: 8px;
+  text-align: left;
+}
+
+.table-scroll th:first-child {
+  border-top-left-radius: 12px; /* top-left corner */
+}
+
+.table-scroll th:last-child {
+  border-top-right-radius: 12px; /* top-right corner */
+}
+
+.mark-received-btn {
+  background-color: #04B4FC; 
+  color: #fff;               
+  border: none;              
+  padding: 6px 12px;         
+  border-radius: 6px;        
+  cursor: pointer;           
+  font-weight: 600;          
+  font-size: 0.9rem;         
+  transition: background 0.2s ease, transform 0.1s ease; 
+}
+
+/* Hover effect */
+.mark-received-btn:hover {
+  background-color: #91c3d7; /* Darker green */
+  transform: translateY(-1px); /* Slight lift */
+}
+/* Status colors */
+.status-pending { color: blue; }
+.status-rejected { color: red; }
+
+
+/* Status colors */
+.status-confirmed { color: orange; }
+.status-pending { color: blue; }
+.status-rejected { color: red; }
+.status-received { color: green; }
+
+
+/* Modal overlay */
+.sup-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+/* Modal box */
+.modal-box {
+  background: #fff;
+  padding: 25px 30px;
+  border-radius: 12px;
+  width: 400px;
+  max-width: 90%;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Modal animation */
+@keyframes slideIn {
+  from { transform: translateY(-20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Labels & inputs */
+.modal-box label {
+  display: block;
+  margin-top: 15px;
+  font-weight: 500;
+}
+
+.modal-box input {
+  width: 100%;
+  padding: 8px 10px;
+  margin-top: 5px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  outline: none;
+  transition: border 0.2s;
+}
+
+.modal-box input:focus {
+  border-color: #007bff;
+}
+
+/* Error message */
+.modal-error {
+  color: red;
+  margin-top: 10px;
+  font-size: 0.9rem;
+}
+
+/* Footer buttons */
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+  gap: 10px;
+}
+
+.btn-confirm {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-confirm:hover {
+  background-color: #0056b3;
+}
+
+.btn-cancel {
+  background-color: #ccc;
+  color: #333;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-cancel:hover {
+  background-color: #aaa;
+}
+
+/* Modal Buttons */
+.received-btn, .cancel-sup-btn {
+  padding: 10px 18px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-right: 10px;
+  min-width: 120px;
+  margin-top: 15px;
+  border: 1px solid #D0D5DD
+}
+
+/* Confirm Receive Button - Green */
+.received-btn {
+  background-color: #04B4FC;
+  color: white;
+}
+
+.received-btn:hover {
+  background-color: #91c3d7;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+
+/* Cancel Button - Red / Neutral */
+.cancel-sup-btn {
+  background-color: white;
+  color: black;
+}
+
+.cancel-sup-btn:hover {
+  background-color: #e53935;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+
+/* Optional: make disabled state look muted */
+.received-btn:disabled, .cancel-sup-btn:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}

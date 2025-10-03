@@ -1,8 +1,33 @@
 import React from "react";
 import { formatDistanceToNow, parseISO } from "date-fns";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import "../stylecss/ProductAvailability.css";
 
 const ProductAvailability = ({ lowStockProducts }) => {
+
+  const handleReorder = async (category) => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/reorder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productid: category.productid,
+          productcategoryid: category.productcategoryid,
+          supplierid: category.product?.supplierid,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) return toast.error(data.error || "Failed to reorder");
+
+      toast.success(data.message || "Reorder placed!");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to reorder");
+    }
+  };
+
   return (
     <div className="availability-panel">
       <h3>Product Availability</h3>
@@ -26,7 +51,6 @@ const ProductAvailability = ({ lowStockProducts }) => {
                 0
               );
 
-              // severity classification
               let severity = "ok";
               if (category.currentstock === 0) severity = "critical";
               else if (category.currentstock < category.reorderpoint / 2)
@@ -45,7 +69,6 @@ const ProductAvailability = ({ lowStockProducts }) => {
                   key={category.productcategoryid || i}
                   className={`availability-item severity-${severity}`}
                 >
-                  {/* Thumbnail */}
                   {product.image_url ? (
                     <img
                       src={product.image_url}
@@ -57,13 +80,11 @@ const ProductAvailability = ({ lowStockProducts }) => {
                   )}
 
                   <div className="availability-details">
-                    {/* Name + variant */}
                     <span className="name">
                       {product.productname || "Unnamed Product"}{" "}
                       <span className="category-label">({categoryLabel})</span>
                     </span>
 
-                    {/* Stock Progress Bar */}
                     <div className="stock-meter">
                       <div
                         className={`stock-fill severity-${severity}`}
@@ -76,29 +97,29 @@ const ProductAvailability = ({ lowStockProducts }) => {
                       ></div>
                     </div>
 
-                    {/* Stock summary */}
                     <div className="stock-summary">
-                      <span className="stock">
-                        {category.currentstock} pcs left
-                      </span>
-                      <span className="reorder-point">
-                        Reorder at {category.reorderpoint}
-                      </span>
+                      <span className="stock">{category.currentstock} pcs left</span>
+                      <span className="reorder-point">Reorder at {category.reorderpoint}</span>
                     </div>
 
-                    {/* Deficit + Last updated */}
                     <div className="extra-info">
-                      <span className="deficit">
-                        Deficit: {deficit > 0 ? deficit : 0}
-                      </span>
+                      <span className="deficit">Deficit: {deficit > 0 ? deficit : 0}</span>
                       <span className="time">Updated {lastUpdated}</span>
                     </div>
+
+                    <button
+                      className="reorder-btn"
+                      onClick={() => handleReorder(category)}
+                    >
+                      Reorder
+                    </button>
                   </div>
                 </div>
               );
             })
         )}
       </div>
+      <ToastContainer position="top-right" autoClose={3000} />
     </div>
   );
 };
