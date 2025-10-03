@@ -196,10 +196,10 @@ const OrderSales = ({ orderData, onInvoiceSelect, onAddSale }) => {
   };
 
   const exportToCSV = () => {
-    // Create CSV headers
+    // Create sheet headers
     const headers = ['Product Name', 'Order Code', 'Status', 'Quantity', 'Price', 'Total Amount', 'Date'];
     
-    // Create CSV rows from filtered data
+    // Create sheet rows from filtered data
     const rows = filteredData.map(item => [
       item.products?.productname || 'N/A',
       item.orderid,
