@@ -476,6 +476,17 @@
   justify-content: flex-end;
   flex-shrink: 0;
 }
+.modal-sheet {
+  background: #fff;
+  border-radius: 12px;
+  width: 80%;       
+  max-width: 1500px; 
+  height: 800px;  
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+  overflow-y: auto; 
+  padding: 20px;
+  position: relative;
+}
 
 .modal-actions button {
   padding: 10px 24px;

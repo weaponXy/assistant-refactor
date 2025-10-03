@@ -293,7 +293,7 @@ const DailyGrossSales = () => {
       {/* Upload Modal */}
       {showUploadModal && (
         <div className="modal-overlay" onClick={() => setShowUploadModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-sheet" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>Upload Sales Spreadsheet</h2>
               <button

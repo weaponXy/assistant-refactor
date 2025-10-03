@@ -111,7 +111,7 @@ table {
   border-spacing: 0 10px;
 }
 
-thead th {
+.inventory-container thead th {
   text-align: left;
   font-size: 13px;
   color: #666;
@@ -240,7 +240,7 @@ tbody td {
   padding: 6px;
 }
 
-.product-thumbnail {
+.I-product-thumbnail {
   width: 42px;
   height: 42px;
   object-fit: cover;
