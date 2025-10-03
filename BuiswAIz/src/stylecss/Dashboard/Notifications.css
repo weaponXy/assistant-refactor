@@ -59,7 +59,6 @@
 
 .notification-item.priority-high {
   background-color: #fefefe;
-  border-bottom: 1px solid #fecaca;
   border-color: #fecaca;
   margin-bottom: 15px;
   box-shadow: rgba(4, 180, 252, 0.3);
@@ -68,6 +67,7 @@
 .notification-item.priority-high:hover {
   background-color: #fef7f7;
   border-color: #fca5a5;
+  border-bottom: 1px solid #fecaca;
 }
 
 .notification-item.priority-medium {
