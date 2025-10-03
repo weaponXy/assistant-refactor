@@ -5,6 +5,7 @@ import sharp from "sharp";
 import multer from "multer";
 import { createClient } from "@supabase/supabase-js";
 import nodemailer from "nodemailer";
+import sgMail from "@sendgrid/mail";
 
 
 dotenv.config();
@@ -12,6 +13,7 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 // Middleware
 app.use(cors({ origin: process.env.FRONTEND_URL }));
 // Only apply JSON parser for non-file routes
@@ -649,22 +651,14 @@ app.post("/api/reorder", async (req, res) => {
 
     if (orderError || !newOrder) return res.status(500).json({ error: "Failed to create purchase order." });
 
-    // 8️⃣ Send email to supplier (optional)
+    // 8️⃣ Send email to supplier (using SendGrid)
     try {
-      const transporter = nodemailer.createTransport({
-        service: "gmail",
-        auth: {
-          user: process.env.SYSTEM_EMAIL,
-          pass: process.env.SYSTEM_EMAIL_PASS,
-        },
-      });
-
       const confirmLink = `${process.env.CONFIRM_BASE_URL}/api/confirm-order?purchaseorderid=${newOrder.purchaseorderid}`;
       const rejectLink = `${process.env.CONFIRM_BASE_URL}/api/reject-order?purchaseorderid=${newOrder.purchaseorderid}`;
 
-      const mailOptions = {
-        from: `"Buisness-BuiswAIZ" <${process.env.SYSTEM_EMAIL}>`,
+      const msg = {
         to: supplier.supplieremail,
+        from: process.env.SYSTEM_EMAIL, // verified SendGrid sender
         subject: `Reorder Request - ${product.productname}`,
         text: `Hello ${supplier.suppliername},
 
@@ -682,12 +676,12 @@ Please respond to this order by clicking one of the links below:
 - IBuisness-Buiswaiz`,
       };
 
-      await transporter.sendMail(mailOptions);
+      await sgMail.send(msg);
     } catch (emailError) {
-      console.error("Email sending error:", emailError);
+      console.error("SendGrid email error:", emailError);
       return res.status(200).json({
         success: true,
-        message: "Purchase order created, but failed to send email.",
+        message: "Purchase order created, but failed to send email via SendGrid.",
         purchaseOrderId: newOrder.purchaseorderid,
       });
     }
@@ -732,7 +726,6 @@ app.get("/api/confirm-order", async (req, res) => {
 
   res.send(`<h2>✅ Order ${purchaseorderid} confirmed successfully!</h2>`);
 });
-
 
 // Supplier rejects order
 app.get("/api/reject-order", async (req, res) => {
