@@ -1,12 +1,17 @@
-import React from "react";
+import React, { useState } from "react";
 import { formatDistanceToNow, parseISO } from "date-fns";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import "../stylecss/ProductAvailability.css";
 
 const ProductAvailability = ({ lowStockProducts }) => {
+  // ✅ Track loading per product category
+  const [loadingIds, setLoadingIds] = useState([]);
 
   const handleReorder = async (category) => {
+    const id = category.productcategoryid;
+    setLoadingIds((prev) => [...prev, id]); // mark as loading
+
     try {
       const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/reorder`, {
         method: "POST",
@@ -25,6 +30,8 @@ const ProductAvailability = ({ lowStockProducts }) => {
     } catch (err) {
       console.error(err);
       toast.error("Failed to reorder");
+    } finally {
+      setLoadingIds((prev) => prev.filter((i) => i !== id)); // remove from loading
     }
   };
 
@@ -38,31 +45,26 @@ const ProductAvailability = ({ lowStockProducts }) => {
           lowStockProducts
             .sort(
               (a, b) =>
-                (b.reorderpoint - b.currentstock) -
-                (a.reorderpoint - a.currentstock)
+                b.reorderpoint - b.currentstock - (a.reorderpoint - a.currentstock)
             )
             .map((category, i) => {
               const product = category.product || {};
               const categoryLabel =
                 [category.color, category.agesize].filter(Boolean).join(" / ") ||
                 "N/A";
-              const deficit = Math.max(
-                category.reorderpoint - category.currentstock,
-                0
-              );
+              const deficit = Math.max(category.reorderpoint - category.currentstock, 0);
 
               let severity = "ok";
               if (category.currentstock === 0) severity = "critical";
-              else if (category.currentstock < category.reorderpoint / 2)
-                severity = "urgent";
-              else if (category.currentstock < category.reorderpoint)
-                severity = "warning";
+              else if (category.currentstock < category.reorderpoint / 2) severity = "urgent";
+              else if (category.currentstock < category.reorderpoint) severity = "warning";
 
               const lastUpdated = category.updatedstock
-                ? formatDistanceToNow(parseISO(category.updatedstock), {
-                    addSuffix: true,
-                  })
+                ? formatDistanceToNow(parseISO(category.updatedstock), { addSuffix: true })
                 : "No recent updates";
+
+              // ✅ Determine if this category is currently loading
+              const isLoading = loadingIds.includes(category.productcategoryid);
 
               return (
                 <div
@@ -110,8 +112,9 @@ const ProductAvailability = ({ lowStockProducts }) => {
                     <button
                       className="reorder-btn"
                       onClick={() => handleReorder(category)}
+                      disabled={isLoading} // disable button while loading
                     >
-                      Reorder
+                      {isLoading ? "Reordering..." : "Reorder"} {/* show loading */}
                     </button>
                   </div>
                 </div>
