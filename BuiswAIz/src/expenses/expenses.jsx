@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -7,15 +7,25 @@ import {
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import { supabase } from '../supabase';
-import "../expenses/ExpenseDashboard.css";
+import "./ExpenseDashboard.css";
 import { fetchMainCategories, fetchSubcategories, getCategoryById } from '../api/categories';
-import { listLabels, createLabel } from '../api/labels';
 import { listContacts, createContact } from '../api/contacts';
 import { listExpensesByMonth, createExpense, updateExpense, listExpensesByYear, listExpensesBetween, deleteExpense } from '../api/expenses';
 import { AttachmentsPanel } from '../components/AttachmentsPanel';
 import { uploadAttachments } from '../api/attachments';
 import BudgetCenter from "../budget/BudgetCenter";
 import ContactsCenter from "../contacts/ContactsCenter";
+import { listLabels, createLabel, deleteLabel } from '../api/labels';
+import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
+import.meta.env.VITE_ATTACHMENTS_BUCKET || "attachments";
+
+
+// lightweight notifier so we don't crash if a toast lib isn't present
+const notify = {
+  success: (msg) => { try { console.log(msg); alert(msg); } catch {} },
+  error:   (msg) => { try { console.error(msg); alert(msg); } catch {} },
+};
+
 
 /** Utils */
 function formatYYYYMM(d) {
@@ -75,6 +85,7 @@ const ExpenseDashboard = () => {
   const navigate = useNavigate();
 
   // ======== State ========
+
   const [budget, setBudget] = useState(0);
 
   const [editId, setEditId] = useState(null);
@@ -87,7 +98,6 @@ const ExpenseDashboard = () => {
     [selectedMonth]
   );
   const [yearRows, setYearRows] = useState([]);
-
   // range filtering
   const [rangeMode, setRangeMode] = useState('month'); // 'month' | 'preset' | 'custom'
   const [rangePreset, setRangePreset] = useState('thisMonth');
@@ -110,6 +120,8 @@ const ExpenseDashboard = () => {
   const [notes, setNotes] = useState('');
   const [labelIds, setLabelIds] = useState([]);
   const [newFiles, setNewFiles] = useState([]);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const confirmRef = useRef({});
 
   // pickers
   const [mains, setMains] = useState([]);
@@ -135,6 +147,66 @@ const ExpenseDashboard = () => {
     return;
   }
 
+
+  // parse "bucket/path/to/file" or just "path" (uses default bucket)
+const DEFAULT_ATTACHMENTS_BUCKET =
+  
+
+
+  
+
+function splitStorageKey(key = "") {
+  if (!key) return { bucket: DEFAULT_ATTACHMENTS_BUCKET, path: "" };
+  const i = key.indexOf("/");
+  return i > 0
+    ? { bucket: key.slice(0, i), path: key.slice(i + 1) }
+    : { bucket: DEFAULT_ATTACHMENTS_BUCKET, path: key };
+}
+
+async function deleteExpenseDeep(expenseId) {
+  // 1) Find related attachments
+  const { data: atts, error: qErr } = await supabase
+    .from("attachments")
+    .select("id, storage_key")
+    .eq("expense_id", expenseId);
+  if (qErr) throw qErr;
+
+  // 2) Remove Storage objects (best-effort; skip missing)
+  const byBucket = new Map();
+  for (const a of atts || []) {
+    const { bucket, path } = splitStorageKey(a.storage_key || "");
+    if (!path) continue;
+    if (!byBucket.has(bucket)) byBucket.set(bucket, []);
+    byBucket.get(bucket).push(path);
+  }
+  for (const [bucket, paths] of byBucket) {
+    // Storage remove expects an array of paths
+    const { error: rmErr } = await supabase.storage.from(bucket).remove(paths);
+    if (rmErr) {
+      // Not fatal: file might already be gone
+      console.warn("Storage remove warning:", bucket, rmErr.message);
+    }
+  }
+
+  // 3) Delete attachment rows
+  const { error: delAttErr } = await supabase
+    .from("attachments")
+    .delete()
+    .eq("expense_id", expenseId);
+  if (delAttErr) throw delAttErr;
+
+  // 4) Delete the expense
+  const { error: delExpErr } = await supabase
+    .from("expenses")
+    .delete()
+    .eq("id", expenseId);
+  if (delExpErr) throw delExpErr;
+}
+
+
+
+
+
   // Fallback: fetch by id (could be outside current month filter)
     try {
       const { data, error } = await supabase
@@ -154,6 +226,50 @@ const ExpenseDashboard = () => {
       alert(e.message || "Failed to open expense.");
     }
   }, [rows, openEdit]);
+
+
+  const DEFAULT_ATTACHMENTS_BUCKET = import.meta.env.VITE_ATTACHMENTS_BUCKET || "attachments";
+
+function splitStorageKey(key = "") {
+  if (!key) return { bucket: DEFAULT_ATTACHMENTS_BUCKET, path: "" };
+  const i = key.indexOf("/");
+  return i > 0
+    ? { bucket: key.slice(0, i), path: key.slice(i + 1) }
+    : { bucket: DEFAULT_ATTACHMENTS_BUCKET, path: key };
+}
+
+async function deleteExpenseDeep(expenseId) {
+  const { data: atts, error: qErr } = await supabase
+    .from("attachments")
+    .select("id, storage_key")
+    .eq("expense_id", expenseId);
+  if (qErr) throw qErr;
+
+  const byBucket = new Map();
+  for (const a of atts || []) {
+    const { bucket, path } = splitStorageKey(a.storage_key || "");
+    if (!path) continue;
+    if (!byBucket.has(bucket)) byBucket.set(bucket, []);
+    byBucket.get(bucket).push(path);
+  }
+  for (const [bucket, paths] of byBucket) {
+    const { error: rmErr } = await supabase.storage.from(bucket).remove(paths);
+    if (rmErr) console.warn("Storage remove warning:", bucket, rmErr.message);
+  }
+
+  const { error: delAttErr } = await supabase
+    .from("attachments")
+    .delete()
+    .eq("expense_id", expenseId);
+  if (delAttErr) throw delAttErr;
+
+  const { error: delExpErr } = await supabase
+    .from("expenses")
+    .delete()
+    .eq("id", expenseId);
+  if (delExpErr) throw delExpErr;
+}
+
 
   // ======== Auth guard ========
   useEffect(() => {
@@ -389,16 +505,40 @@ const ExpenseDashboard = () => {
   }
 
   async function handleDeleteExpense(id) {
-    if (!window.confirm('Delete this expense permanently?')) return;
-    try {
-      await deleteExpense(id);
-      await refresh();
-      const y = Number(selectedMonth.slice(0,4));
-      setYearRows(await listExpensesByYear(y));
-    } catch (e) {
-      alert(`Failed to delete: ${e?.message || 'Unknown error'}`);
-    }
+    const row = rows.find(r => r.id === id);
+    setConfirmOpen(true);
+    confirmRef.current = {
+      title: "Delete expense",
+      message: "This will delete the expense and its attachments.",
+      onConfirm: async () => {
+        setConfirmOpen(false);
+        try {
+          await deleteExpenseDeep(id);             
+          setRows(prev => prev.filter(r => r.id !== id));
+        } catch (e) {
+          toast.error(e?.message || "Failed to delete expense");
+        }
+      }
+    };
+
   }
+
+
+
+  async function handleDeleteLabel(id) {
+  if (!confirm('Delete this label permanently? This cannot be undone.')) return;
+  try {
+    await deleteLabel(id);                   // hard delete in DB
+    const next = await listLabels();         // refresh list
+    setLabels(next);
+    // remove from current selection if it was selected
+    setLabelIds(prev => prev.filter(x => next.some(l => l.id === x)));
+  } catch (e) {
+    alert(`Failed to delete label: ${e?.message || 'Unknown error'}`);
+  }
+}
+
+
 
   async function openEdit(row) {
     try {
@@ -449,6 +589,20 @@ const ExpenseDashboard = () => {
       if (calendarDate < ms || calendarDate > me) setCalendarDate(ms);
     }
   }
+
+// 1) Try inline JSON/array fields on the row itself
+function getInlineAttachmentsFromRow(row) {
+  return (
+    row?.attachments ||
+    row?.files ||
+    row?.images ||
+    row?.docs ||
+    row?.attachments_json ||
+    []
+  );
+}
+
+
 
   const amountNum = Number.parseFloat(String(amount).trim());
   const canSave =
@@ -619,25 +773,41 @@ const ExpenseDashboard = () => {
                       </div>
                     </td>
                     <td>₱{Number(r.amount).toFixed(2)}</td>
-                    <td className="capitalize">{r.status}</td>
+                    <td>
+                      <span className={`badge status status--${r.status}`}>{r.status}</span>
+                    </td>
                     <td>📎 {r.attachments_count ?? 0}</td>
                     <td className="col-actions">
-                      <div className="table-actions">
-                        <button
-                          className="btn xs outline"
-                          onClick={(e) => { e.stopPropagation(); setSelectedId(r.id); }}
-                        >
-                          Attachments
-                        </button>
+                      <div
+                        className="table-actions"
+                        onClick={(e) => e.stopPropagation()}   // prevent row onClick
+                      >
+                      <button
+                        type="button"
+                        className="btn xs"
+                         onClick={(e) => {
+                         e.preventDefault();
+                         e.stopPropagation();
+                         setSelectedId(r.id); // open the original AttachmentsPanel
+                       }}
+                      >
+                        View attachments
+                      </button>
+
+
                         <button
                           className="btn xs danger"
-                          onClick={(e) => { e.stopPropagation(); handleDeleteExpense(r.id); }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteExpense(r.id);                   // use r
+                          }}
                           title="Delete expense"
                         >
                           Delete
                         </button>
                       </div>
                     </td>
+
                   </tr>
                 ))}
                 {visibleExpenses.length === 0 && (
@@ -650,6 +820,7 @@ const ExpenseDashboard = () => {
               </tbody>
             </table>
           </div>
+
 
           {/* Chart + Calendar */}
           <div className="chart-and-calendar">
@@ -686,6 +857,16 @@ const ExpenseDashboard = () => {
           </div>
         </main>
       </div>
+
+        
+      <ConfirmDeleteModal
+      isOpen={confirmOpen}
+      message={confirmRef.current.message}
+      onCancel={() => setConfirmOpen(false)}
+      onConfirm={confirmRef.current.onConfirm}
+      />
+
+
 
       {/* Add Expense modal */}
       {showAddModal && (
@@ -763,27 +944,31 @@ const ExpenseDashboard = () => {
                   </div>
                   <div className="field" style={{ gridColumn:'1 / -1' }}>
                     <label>Labels</label>
-
-                    {/* Multi-select with checkboxes */}
-                    <div style={{ display:'flex', flexDirection:'column', gap:6, maxHeight:180, overflow:'auto', padding:6, border:'1px solid #e5e7eb', borderRadius:8 }}>
+                    <div className="label-cloud">
                       {labels.map(l => {
                         const checked = labelIds.includes(l.id);
                         return (
-                          <label key={l.id} style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer' }}>
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setLabelIds(prev => prev.includes(l.id) ? prev : [...prev, l.id]);
-                                } else {
-                                  setLabelIds(prev => prev.filter(id => id !== l.id));
-                                }
-                              }}
-                            />
-                            <span style={{ display:'inline-block', width:12, height:12, borderRadius:999, background:l.color }} />
-                            <span>{l.name}</span>
-                          </label>
+                          <div className={`chip ${checked ? 'chip--selected' : ''}`} key={l.id} title={l.name}>
+                            <button
+                              type="button"
+                              className="chip__main"
+                              onClick={() =>
+                                setLabelIds(prev => (checked ? prev.filter(id => id !== l.id) : [...prev, l.id]))
+                              }
+                            >
+                              <span className="chip__dot" style={{ background: l.color || '#64748b' }} />
+                              <span className="chip__text">{l.name}</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="chip__delete"
+                              aria-label={`Delete ${l.name}`}
+                              title="Delete label"
+                              onClick={(e) => { e.stopPropagation(); handleDeleteLabel(l.id); }}
+                            >
+                              ×
+                            </button>
+                          </div>
                         );
                       })}
                     </div>
@@ -929,22 +1114,20 @@ const ExpenseDashboard = () => {
 
                 <div className="field" style={{ gridColumn:'1 / -1' }}>
                   <label>Labels</label>
-                  <div style={{ display:'flex', flexDirection:'column', gap:6, maxHeight:180, overflow:'auto', padding:6, border:'1px solid #e5e7eb', borderRadius:8 }}>
+                  <div className="label-cloud">
                     {labels.map(l => {
                       const checked = labelIds.includes(l.id);
                       return (
-                        <label key={l.id} style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer' }}>
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={(e) => {
-                              if (e.target.checked) setLabelIds(prev => prev.includes(l.id) ? prev : [...prev, l.id]);
-                              else setLabelIds(prev => prev.filter(id => id !== l.id));
-                            }}
-                          />
-                          <span style={{ display:'inline-block', width:12, height:12, borderRadius:999, background:l.color }} />
-                          <span>{l.name}</span>
-                        </label>
+                        <button
+                          type="button"
+                          key={l.id}
+                          className={`chip ${checked ? 'chip--selected' : ''}`}
+                          onClick={() => setLabelIds(prev => checked ? prev.filter(id => id !== l.id) : [...prev, l.id])}
+                          title={l.name}
+                        >
+                          <span className="chip__dot" style={{ background: l.color || '#64748b' }} />
+                          <span className="chip__text">{l.name}</span>
+                        </button>
                       );
                     })}
                   </div>
@@ -1003,16 +1186,18 @@ const ExpenseDashboard = () => {
       {selectedId && (
         <div className="main" style={{ paddingTop: 0 }}>
           <section className="rounded-2xl border p-4">
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <h2 className="modal-title">Attachments</h2>
-              <button className="btn secondary" onClick={() => setSelectedId(null)}>Close</button>
-            </div>
-            <AttachmentsPanel expenseId={selectedId} />
+              <AttachmentsPanel
+              expenseId={selectedId}
+              onClose={() => setSelectedId(null)}
+            />
+
           </section>
         </div>
       )}
     </div>
   );
+
+
 };
 
 // Inline “quick contact”
@@ -1023,32 +1208,65 @@ function QuickContactInline({ onCreated }) {
   const [phone, setPhone] = useState('');
   const [saving, setSaving] = useState(false);
 
+  const emailValid = !email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const canSave = name.trim() && emailValid && !saving;
+
   async function submit() {
+    if (!canSave) return;
     setSaving(true);
     try {
-      const c = await createContact({ name, email, phone });
+      const c = await createContact({ name: name.trim(), email: email.trim(), phone: phone.trim() });
       onCreated(c);
       setOpen(false);
       setName(''); setEmail(''); setPhone('');
+    } catch (e) {
+      alert(`Failed to create contact: ${e?.message || 'Unknown error'}`);
     } finally {
       setSaving(false);
     }
   }
 
-  if (!open) return <button className="btn xs outline" onClick={() => setOpen(true)}>+ New contact</button>;
-
   return (
-    <div className="fields-grid" style={{ marginTop: 8 }}>
-      <div className="field"><label>Name</label><input value={name} onChange={(e)=>setName(e.target.value)} placeholder="Contact name" /></div>
-      <div className="field"><label>Email</label><input value={email} onChange={(e)=>setEmail(e.target.value)} placeholder="email@example.com" /></div>
-      <div className="field"><label>Phone</label><input value={phone} onChange={(e)=>setPhone(e.target.value)} placeholder="+63…" /></div>
-      <div className="field" style={{ gridColumn:'1 / -1' }}>
-        <button type="button" className="btn primary" disabled={saving} onClick={submit}>Save contact</button>
-        <button type="button" className="btn secondary" style={{ marginLeft: 8 }} onClick={()=>setOpen(false)}>Cancel</button>
-      </div>
+    <div className="inline-add" style={{ marginTop: 6 }}>
+      {!open && (
+        <button type="button" className="btn link" onClick={() => setOpen(true)}>
+          + New contact
+        </button>
+      )}
+      {open && (
+        <div className="inline-card">
+          <div className="fields-grid">
+            <div className="field">
+              <label>Name</label>
+              <input value={name} onChange={(e)=>setName(e.target.value)} placeholder="Contact name" />
+            </div>
+            <div className="field">
+              <label>Email</label>
+              <input value={email} onChange={(e)=>setEmail(e.target.value)} placeholder="email@example.com" type="email" />
+              {!emailValid && <div className="hint error">Please enter a valid email</div>}
+            </div>
+            <div className="field">
+              <label>Phone</label>
+              <input value={phone} onChange={(e)=>setPhone(e.target.value)} placeholder="+63…" />
+              <div className="hint">Optional</div>
+            </div>
+            <div className="field" style={{ gridColumn:'1 / -1' }}>
+              <div className="actions">
+                <button type="button" className="btn primary" disabled={!canSave} onClick={submit}>
+                  Save contact
+                </button>
+                <button type="button" className="btn secondary" onClick={()=>setOpen(false)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
 
 function QuickLabelInline({ onCreated }) {
   const [open, setOpen] = useState(false);
@@ -1105,6 +1323,9 @@ function QuickLabelInline({ onCreated }) {
       </div>
     </div>
   );
+
+
+
 }
 
 export default ExpenseDashboard;
