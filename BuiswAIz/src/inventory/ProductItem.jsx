@@ -85,22 +85,38 @@ const ProductItems = ({ productId, productName, onBack, refreshTrigger }) => {
             return;
         }
 
-        const { error } = await supabase
-            .from("productcategory")
-            .delete()
-            .eq("productcategoryid", deleteTarget.productcategoryid);
+        try {
+            // 1️⃣ Delete stock_setting row(s) associated with this category
+            const { error: stockError } = await supabase
+                .from("stock_setting")
+                .delete()
+                .eq("productcategoryid", deleteTarget.productcategoryid);
 
-        if (error) {
-            console.error("Error deleting item:", error);
-            alert("Failed to delete item.");
-        } else {
-            setItems((prev) =>
-                prev.filter((i) => i.productcategoryid !== deleteTarget.productcategoryid)
-            );
+            if (stockError) {
+                console.error("Error deleting stock settings:", stockError);
+            }
+
+            // 2️⃣ Delete the category itself
+            const { error: categoryError } = await supabase
+                .from("productcategory")
+                .delete()
+                .eq("productcategoryid", deleteTarget.productcategoryid);
+
+            if (categoryError) {
+                console.error("Error deleting item:", categoryError);
+                alert("Failed to delete category.");
+            } else {
+                setItems((prev) =>
+                    prev.filter((i) => i.productcategoryid !== deleteTarget.productcategoryid)
+                );
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Failed to delete category.");
+        } finally {
+            setShowModal(false);
+            setDeleteTarget(null);
         }
-
-        setShowModal(false);
-        setDeleteTarget(null);
     };
 
     return (
