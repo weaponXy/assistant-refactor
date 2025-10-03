@@ -1,12 +1,14 @@
 // inventory/DefectivePanel.jsx
 import React from "react";
 import "../stylecss/DefectPanel.css";
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 const DefectivePanel = ({ defectiveItems, user, loadDefectiveItems, onAddDefect }) => {
 
   const handleStatusChange = async (defectiveItemId, newStatus) => {
     if (!user) {
-      alert("User not loaded. Please wait...");
+      toast.warning("User not loaded. Please wait...");
       return;
     }
 
@@ -30,10 +32,10 @@ const DefectivePanel = ({ defectiveItems, user, loadDefectiveItems, onAddDefect 
       }
 
       loadDefectiveItems();
-      alert(data.message || "Status updated successfully");
+      toast.success(data.message || "Status updated successfully");
     } catch (err) {
       console.error("Update failed:", err);
-      alert("Failed to update status. See console for details.");
+      toast.error("Failed to update status. See console for details.");
     }
   };
 
