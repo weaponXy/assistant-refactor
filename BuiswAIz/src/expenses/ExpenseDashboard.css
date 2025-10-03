@@ -45,23 +45,6 @@ body {
 }
 .btn.danger:hover { background: #dc2626; border-color: #dc2626; }
 
-
-/* Header Bar */
-.header-bar {
-  height: 60px;
-  background-color: #ffffff;
-  display: flex;
-  align-items: center;
-  padding: 0 24px;
-  border-bottom: 1px solid #e1e4ea;
-}
-
-.header-title {
-  font-size: 20px;
-  font-weight: bold;
-  color: #0084ff;
-}
-
 /* Main Layout */
 .main-section {
   display: flex;
@@ -69,13 +52,6 @@ body {
   height: calc(100vh - 60px);
 }
 
-/* Sidebar */
-.sidebar {
-  width: 220px;
-  background-color: #f9fbfd;
-  padding: 30px 20px;
-  border-right: 1px solid #e3e9f1;
-}
 
 .logo {
   font-size: 1.5rem;

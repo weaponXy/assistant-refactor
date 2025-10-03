@@ -13,3 +13,18 @@ export async function fetchSupplier() {
 
   return data;
 }
+
+
+export async function fetchSupplierWithProducts() {
+  const { data, error } = await supabase
+    .from("supplier_with_products")
+    .select("*")
+    .order("totalproducts", { ascending: false });  
+
+  if (error) {
+    console.error("Fetch error (with products):", error);
+    throw error;
+  }
+
+  return data;
+}

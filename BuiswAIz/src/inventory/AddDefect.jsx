@@ -104,7 +104,7 @@ const AddDefect = ({ onClose, user }) => {
   };
 
   return (
-    <div className="modal-overlay">
+    <div className="AddDefmodal-overlay">
       <div className="AddDefmodal-content slide-up">
         <div className="modal-header">
           <button className="back-btn" onClick={onClose}>←</button>

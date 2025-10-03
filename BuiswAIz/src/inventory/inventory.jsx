@@ -185,7 +185,7 @@ const Inventory = () => {
                             <img
                               src={product.image_url}
                               alt="Product"
-                              className="product-thumbnail"
+                              className="I-product-thumbnail"
                             />
                           ) : (
                             <div className="img-placeholder" />
@@ -210,13 +210,17 @@ const Inventory = () => {
                   {user ? user.username : "Loading..."}
                 </div>
               </div>
-              <button className="logout-button"
-              onClick={async () => {
-                await supabase.auth.signOut();
-                localStorage.clear();
-                window.location.href = '/'; // redirect to login
-              }}
-              >Logout</button>
+                <button
+                  className="logout-button"
+                  onClick={async () => {
+                    await supabase.auth.signOut();
+                    localStorage.removeItem("userProfile"); // optional
+                    localStorage.removeItem('lastActive');
+                    window.location.href = "/login"; // send back to login
+                  }}
+                >
+                  ⏻
+              </button>
             </div>
 
             <ProductAvailability lowStockProducts={lowStockProducts}/>

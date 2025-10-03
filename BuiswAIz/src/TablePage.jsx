@@ -746,7 +746,8 @@ const TablePage = () => {
   const handleLogout = useCallback(async () => {
     try {
       await supabase.auth.signOut();
-      localStorage.clear();
+      localStorage.removeItem("userProfile");
+      localStorage.removeItem('lastActive');
       window.location.href = '/';
     } catch (error) {
       console.error('Error during logout:', error);
@@ -770,7 +771,7 @@ const TablePage = () => {
               <li onClick={() => navigate("/supplier")}>Supplier</li>
               <li className="active">Sales</li>
               <li onClick={() => navigate("/expenses")}>Expenses</li>
-              <li>AI Assistant</li>
+              <li onClick={() => navigate("/assistant")}>AI Assistant</li>
             </ul>
             <p className="nav-header">SUPPORT</p>
             <ul>
@@ -803,7 +804,7 @@ const TablePage = () => {
                         </div>
                       </div>
                       <button className="logout-button" onClick={handleLogout}>
-                        Logout
+                        ⏻
                       </button>
                     </div>
                     <Bestseller bestsellers={bestsellers} />

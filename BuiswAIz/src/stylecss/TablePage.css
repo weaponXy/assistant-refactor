@@ -21,22 +21,6 @@ body {
   overflow: auto;
 }
 
-/* Header Bar */
-.header-bar {
-  grid-column: 1;
-  grid-row: 1;
-  background-color: #ffffff;
-  display: flex;
-  align-items: center;
-  padding: 0 24px;
-  border-bottom: 1px solid #e1e4ea;
-}
-
-.header-title {
-  font-size: 20px;
-  font-weight: bold;
-  color: #0084ff;
-}
 
 /* Main Section - Grid Layout */
 .main-section {
@@ -46,42 +30,6 @@ body {
   grid-template-columns: 220px 1fr;
   height: calc(100vh - 60px);
   overflow: hidden;
-}
-
-/* Sidebar */
-.sidebar {
-  grid-column: 1;
-  grid-row: 1;
-  background-color: #f9fbfd;
-  padding: 30px 20px;
-  border-right: 1px solid #e3e9f1;
-  overflow-y: auto;
-}
-
-.nav-header {
-  font-size: 12px;
-  color: #aaa;
-  margin: 20px 0 10px;
-  font-weight: bold;
-}
-
-.sidebar ul {
-  list-style: none;
-}
-
-.sidebar li {
-  padding: 10px 12px;
-  margin-bottom: 6px;
-  border-radius: 10px;
-  color: #333;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.sidebar li.active,
-.sidebar li:hover {
-  background-color: #04B4FC;
-  color: white;
 }
 
 .main-content {
@@ -230,7 +178,7 @@ table {
 
 table th,
 table td {
-  padding: 12px;
+  padding: 12px 0 15px 0;
   text-align: center;
   font-family: 'Montserrat', sans-serif;
   font-size: 14px;
@@ -238,6 +186,7 @@ table td {
 }
 
 table th {
+  padding-right: 20px;
   background-color: rgb(214, 241, 251);
   position: sticky;
   top: 0;
