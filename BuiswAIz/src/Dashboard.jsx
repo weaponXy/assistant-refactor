@@ -25,6 +25,81 @@ const Dashboard = () => {
   const [expenseChartData, setExpenseChartData] = useState([]);
   const [activityLogs, setActivityLogs] = useState([]);
 
+
+  
+
+  // ⬇️ Put this INSIDE the Dashboard component, above `return ( ... )`
+function downloadTemplate() {
+  const headers = [
+    "orderid",
+    "orderdate",     // use YYYY-MM-DD
+    "productname",
+    "color",
+    "agesize",
+    "quantity",
+    "unitprice",
+    "subtotal",      // = quantity * unitprice
+    "amountpaid",
+  ];
+
+  // one helpful example row
+  const sample = [
+    "10001",
+    "2025-10-04",
+    "Basic Tee",
+    "Black",
+    "M",
+    "2",
+    "250",
+    "500",
+    "500",
+  ];
+
+  const hasXLSX = typeof window !== "undefined" && window.XLSX;
+
+  if (hasXLSX) {
+    const ws = window.XLSX.utils.aoa_to_sheet([headers, sample]);
+    const wb = window.XLSX.utils.book_new();
+    window.XLSX.utils.book_append_sheet(wb, ws, "Sales Upload Template");
+    const wbout = window.XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([wbout], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "sales_upload_template.xlsx";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } else {
+    // CSV fallback
+    const rows = [headers, sample];
+    const csv = rows
+      .map(r =>
+        r
+          .map(v => {
+            const s = String(v ?? "");
+            return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+          })
+          .join(",")
+      )
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "sales_upload_template.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+}
+
+
+
   function getExpenseDate(row) {
     // Prefer your domain date fields
     const raw =
@@ -406,17 +481,23 @@ const Dashboard = () => {
     <div className="modal">
       <div className="modal-header">
         <h2>Upload Sales Spreadsheet</h2>
-        <button
-          className="close-btn"
-          onClick={() => setShowUploadModal(false)}
-          aria-label="Close"
-        >
-          ✕
+        <button className="close-btn" onClick={() => setShowUploadModal(false)} aria-label="Close">✕</button>
+      </div>
+
+      {/* Sub-header actions (template download) */}
+      <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap', padding:'0 16px 10px' }}>
+        <button type="button" className="btn secondary" onClick={downloadTemplate}>
+          Download template
         </button>
+        <small className="muted" style={{ lineHeight: 1.4 }}>
+          Columns: <code>orderid, orderdate, productname, color, agesize, quantity, unitprice, subtotal, amountpaid</code>.
+          Use <b>YYYY-MM-DD</b> for dates.
+        </small>
       </div>
 
       {/* The uploader */}
       <UploadSheets />
+
 
       <div className="modal-actions">
         <button onClick={() => setShowUploadModal(false)}>Close</button>

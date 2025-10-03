@@ -19,6 +19,77 @@ function normalizeHeader(h) {
   return String(h || "").trim().toLowerCase();
 }
 
+function downloadTemplate() {
+  const headers = [
+    "orderid",
+    "orderdate",
+    "productname",
+    "color",
+    "agesize",
+    "quantity",
+    "unitprice",
+    "subtotal",
+    "amountpaid",
+  ];
+
+  // A helpful sample row (safe values)
+  const sample = [
+    "10001",
+    "2025-10-04",        // YYYY-MM-DD is safest
+    "Basic Tee",
+    "Black",
+    "M",
+    "2",
+    "250",
+    "500",               // 2 * 250
+    "500"
+  ];
+
+  // If SheetJS (xlsx) is available, build a .xlsx; else CSV
+  const hasXLSX = typeof window !== "undefined" && window.XLSX;
+
+  if (hasXLSX) {
+    const wsData = [headers, sample];
+    const ws = window.XLSX.utils.aoa_to_sheet(wsData);
+    const wb = window.XLSX.utils.book_new();
+    window.XLSX.utils.book_append_sheet(wb, ws, "Sales Upload Template");
+
+    const wbout = window.XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "sales_upload_template.xlsx";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } else {
+    // CSV fallback (works everywhere)
+    const rows = [headers, sample];
+    const csv = rows.map(r =>
+      r.map(v => {
+        const s = String(v ?? "");
+        // Escape commas/quotes/newlines
+        if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+        return s;
+      }).join(",")
+    ).join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "sales_upload_template.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+}
+
+
 function UploadSheets() {
   const [rawRows, setRawRows] = useState([]);
   const [rows, setRows] = useState([]);
