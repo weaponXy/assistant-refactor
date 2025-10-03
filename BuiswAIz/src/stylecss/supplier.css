@@ -68,6 +68,16 @@ body {
   border: 1px solid #eee;
   border-radius: 12px;
 }
+.supplier-container::-webkit-scrollbar {
+  width: 6px;
+}
+.supplier-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+.supplier-container::-webkit-scrollbar-thumb {
+  background: #04B4FC;
+  border-radius: 3px;
+}
 
 /* Search Input */
 .supplier-search {
