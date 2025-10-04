@@ -769,6 +769,7 @@ const TablePage = () => {
               <li onClick={() => navigate("/Dashboard")}>Dashboard</li>
               <li onClick={() => navigate("/inventory")}>Inventory</li>
               <li onClick={() => navigate("/supplier")}>Supplier</li>
+              <li onClick={() => navigate("/pos")}>Point of Sales</li>
               <li className="active">Sales</li>
               <li onClick={() => navigate("/expenses")}>Expenses</li>
               <li onClick={() => navigate("/assistant")}>AI Assistant</li>
