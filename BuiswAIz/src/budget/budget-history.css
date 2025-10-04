@@ -94,6 +94,49 @@
   padding: 16px;
 }
 
+/* Header Bar Styling for Modal */
+.header-bar {
+  height: 60px;
+  min-height: 60px;
+  background-color: #fff;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  border-bottom: 3px solid transparent;
+  background-image: 
+    linear-gradient(white, white),
+    linear-gradient(90deg, #0084ff, #00d4ff, #0084ff, #ff6b6b, #4ecdc4, #45b7d1, #0084ff);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  background-size: 100% 100%, 200% 100%;
+  animation: borderFlow 4s linear infinite;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.header-bar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 200%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(0, 132, 255, 0.1), transparent);
+  animation: shimmer 3s infinite;
+}
+
+@keyframes borderFlow {
+  0% { background-position: 0% 0%, 0% 0%; }
+  100% { background-position: 0% 0%, 200% 0%; }
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+
 
 .pie-wrap { display: flex; flex-direction: column; gap: 12px; }
 .pie-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
