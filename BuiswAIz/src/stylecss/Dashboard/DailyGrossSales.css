@@ -624,3 +624,71 @@
     font-size: 11px;
   }
 }
+
+
+/* Toolbar wrapper */
+.template-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 12px 0;
+  padding: 10px 12px;
+  background: #0f172a0f; /* subtle slate overlay */
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+}
+
+/* Nice, modern pill button */
+.download-template-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 9999px;
+  border: 1px solid #0ea5e9;           /* sky-500 */
+  background: #0ea5e914;                /* faint sky fill */
+  color: #0369a1;                        /* sky-700 for text/icon */
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+
+.download-template-btn:hover {
+  background: #0ea5e926; /* slightly stronger */
+  box-shadow: 0 6px 20px rgba(14,165,233,0.18);
+  transform: translateY(-1px);
+}
+
+.download-template-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 3px 10px rgba(14,165,233,0.14);
+}
+
+.download-template-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(14,165,233,0.25);
+}
+
+/* SVG icon inside the button */
+.download-template-btn .icon {
+  display: block;
+}
+
+/* Helper text on the right */
+.template-help {
+  font-size: 12.5px;
+  color: #374151;
+  opacity: 0.9;
+  line-height: 1.3;
+}
+
+.template-help code {
+  background: #1118270e;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 2px 6px;
+  margin-right: 4px;
+  display: inline-block;
+}
