@@ -382,7 +382,7 @@ const InvoiceModal = ({ invoice, onClose, onUpdateOrder }) => {
                   </div>
                   <div className="invoice-info-item">
                     <strong>Date:</strong>
-                    <span>{formatDate(invoice.createdat || invoice.orderItems?.[0]?.orders?.orderdate || new Date())}</span>
+                    <span>{formatDate(invoice.orderdate || invoice.orderItems?.[0]?.orders?.orderdate || new Date())}</span>
                   </div>
                 </div>
                 <div className="invoice-info-row">

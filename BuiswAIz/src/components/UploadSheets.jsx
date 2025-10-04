@@ -1,3 +1,4 @@
+// UploadSheets.jsx
 import React, { useState, useMemo } from "react";
 import * as XLSX from "xlsx";
 import { toast } from "react-toastify";
@@ -20,7 +21,8 @@ function normalizeHeader(h) {
   return String(h || "").trim().toLowerCase();
 }
 
-function downloadTemplate() {
+// ⬇️ Changed: make this a named export
+export function downloadTemplate() {
   const headers = [
     "orderid",
     "orderdate",
@@ -33,20 +35,18 @@ function downloadTemplate() {
     "amountpaid",
   ];
 
-  // A helpful sample row (safe values)
   const sample = [
     "10001",
-    "2025-10-04",        // YYYY-MM-DD is safest
+    "2025-10-04",
     "Basic Tee",
     "Black",
     "M",
     "2",
     "250",
-    "500",               // 2 * 250
+    "500",
     "500"
   ];
 
-  // If SheetJS (xlsx) is available, build a .xlsx; else CSV
   const hasXLSX = typeof window !== "undefined" && window.XLSX;
 
   if (hasXLSX) {
@@ -67,12 +67,10 @@ function downloadTemplate() {
     a.remove();
     URL.revokeObjectURL(url);
   } else {
-    // CSV fallback (works everywhere)
     const rows = [headers, sample];
     const csv = rows.map(r =>
       r.map(v => {
         const s = String(v ?? "");
-        // Escape commas/quotes/newlines
         if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
         return s;
       }).join(",")
@@ -90,6 +88,10 @@ function downloadTemplate() {
   }
 }
 
+// Optional: keep a global for any legacy callers
+if (typeof window !== "undefined") {
+  window.downloadTemplate = downloadTemplate;
+}
 
 function UploadSheets() {
   const [rawRows, setRawRows] = useState([]);
@@ -129,7 +131,7 @@ function UploadSheets() {
 
       const idx = Object.fromEntries(headers.map((h, i) => [h, i]));
       const parsed = json.slice(1).filter(r => r && r.some(v => v !== undefined && v !== null && String(v).trim() !== "")).map((r, rowIndex) => ({
-        __row: rowIndex + 2, // for user-friendly excel row ref
+        __row: rowIndex + 2,
         orderid: r[idx.orderid],
         productname: r[idx.productname],
         color: r[idx.color],
@@ -161,7 +163,6 @@ function UploadSheets() {
     }
   };
 
-  // Basic inline editing: all cells are editable; we revalidate on each change
   const onCellChange = async (rowIdx, key, value) => {
     const updated = rows.map((r, i) => (i === rowIdx ? { ...r, [key]: value } : r));
     setRows(updated);
