@@ -97,15 +97,16 @@ const Notifications = () => {
         const { data: purchaseOrders, error: purchaseError } = await supabase
           .from('purchase_orders')
           .select(`
-            purchaseorderid,
-            order_qty,
-            unit_cost,
-            status,
-            confirmed_at,
-            products (productname),
-            productcategory (color, agesize),
-            suppliers (suppliername)
-          `)
+          purchaseorderid,
+          order_qty,
+          unit_cost,
+          status,
+          confirmed_at,
+          created_at,               
+          products (productname),
+          productcategory (color, agesize),
+          suppliers (suppliername)
+                `)
           .in('status', ['Confirmed', 'Pending'])
           .order('confirmed_at', { ascending: false })
           .limit(10);
@@ -125,7 +126,10 @@ const Notifications = () => {
               variantInfo,
               details: `Status: ${order.status} | Supplier: ${order.suppliers?.suppliername || 'Unknown'} | Qty: ${order.order_qty}`,
               priority: 'medium',
-              timestamp: order.confirmed_at ? new Date(order.confirmed_at) : new Date(),
+              timestamp:
+                order.confirmed_at
+                  ? new Date(order.confirmed_at)           // Confirmed → use confirmed_at
+                  : (order.created_at ? new Date(order.created_at) : null), // Pending → use created_at; NEVER “now”
               navigationPath: '/supplier'
             });
           });
@@ -227,6 +231,13 @@ const Notifications = () => {
         const usedPct = allocated > 0 ? Math.round((spent / allocated) * 100) : 0;
 
         // Compute effective timestamp
+        const nowTs = new Date();
+
+        // 1) Detect if there is any expense for "today" (Asia/Manila)
+        const todayPH = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }); // YYYY-MM-DD
+        const hasExpenseToday = (monthExpenses || []).some(e => String(e?.occurred_on) === todayPH);
+
+        // 2) Find the latest expense date (still useful if there’s no expense today)
         let latestExpenseTs = null;
         if (monthExpenses?.length) {
           const latest = monthExpenses
@@ -234,17 +245,22 @@ const Notifications = () => {
             .filter(Boolean)
             .map(d => {
               const [yy, mm, dd] = String(d).split('-').map(n => parseInt(n, 10));
-              return new Date(yy, (mm || 1) - 1, dd || 1, 12, 0, 0, 0); // noon local
+              // Keep noon for historical days
+              return new Date(yy, (mm || 1) - 1, dd || 1, 12, 0, 0, 0);
             })
             .sort((a, b) => b - a)[0];
           latestExpenseTs = latest || null;
         }
+
         const createdTs = currentMonthBudget?.created_at ? new Date(currentMonthBudget.created_at) : null;
-        const nowTs = new Date();
         const clampToNow = (d) => (d && d > nowTs ? nowTs : d);
-        const latestClamped = clampToNow(latestExpenseTs);
-        const createdClamped = clampToNow(createdTs);
-        const effectiveTs = latestClamped || createdClamped || nowTs;
+
+        // If there is an expense dated today (PH), show it as "now" to feel immediate.
+        // Otherwise, fall back to the latest expense noon, or budget created_at, or now.
+        const effectiveTs = hasExpenseToday
+          ? nowTs
+          : (clampToNow(latestExpenseTs) || clampToNow(createdTs) || nowTs);
+
 
         if (DEBUG_BUDGET) {
           console.log('[BUDGET] spent:', spent, 'allocated:', allocated, 'usedPct:', usedPct);
@@ -326,9 +342,11 @@ const Notifications = () => {
   const getPriorityClass = (priority) => `notification-item priority-${priority}`;
 
   const formatTimestamp = (timestamp) => {
+    if (!timestamp) return '';              // ⬅️ if null/undefined, show nothing
     const now = new Date();
     let diff = now - new Date(timestamp);
-    if (diff < 0) diff = 0; // guard against future
+    if (Number.isNaN(diff)) return '';      // ⬅️ guard invalid dates
+    if (diff < 0) diff = 0;
     const minutes = Math.floor(diff / (1000 * 60));
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
@@ -337,6 +355,7 @@ const Notifications = () => {
     if (hours < 24) return `${hours}h ago`;
     return `${days}d ago`;
   };
+
 
   if (loading) {
     return (
