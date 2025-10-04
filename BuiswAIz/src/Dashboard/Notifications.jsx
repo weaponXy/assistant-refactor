@@ -92,44 +92,45 @@ const Notifications = () => {
         /* continue without orders */
       }
 
-        try {
-          const { data: purchaseOrders, error: purchaseError } = await supabase
-            .from('purchase_orders')
-            .select(`
-              purchaseorderid,
-              order_qty,
-              unit_cost,
-              status,
-              confirmed_at,
-              products (productname),
-              productcategory (color, agesize),
-              suppliers (suppliername)
-            `)
-            .in('status', ['Confirmed', 'Pending']) // <- fetch both
-            .order('confirmed_at', { ascending: false })
-            .limit(10);
+      // 2.5 PURCHASE ORDERS
+      try {
+        const { data: purchaseOrders, error: purchaseError } = await supabase
+          .from('purchase_orders')
+          .select(`
+            purchaseorderid,
+            order_qty,
+            unit_cost,
+            status,
+            confirmed_at,
+            products (productname),
+            productcategory (color, agesize),
+            suppliers (suppliername)
+          `)
+          .in('status', ['Confirmed', 'Pending'])
+          .order('confirmed_at', { ascending: false })
+          .limit(10);
 
-          if (!purchaseError && purchaseOrders?.length) {
-            purchaseOrders.forEach((order, index) => {
-              const variants = [];
-              if (order.productcategory?.color?.trim()) variants.push(`C: ${order.productcategory.color}`);
-              if (order.productcategory?.agesize?.trim()) variants.push(`S: ${order.productcategory.agesize}`);
-              const variantInfo = variants.length ? variants.join(', ') : null;
+        if (!purchaseError && purchaseOrders?.length) {
+          purchaseOrders.forEach((order, index) => {
+            const variants = [];
+            if (order.productcategory?.color?.trim()) variants.push(`C: ${order.productcategory.color}`);
+            if (order.productcategory?.agesize?.trim()) variants.push(`S: ${order.productcategory.agesize}`);
+            const variantInfo = variants.length ? variants.join(', ') : null;
 
-              allNotifications.push({
-                id: `purchase-${order.purchaseorderid}-${index}-${Date.now()}`,
-                type: 'purchase-order', 
-                title: 'Purchase Order',
-                message: `${order.products?.productname || 'Unknown Product'}`,
-                variantInfo,
-                details: `Status: ${order.status} | Supplier: ${order.suppliers?.suppliername || 'Unknown'} | Qty: ${order.order_qty}`,
-                priority: 'medium',
-                timestamp: order.confirmed_at ? new Date(order.confirmed_at) : new Date(),
-                navigationPath: '/supplier'
-              });
+            allNotifications.push({
+              id: `purchase-${order.purchaseorderid}-${index}-${Date.now()}`,
+              type: 'purchase-order',
+              title: 'Purchase Order',
+              message: `${order.products?.productname || 'Unknown Product'}`,
+              variantInfo,
+              details: `Status: ${order.status} | Supplier: ${order.suppliers?.suppliername || 'Unknown'} | Qty: ${order.order_qty}`,
+              priority: 'medium',
+              timestamp: order.confirmed_at ? new Date(order.confirmed_at) : new Date(),
+              navigationPath: '/supplier'
             });
-          }
-        } catch {}
+          });
+        }
+      } catch {}
 
       // 3. INVENTORY: Defective items
       try {
@@ -185,13 +186,12 @@ const Notifications = () => {
         /* continue without defective items */
       }
 
-      // 4. BUDGET: Over budget / threshold alerts (fixed + debug-friendly)
+      // 4. BUDGET: Over budget / threshold alerts
       try {
         const THRESHOLD_PCT = 80;
-        const DEBUG_BUDGET = true;     // set to false when done debugging
-        const FORCE_BUDGET_TEST = false; // set to true to always show a test card
+        const DEBUG_BUDGET = true;
+        const FORCE_BUDGET_TEST = false;
 
-        // Build YYYY-MM-01 .. YYYY-MM-last bounds as strings (for DATE column)
         const now = new Date();
         const y = now.getFullYear();
         const m = String(now.getMonth() + 1).padStart(2, '0');
@@ -199,7 +199,6 @@ const Notifications = () => {
         const lastDayNum = new Date(y, now.getMonth() + 1, 0).getDate();
         const end = `${y}-${m}-${String(lastDayNum).padStart(2, '0')}`;
 
-        // Fetch current month budget row
         const { data: budgets, error: budgetErr } = await supabase
           .from('budget')
           .select('id, month_year, monthly_budget_amount, created_at')
@@ -213,15 +212,13 @@ const Notifications = () => {
           return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
         });
 
-        // Fetch expenses for the month using DATE bounds
         const { data: monthExpenses, error: expErr } = await supabase
           .from('expenses')
-          .select('amount')
+          .select('amount, occurred_on')
           .gte('occurred_on', start)
           .lte('occurred_on', end);
         if (expErr) throw expErr;
 
-        // Compute spent/allocated/used
         const spent = (monthExpenses || []).reduce((sum, e) => {
           const val = Number(e?.amount ?? 0);
           return Number.isFinite(val) ? sum + val : sum;
@@ -229,14 +226,31 @@ const Notifications = () => {
         const allocated = Number(currentMonthBudget?.monthly_budget_amount ?? 0);
         const usedPct = allocated > 0 ? Math.round((spent / allocated) * 100) : 0;
 
+        // Compute effective timestamp
+        let latestExpenseTs = null;
+        if (monthExpenses?.length) {
+          const latest = monthExpenses
+            .map(e => e?.occurred_on)
+            .filter(Boolean)
+            .map(d => {
+              const [yy, mm, dd] = String(d).split('-').map(n => parseInt(n, 10));
+              return new Date(yy, (mm || 1) - 1, dd || 1, 12, 0, 0, 0); // noon local
+            })
+            .sort((a, b) => b - a)[0];
+          latestExpenseTs = latest || null;
+        }
+        const createdTs = currentMonthBudget?.created_at ? new Date(currentMonthBudget.created_at) : null;
+        const nowTs = new Date();
+        const clampToNow = (d) => (d && d > nowTs ? nowTs : d);
+        const latestClamped = clampToNow(latestExpenseTs);
+        const createdClamped = clampToNow(createdTs);
+        const effectiveTs = latestClamped || createdClamped || nowTs;
+
         if (DEBUG_BUDGET) {
-          console.log('[BUDGET] row:', currentMonthBudget);
-          console.log('[BUDGET] start..end:', start, end);
-          console.log('[BUDGET] expenses count:', monthExpenses?.length ?? 0);
           console.log('[BUDGET] spent:', spent, 'allocated:', allocated, 'usedPct:', usedPct);
+          console.log('[BUDGET] effectiveTs:', effectiveTs);
         }
 
-        // Optional: force a test card to verify UI path
         if (FORCE_BUDGET_TEST) {
           allNotifications.push({
             id: `budget-test-${Date.now()}`,
@@ -246,7 +260,7 @@ const Notifications = () => {
             details: `Used ${spent} of ${allocated} (${usedPct}%)`,
             priority: 'medium',
             timestamp: new Date(),
-            navigationPath: '/budget',
+            navigationPath: '/expenses',
           });
         }
 
@@ -265,16 +279,13 @@ const Notifications = () => {
               message: now.toLocaleString(undefined, { month: 'long', year: 'numeric' }),
               details: `Used ${prettyMoney(spent)} of ${prettyMoney(allocated)} (${usedPct}%)`,
               priority: overBudget ? 'high' : 'medium',
-              timestamp: currentMonthBudget.created_at
-                ? new Date(currentMonthBudget.created_at)
-                : new Date(),
-              navigationPath: '/budget',
+              timestamp: effectiveTs,
+              navigationPath: '/expenses',
             });
           }
         }
       } catch (e) {
         console.error('Budget fetch error:', e);
-        // Optional: surface a debug card in the UI
         allNotifications.push({
           id: `budget-error-${Date.now()}`,
           type: 'debug',
@@ -286,7 +297,7 @@ const Notifications = () => {
         });
       }
 
-      // Sort by timestamp (newest first), then priority if within 1 minute
+      // Sort notifications
       allNotifications.sort((a, b) => {
         const timeDiff = new Date(b.timestamp) - new Date(a.timestamp);
         if (Math.abs(timeDiff) < 60000) {
@@ -316,10 +327,12 @@ const Notifications = () => {
 
   const formatTimestamp = (timestamp) => {
     const now = new Date();
-    const diff = now - new Date(timestamp);
+    let diff = now - new Date(timestamp);
+    if (diff < 0) diff = 0; // guard against future
     const minutes = Math.floor(diff / (1000 * 60));
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    if (minutes < 1) return 'just now';
     if (minutes < 60) return `${minutes}m ago`;
     if (hours < 24) return `${hours}h ago`;
     return `${days}d ago`;

@@ -91,10 +91,12 @@ export default function BudgetCenter({
   const years = useMemo(() => {
     const ys = Array.from(
       new Set(
-        (budgets || []).map((b) => {
-          const d = new Date(b.month_year);
-          return Number.isFinite(d.getFullYear()) ? d.getFullYear() : null;
-        }).filter(Boolean)
+        (budgets || [])
+          .map((b) => {
+            const d = new Date(b.month_year);
+            return Number.isFinite(d.getFullYear()) ? d.getFullYear() : null;
+          })
+          .filter(Boolean)
       )
     );
     ys.sort((a, b) => b - a); // newest year first
@@ -102,7 +104,7 @@ export default function BudgetCenter({
   }, [budgets]);
 
   const [yearFilter, setYearFilter] = useState(() =>
-    years.includes(currentYear) ? currentYear : (years[0] ?? "All")
+    years.includes(currentYear) ? currentYear : years[0] ?? "All"
   );
 
   useEffect(() => {
@@ -169,10 +171,7 @@ export default function BudgetCenter({
     const iso = `${monthYYYYMM}-01`;
     const { error } = await supabase
       .from("budget")
-      .upsert(
-        { month_year: iso, monthly_budget_amount: Number(amount || 0) },
-        { onConflict: ["month_year"] }
-      );
+      .upsert({ month_year: iso, monthly_budget_amount: Number(amount || 0) }, { onConflict: ["month_year"] });
     if (error) throw error;
   }
 
@@ -256,7 +255,7 @@ export default function BudgetCenter({
     const nameSafe = (fmtMonthLabel(active.month_year) || "month").replace(/[^a-z0-9-_]+/gi, "_");
     const a = document.createElement("a");
     a.href = url;
-    a.download = `expenses_${nameSafe}_${new Date().toISOString().slice(0,10)}.csv`;
+    a.download = `expenses_${nameSafe}_${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -271,12 +270,41 @@ export default function BudgetCenter({
       </button>
 
       {!open ? null : (
-        <div className="modal-overlay" style={{ zIndex: 50 }}>
-          <div className="modal" style={{ width: "min(980px, 94vw)", maxHeight: "90vh", overflow: "auto" }}>
-            
-            <div className="header-bar" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div
+          className="modal-overlay"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setOpen(false);
+          }}
+          style={{ zIndex: 1100 }}
+        >
+          <div
+            className="modal"
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              width: "min(980px, 94vw)",
+              maxHeight: "90vh",
+              overflow: "auto",
+              position: "relative",
+              zIndex: 1110,
+            }}
+          >
+            <div
+              className="header-bar"
+              style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
+            >
               <h2 style={{ margin: 0 }}>Budgets</h2>
-              <button className="btn icon" onClick={() => setOpen(false)} aria-label="Close">✕</button>
+              <button
+                type="button"
+                className="btn icon"
+                aria-label="Close"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpen(false);
+                }}
+              >
+                ✕
+              </button>
             </div>
 
             {/* Controls row: Year (left) + Add budget (right) */}
@@ -325,37 +353,57 @@ export default function BudgetCenter({
                   <form className="add-budget-form inline-card compact-row" onSubmit={onAddSubmit}>
                     <label className="stack">
                       <span className="muted">Month</span>
-                      <input className="input" type="month" value={addMonth} onChange={(e)=>setAddMonth(e.target.value)} required />
+                      <input
+                        className="input"
+                        type="month"
+                        value={addMonth}
+                        onChange={(e) => setAddMonth(e.target.value)}
+                        required
+                      />
                     </label>
 
                     <label className="stack">
                       <span className="muted">Amount</span>
-                    <div className="input-affix">
-                      <span className="affix">₱</span>
-                      <input type="number" min="0" step="0.01" value={editAmount} onChange={(e)=>setEditAmount(e.target.value)} required />
-                    </div>
-
+                      <div className="input-affix">
+                        <span className="affix">₱</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={editAmount}
+                          onChange={(e) => setEditAmount(e.target.value)}
+                          required
+                        />
+                      </div>
                     </label>
 
                     <div className="actions">
-                      <button type="submit" className="btn primary">Save</button>
-                      <button type="button" className="btn outline" onClick={() => { setAddOpen(false); setAddMonth(''); setAddAmount(''); }}>
+                      <button type="submit" className="btn primary">
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        className="btn outline"
+                        onClick={() => {
+                          setAddOpen(false);
+                          setAddMonth("");
+                          setAddAmount("");
+                        }}
+                      >
                         Cancel
                       </button>
                     </div>
                   </form>
-
                 )}
               </div>
             </div>
-
 
             {/* List of months with budgets */}
             <div className="history-wrap" style={{ marginBottom: 16 }}>
               {loading ? (
                 <p>Loading budgets…</p>
               ) : (
-                <div className="log-scroll">    
+                <div className="log-scroll">
                   <div className="bh-grid scrollable">
                     {filteredBudgets.map((b) => (
                       <div
@@ -363,11 +411,15 @@ export default function BudgetCenter({
                         className="bh-card bh-item"
                         role="button"
                         tabIndex={0}
-                        onClick={() => { setActive(b); setTab("expenses"); }}
+                        onClick={() => {
+                          setActive(b);
+                          setTab("expenses");
+                        }}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
-                            setActive(b); setTab("expenses");
+                            setActive(b);
+                            setTab("expenses");
                           }
                         }}
                         title="Open"
@@ -385,7 +437,10 @@ export default function BudgetCenter({
 
                         <div className="bh-foot">
                           <button
-                            onClick={(e) => { e.stopPropagation(); openEdit(b); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEdit(b);
+                            }}
                             className="btn primary"
                             title="Edit"
                           >
@@ -400,9 +455,8 @@ export default function BudgetCenter({
                       </div>
                     )}
                   </div>
-                </div> 
+                </div>
               )}
-
             </div>
 
             {/* Detail for selected month */}
@@ -411,26 +465,44 @@ export default function BudgetCenter({
                 <div className="budget-detail-header">
                   <h3 style={{ margin: 0 }}>{fmtMonthLabel(active.month_year)}</h3>
                   <div className="muted totals-inline">
-                    <span>Budget: <strong>{currency(active.monthly_budget_amount)}</strong></span>
-                    <span>Used: <strong>{currency(totals.used)}</strong></span>
-                    <span>Remaining: <strong>{currency(totals.remaining)}</strong></span>
+                    <span>
+                      Budget: <strong>{currency(active.monthly_budget_amount)}</strong>
+                    </span>
+                    <span>
+                      Used: <strong>{currency(totals.used)}</strong>
+                    </span>
+                    <span>
+                      Remaining: <strong>{currency(totals.remaining)}</strong>
+                    </span>
                   </div>
                 </div>
 
                 {/* Tabs */}
                 <div className="tabs" style={{ marginTop: 10 }}>
-                  <button className={tab === "expenses" ? "active" : ""} onClick={() => setTab("expenses")}>Expenses</button>
-                  <button className={tab === "log" ? "active" : ""} onClick={() => setTab("log")}>Budget change log</button>
-                  <button className={tab === "pie" ? "active" : ""} onClick={() => setTab("pie")}>Category Breakdown</button>
+                  <button
+                    className={tab === "expenses" ? "active" : ""}
+                    onClick={() => setTab("expenses")}
+                  >
+                    Expenses
+                  </button>
+                  <button className={tab === "log" ? "active" : ""} onClick={() => setTab("log")}>
+                    Budget change log
+                  </button>
+                  <button className={tab === "pie" ? "active" : ""} onClick={() => setTab("pie")}>
+                    Category Breakdown
+                  </button>
                 </div>
 
                 <div className="tab-body" style={{ marginTop: 12 }}>
                   {detailLoading && <p>Loading…</p>}
-                  
+
                   {!detailLoading && tab === "expenses" && (
                     <div className="table-wrap">
                       {/* NEW: summary + Export */}
-                      <div className="records-summary muted" style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 8 }}>
+                      <div
+                        className="records-summary muted"
+                        style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 8 }}
+                      >
                         <span>
                           Total records: <strong>{totals.count}</strong>
                         </span>
@@ -438,39 +510,45 @@ export default function BudgetCenter({
                           Sum: <strong>{currency(totals.used)}</strong>
                         </span>
                         <div style={{ marginLeft: "auto" }}>
-                          <button className="btn xs" onClick={exportMonthCSV}>Export CSV</button>
+                          <button className="btn xs" onClick={exportMonthCSV}>
+                            Export CSV
+                          </button>
                         </div>
                       </div>
                       <div className="logs-scroll">
-                      <table>
-                        <thead>
-                          <tr>
-                            <th style={{ textAlign: "left" }}>Date</th>
-                            <th style={{ textAlign: "left" }}>Category</th>
-                            <th style={{ textAlign: "left" }}>Notes</th>
-                            <th style={{ textAlign: "right" }}>Amount</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {expenses.map((e) => (
-                            <tr
-                              key={e.id}
-                              className={onOpenExpense ? "clickable-row" : ""}
-                              style={{ cursor: onOpenExpense ? "pointer" : "default" }}
-                              onClick={() => onOpenExpense && openRecordInParent(e)}
-                              title={onOpenExpense ? "Open in editor" : ""}
-                            >
-                              <td>{new Date(e.occurred_on).toLocaleDateString()}</td>
-                              <td>{e.category_path || "Uncategorized"}</td>
-                              <td>{e.notes || ""}</td>
-                              <td style={{ textAlign: "right" }}>{currency(e.amount)}</td>
+                        <table>
+                          <thead>
+                            <tr>
+                              <th style={{ textAlign: "left" }}>Date</th>
+                              <th style={{ textAlign: "left" }}>Category</th>
+                              <th style={{ textAlign: "left" }}>Notes</th>
+                              <th style={{ textAlign: "right" }}>Amount</th>
                             </tr>
-                          ))}
-                          {!expenses.length && (
-                            <tr><td colSpan="4" className="muted">No expenses for this month.</td></tr>
-                          )}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody>
+                            {expenses.map((e) => (
+                              <tr
+                                key={e.id}
+                                className={onOpenExpense ? "clickable-row" : ""}
+                                style={{ cursor: onOpenExpense ? "pointer" : "default" }}
+                                onClick={() => onOpenExpense && openRecordInParent(e)}
+                                title={onOpenExpense ? "Open in editor" : ""}
+                              >
+                                <td>{new Date(e.occurred_on).toLocaleDateString()}</td>
+                                <td>{e.category_path || "Uncategorized"}</td>
+                                <td>{e.notes || ""}</td>
+                                <td style={{ textAlign: "right" }}>{currency(e.amount)}</td>
+                              </tr>
+                            ))}
+                            {!expenses.length && (
+                              <tr>
+                                <td colSpan="4" className="muted">
+                                  No expenses for this month.
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
                   )}
@@ -494,7 +572,11 @@ export default function BudgetCenter({
                             </tr>
                           ))}
                           {!history.length && (
-                            <tr><td colSpan="3" className="muted">No budget changes yet.</td></tr>
+                            <tr>
+                              <td colSpan="3" className="muted">
+                                No budget changes yet.
+                              </td>
+                            </tr>
                           )}
                         </tbody>
                       </table>
@@ -517,19 +599,63 @@ export default function BudgetCenter({
 
       {/* Edit Budget modal */}
       {editOpen && (
-        <div className="modal-overlay" onMouseDown={(e)=>{ if(e.target===e.currentTarget) setEditOpen(false); }}>
-          <form className="modal" onSubmit={onEditSubmit}>
-            <div className="modal-header" style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <h3 style={{ margin:0 }}>Edit Budget</h3>
-              <button type="button" className="btn icon" onClick={()=>setEditOpen(false)} aria-label="Close">✕</button>
+        <div
+          className="modal-overlay"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setEditOpen(false);
+          }}
+          style={{ zIndex: 1100 }}
+        >
+          <form
+            className="modal"
+            onMouseDown={(e) => e.stopPropagation()}
+            onSubmit={onEditSubmit}
+            style={{ position: "relative", zIndex: 1110 }}
+          >
+            <div
+              className="modal-header"
+              style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
+            >
+              <h3 style={{ margin: 0 }}>Edit Budget</h3>
+              <button
+                type="button"
+                className="btn icon"
+                aria-label="Close"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditOpen(false);
+                }}
+              >
+                ✕
+              </button>
             </div>
             <div className="input-affix">
               <span className="affix">₱</span>
-              <input type="number" min="0" step="0.01" value={editAmount} onChange={(e)=>setEditAmount(e.target.value)} required />
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={editAmount}
+                onChange={(e) => setEditAmount(e.target.value)}
+                required
+              />
             </div>
-            <div className="modal-footer" style={{ display:'flex', justifyContent:'flex-end', gap:8 }}>
-              <button type="button" className="btn outline" onClick={()=>setEditOpen(false)}>Cancel</button>
-              <button type="submit" className="btn primary">Save changes</button>
+            <div className="modal-footer" style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button
+                type="button"
+                className="btn outline"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditOpen(false);
+                }}
+              >
+                Cancel
+              </button>
+              <button type="submit" className="btn primary">
+                Save changes
+              </button>
             </div>
           </form>
         </div>
@@ -537,7 +663,7 @@ export default function BudgetCenter({
 
       {/* Toasts */}
       <div className="toast-stack">
-        {toasts.map(t => (
+        {toasts.map((t) => (
           <div key={t.id} className={`toast ${t.type}`}>
             {t.message}
           </div>
