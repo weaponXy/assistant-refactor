@@ -1,7 +1,9 @@
+// UploadSheets.jsx
 import React, { useState, useMemo } from "react";
 import * as XLSX from "xlsx";
 import { toast } from "react-toastify";
 import { validateSpreadsheetRows, uploadValidatedData } from "../services/supabaseUploader";
+import "../stylecss/UploadSheets.css";
 
 const REQUIRED_COLUMNS = [
   "orderid",
@@ -17,6 +19,78 @@ const REQUIRED_COLUMNS = [
 
 function normalizeHeader(h) {
   return String(h || "").trim().toLowerCase();
+}
+
+// ⬇️ Changed: make this a named export
+export function downloadTemplate() {
+  const headers = [
+    "orderid",
+    "orderdate",
+    "productname",
+    "color",
+    "agesize",
+    "quantity",
+    "unitprice",
+    "subtotal",
+    "amountpaid",
+  ];
+
+  const sample = [
+    "10001",
+    "2025-10-04",
+    "Basic Tee",
+    "Black",
+    "M",
+    "2",
+    "250",
+    "500",
+    "500"
+  ];
+
+  const hasXLSX = typeof window !== "undefined" && window.XLSX;
+
+  if (hasXLSX) {
+    const wsData = [headers, sample];
+    const ws = window.XLSX.utils.aoa_to_sheet(wsData);
+    const wb = window.XLSX.utils.book_new();
+    window.XLSX.utils.book_append_sheet(wb, ws, "Sales Upload Template");
+
+    const wbout = window.XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "sales_upload_template.xlsx";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } else {
+    const rows = [headers, sample];
+    const csv = rows.map(r =>
+      r.map(v => {
+        const s = String(v ?? "");
+        if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+        return s;
+      }).join(",")
+    ).join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "sales_upload_template.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+}
+
+// Optional: keep a global for any legacy callers
+if (typeof window !== "undefined") {
+  window.downloadTemplate = downloadTemplate;
 }
 
 function UploadSheets() {
@@ -57,7 +131,7 @@ function UploadSheets() {
 
       const idx = Object.fromEntries(headers.map((h, i) => [h, i]));
       const parsed = json.slice(1).filter(r => r && r.some(v => v !== undefined && v !== null && String(v).trim() !== "")).map((r, rowIndex) => ({
-        __row: rowIndex + 2, // for user-friendly excel row ref
+        __row: rowIndex + 2,
         orderid: r[idx.orderid],
         productname: r[idx.productname],
         color: r[idx.color],
@@ -89,7 +163,6 @@ function UploadSheets() {
     }
   };
 
-  // Basic inline editing: all cells are editable; we revalidate on each change
   const onCellChange = async (rowIdx, key, value) => {
     const updated = rows.map((r, i) => (i === rowIdx ? { ...r, [key]: value } : r));
     setRows(updated);
@@ -141,7 +214,7 @@ function UploadSheets() {
           value={value}
           onChange={(e) => onCellChange(rowIdx, key, e.target.value)}
           className={hasError ? "border border-red-500" : "border border-gray-300"}
-          style={{ padding: 4, minWidth: 120 }}
+          style={{ padding: 10, minWidth: 120 }}
         />
       </td>
     );
@@ -149,13 +222,13 @@ function UploadSheets() {
 
   return (
     <div style={{ display: "grid", gap: 12 }}>
-      <div>
+      <div className="file-choose">
         <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} disabled={loading} />
         {fileName && <small style={{ marginLeft: 8 }}>Loaded: {fileName}</small>}
       </div>
 
       {warnings?.length > 0 && (
-        <div style={{ background: "#fffbe6", border: "1px solid #ffe58f", padding: 12, borderRadius: 8 }}>
+        <div style={{ color: "#fff", background: "#da02027c", padding: 12, borderRadius: 8 }}>
           <strong>Warnings:</strong>
           <ul style={{ marginTop: 6 }}>
             {warnings.map((w, i) => (<li key={i}>• {w}</li>))}

@@ -94,6 +94,49 @@
   padding: 16px;
 }
 
+/* Header Bar Styling for Modal */
+.header-bar {
+  height: 60px;
+  min-height: 60px;
+  background-color: #fff;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  border-bottom: 3px solid transparent;
+  background-image: 
+    linear-gradient(white, white),
+    linear-gradient(90deg, #0084ff, #00d4ff, #0084ff, #ff6b6b, #4ecdc4, #45b7d1, #0084ff);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  background-size: 100% 100%, 200% 100%;
+  animation: borderFlow 4s linear infinite;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.header-bar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 200%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(0, 132, 255, 0.1), transparent);
+  animation: shimmer 3s infinite;
+}
+
+@keyframes borderFlow {
+  0% { background-position: 0% 0%, 0% 0%; }
+  100% { background-position: 0% 0%, 200% 0%; }
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+
 
 .pie-wrap { display: flex; flex-direction: column; gap: 12px; }
 .pie-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
@@ -235,3 +278,24 @@
 
 /* filter dropdown style helper */
 .bh-filter .input { font-size: 14px; }
+
+
+/* Nice select */
+.nice-select { padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 10px; background:#fff; font-size:14px; appearance:none;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 20 20'><path fill='%2364748b' d='M5.8 7.5l4.2 4.2 4.2-4.2 1.4 1.4-5.6 5.6-5.6-5.6z'/></svg>");
+  background-repeat:no-repeat; background-position:right 10px center; background-size:12px; padding-right:34px; }
+.nice-select:focus { border-color:#0ea5e9; box-shadow:0 0 0 3px rgba(14,165,233,.15); }
+
+/* Inline card layout */
+.inline-card.compact-row { display:flex; align-items:end; gap:12px; background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:12px; }
+
+/* Amount input with ₱ prefix */
+.input-affix { display:grid; grid-template-columns:auto 1fr; align-items:center; border:1px solid #e2e8f0; border-radius:10px; background:#fff; }
+.input-affix .affix { padding:0 10px; color:#64748b; }
+.input-affix input { border:none; height:38px; padding:0 10px 0 0; font-size:14px; }
+
+
+/* Style month input to match */
+.add-budget-form .input[type="month"], .add-budget-form input[type="month"] {
+  padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; font-size: 14px; min-height: 38px;
+}

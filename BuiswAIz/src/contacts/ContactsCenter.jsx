@@ -1,6 +1,7 @@
 // src/contacts/ContactsCenter.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabase";
+import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import "./contacts.css";
 
 /* ------------ tiny toast (no deps) ------------ */
@@ -65,6 +66,9 @@ export default function ContactsCenter({
   const [records, setRecords] = useState([]);
   const [recordsLoading, setRecordsLoading] = useState(false);
 
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const confirmRef = useRef({}); // { name, onConfirm }
+
   const [toasts, toast] = useToasts();
 
   async function refresh() {
@@ -102,33 +106,32 @@ export default function ContactsCenter({
       return hay.includes(q);
     });
   }, [rows, search]);
-  
 
   // Load expense records for selected contact
   async function loadRecords(contact) {
     if (!contact) return;
     setRecordsLoading(true);
     try {
-        let { data, error } = await supabase
+      let { data, error } = await supabase
         .from("expenses")
         .select("id, occurred_on, amount, notes, status, contact_id, category_id")
         .eq("contact_id", contact.id)
         .order("occurred_on", { ascending: false });
 
-        if (error) {
+      if (error) {
         // Fallback (very rare): do it without order, then sort locally
         const fallback = await supabase
-            .from("expenses")
-            .select("id, occurred_on, amount, notes, status, contact_id, category_id")
-            .eq("contact_id", contact.id);
+          .from("expenses")
+          .select("id, occurred_on, amount, notes, status, contact_id, category_id")
+          .eq("contact_id", contact.id);
 
         if (fallback.error) throw fallback.error;
 
-        data = (fallback.data || []).sort((a, b) =>
-            new Date(b.occurred_on) - new Date(a.occurred_on)
+        data = (fallback.data || []).sort(
+          (a, b) => new Date(b.occurred_on) - new Date(a.occurred_on)
         );
-        }
-        setRecords(data || []);
+      }
+      setRecords(data || []);
     } catch (e) {
       toast.error(e.message || "Failed to load records");
     } finally {
@@ -199,20 +202,40 @@ export default function ContactsCenter({
     }
   }
 
-  async function onDelete(row) {
-    if (!window.confirm(`Delete contact "${row.name}"? This will not delete expenses.`)) return;
-    try {
-      const { error } = await supabase.from("contacts").delete().eq("id", row.id);
-      if (error) throw error;
-      toast.success("Contact deleted");
-      if (active?.id === row.id) {
-        setActive(null);
-        setRecords([]);
-      }
-      await refresh();
-    } catch (e) {
-      toast.error(e.message || "Failed to delete contact");
-    }
+  function onDelete(row) {
+    setConfirmOpen(true);
+    confirmRef.current = {
+      name: row.name,
+      onConfirm: async () => {
+        setConfirmOpen(false);
+        try {
+          // (optional) show how many will be affected
+          const { count } = await supabase
+            .from("expenses")
+            .select("id", { count: "exact", head: true })
+            .eq("contact_id", row.id);
+
+          // 1) Unlink expenses first (avoid FK conflict)
+          const upd = await supabase
+            .from("expenses")
+            .update({ contact_id: null })
+            .eq("contact_id", row.id);
+          if (upd.error) throw upd.error;
+
+          // 2) Now delete the contact
+          const del = await supabase.from("contacts").delete().eq("id", row.id);
+          if (del.error) throw del.error;
+
+          // 3) Update UI
+          setRows((prev) => prev.filter((r) => r.id !== row.id));
+          toast.success(
+            count ? `Deleted contact. Unlinked ${count} expense(s).` : "Deleted contact."
+          );
+        } catch (e) {
+          toast.error(e?.message || "Failed to delete contact");
+        }
+      },
+    };
   }
 
   const totals = useMemo(() => {
@@ -239,7 +262,7 @@ export default function ContactsCenter({
     const nameSafe = (active.name || "contact").replace(/[^a-z0-9-_]+/gi, "_");
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${nameSafe}_records_${new Date().toISOString().slice(0,10)}.csv`;
+    a.download = `${nameSafe}_records_${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -250,7 +273,7 @@ export default function ContactsCenter({
   async function openRecordInParent(r) {
     if (!onOpenExpense) return;
     try {
-        const { data, error } = await supabase
+      const { data, error } = await supabase
         .from("expenses")
         .select("id, occurred_on, amount, notes, status, contact_id, category_id")
         .eq("id", r.id)
@@ -273,17 +296,39 @@ export default function ContactsCenter({
       </button>
 
       {!open ? null : (
-        <div className="modal-overlay" style={{ zIndex: 50 }}>
+        <div
+          className="modal-overlay"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setOpen(false);
+          }}
+          style={{ zIndex: 1100 }}
+        >
           <div
             className="modal"
-            style={{ width: "min(980px, 94vw)", maxHeight: "90vh", overflow: "auto" }}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              width: "min(980px, 94vw)",
+              maxHeight: "90vh",
+              overflow: "auto",
+              position: "relative",
+              zIndex: 1110,
+            }}
           >
             <div
               className="header-bar"
               style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
             >
               <h2 style={{ margin: 0 }}>Contacts</h2>
-              <button className="btn icon" onClick={() => setOpen(false)} aria-label="Close">
+              <button
+                type="button"
+                className="btn icon"
+                aria-label="Close"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpen(false);
+                }}
+              >
                 ✕
               </button>
             </div>
@@ -314,58 +359,11 @@ export default function ContactsCenter({
                 )}
               </div>
 
+              {/* Right: Only the trigger now */}
               <div>
-                {!addOpen ? (
-                  <button className="btn primary" onClick={() => setAddOpen(true)}>
-                    + Add contact
-                  </button>
-                ) : (
-                  <form onSubmit={onAdd} className="add-contact-form">
-                    <label className="stack">
-                      <span className="muted">Name</span>
-                      <input
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        required
-                        placeholder="Juan Dela Cruz"
-                      />
-                    </label>
-                    <label className="stack">
-                      <span className="muted">Email</span>
-                      <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="juan@example.com"
-                      />
-                    </label>
-                    <label className="stack">
-                      <span className="muted">Phone</span>
-                      <input
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        placeholder="+63…"
-                      />
-                    </label>
-                    <div className="actions">
-                      <button type="submit" className="btn primary">
-                        Save
-                      </button>
-                      <button
-                        type="button"
-                        className="btn outline"
-                        onClick={() => {
-                          setAddOpen(false);
-                          setName("");
-                          setEmail("");
-                          setPhone("");
-                        }}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </form>
-                )}
+                <button className="btn primary" onClick={() => setAddOpen(true)}>
+                  + Add contact
+                </button>
               </div>
             </div>
 
@@ -374,62 +372,62 @@ export default function ContactsCenter({
               {loading ? (
                 <p>Loading contacts…</p>
               ) : (
-                <div className="logs-scroll">  
-                <table>
-                  <thead>
-                    <tr>
-                      <th style={{ textAlign: "left" }}>Name</th>
-                      <th style={{ textAlign: "left" }}>Email</th>
-                      <th style={{ textAlign: "left" }}>Phone</th>
-                      <th style={{ textAlign: "right" }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredRows.map((r) => (
-                      <tr
-                        key={r.id}
-                        style={{ cursor: "pointer" }}
-                        onClick={() => {
-                          setActive(r);
-                          setTab("details");
-                        }}
-                        title="Open contact"
-                      >
-                        <td>{r.name}</td>
-                        <td>{r.email || "—"}</td>
-                        <td>{r.phone || "—"}</td>
-                        <td style={{ textAlign: "right" }}>
-                          <button
-                            className="btn xs"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openEdit(r);
-                            }}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            className="btn xs danger"
-                            style={{ marginLeft: 8 }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onDelete(r);
-                            }}
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                    {!filteredRows.length && (
+                <div className="logs-scroll">
+                  <table>
+                    <thead>
                       <tr>
-                        <td colSpan="4" className="muted">
-                          {rows.length ? "No matches." : "No contacts yet. Add one above."}
-                        </td>
+                        <th style={{ textAlign: "left" }}>Name</th>
+                        <th style={{ textAlign: "left" }}>Email</th>
+                        <th style={{ textAlign: "left" }}>Phone</th>
+                        <th style={{ textAlign: "right" }}>Actions</th>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {filteredRows.map((r) => (
+                        <tr
+                          key={r.id}
+                          style={{ cursor: "pointer" }}
+                          onClick={() => {
+                            setActive(r);
+                            setTab("details");
+                          }}
+                          title="Open contact"
+                        >
+                          <td>{r.name}</td>
+                          <td>{r.email || "—"}</td>
+                          <td>{r.phone || "—"}</td>
+                          <td style={{ textAlign: "right" }}>
+                            <button
+                              className="btn xs"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEdit(r);
+                              }}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="btn xs danger"
+                              style={{ marginLeft: 8 }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onDelete(r);
+                              }}
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {!filteredRows.length && (
+                        <tr>
+                          <td colSpan="4" className="muted">
+                            {rows.length ? "No matches." : "No contacts yet. Add one above."}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>
@@ -438,17 +436,30 @@ export default function ContactsCenter({
             {active && (
               <div className="history-wrap">
                 <div
-                  style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "baseline",
+                    gap: 8,
+                  }}
                 >
                   <h3 style={{ margin: 0 }}>{active.name}</h3>
-                  <div className="muted">Created: <strong>{fmtDate(active.created_at)}</strong></div>
+                  <div className="muted">
+                    Created: <strong>{fmtDate(active.created_at)}</strong>
+                  </div>
                 </div>
 
                 <div className="tabs" style={{ marginTop: 10 }}>
-                  <button className={tab === "details" ? "active" : ""} onClick={() => setTab("details")}>
+                  <button
+                    className={tab === "details" ? "active" : ""}
+                    onClick={() => setTab("details")}
+                  >
                     Details
                   </button>
-                  <button className={tab === "records" ? "active" : ""} onClick={() => setTab("records")}>
+                  <button
+                    className={tab === "records" ? "active" : ""}
+                    onClick={() => setTab("records")}
+                  >
                     Records
                   </button>
                 </div>
@@ -485,7 +496,10 @@ export default function ContactsCenter({
                         <p>Loading records…</p>
                       ) : (
                         <>
-                          <div className="records-summary muted" style={{ display: "flex", gap: 16, alignItems: "center" }}>
+                          <div
+                            className="records-summary muted"
+                            style={{ display: "flex", gap: 16, alignItems: "center" }}
+                          >
                             <span>
                               Total records: <strong>{totals.count}</strong>
                             </span>
@@ -493,44 +507,46 @@ export default function ContactsCenter({
                               Sum: <strong>{peso(totals.sum)}</strong>
                             </span>
                             <div style={{ marginLeft: "auto" }}>
-                              <button className="btn xs" onClick={downloadCSV}>Export CSV</button>
+                              <button className="btn xs" onClick={downloadCSV}>
+                                Export CSV
+                              </button>
                             </div>
                           </div>
 
-                          <div className="logs-scroll">  
-                          <table>
-                            <thead>
-                              <tr>
-                                <th style={{ textAlign: "left" }}>Date</th>
-                                <th style={{ textAlign: "left" }}>Notes</th>
-                                <th style={{ textAlign: "right" }}>Amount</th>
-                                <th style={{ textAlign: "left" }}>Status</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {records.map((r) => (
-                                <tr
-                                  key={r.id}
-                                  className="clickable-row"
-                                  style={{ cursor: onOpenExpense ? "pointer" : "default" }}
-                                  onClick={() => onOpenExpense && openRecordInParent(r)}
-                                  title={onOpenExpense ? "Open in editor" : ""}
-                                >
-                                  <td>{fmtDate(r.occurred_on)}</td>
-                                  <td>{r.notes || ""}</td>
-                                  <td style={{ textAlign: "right" }}>{peso(r.amount)}</td>
-                                  <td className="capitalize">{r.status || "—"}</td>
-                                </tr>
-                              ))}
-                              {!records.length && (
+                          <div className="logs-scroll">
+                            <table>
+                              <thead>
                                 <tr>
-                                  <td colSpan="4" className="muted">
-                                    No expenses linked to this contact.
-                                  </td>
+                                  <th style={{ textAlign: "left" }}>Date</th>
+                                  <th style={{ textAlign: "left" }}>Notes</th>
+                                  <th style={{ textAlign: "right" }}>Amount</th>
+                                  <th style={{ textAlign: "left" }}>Status</th>
                                 </tr>
-                              )}
-                            </tbody>
-                          </table>
+                              </thead>
+                              <tbody>
+                                {records.map((r) => (
+                                  <tr
+                                    key={r.id}
+                                    className="clickable-row"
+                                    style={{ cursor: onOpenExpense ? "pointer" : "default" }}
+                                    onClick={() => onOpenExpense && openRecordInParent(r)}
+                                    title={onOpenExpense ? "Open in editor" : ""}
+                                  >
+                                    <td>{fmtDate(r.occurred_on)}</td>
+                                    <td>{r.notes || ""}</td>
+                                    <td style={{ textAlign: "right" }}>{peso(r.amount)}</td>
+                                    <td className="capitalize">{r.status || "—"}</td>
+                                  </tr>
+                                ))}
+                                {!records.length && (
+                                  <tr>
+                                    <td colSpan="4" className="muted">
+                                      No expenses linked to this contact.
+                                    </td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
                           </div>
                         </>
                       )}
@@ -543,6 +559,95 @@ export default function ContactsCenter({
         </div>
       )}
 
+      {/* Add Contact Modal */}
+      {addOpen && (
+        <div
+          className="modal-overlay"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setAddOpen(false);
+          }}
+          style={{ zIndex: 1100 }}
+        >
+          <form
+            className="modal"
+            onMouseDown={(e) => e.stopPropagation()}
+            onSubmit={onAdd}
+            style={{ position: "relative", zIndex: 1110 }}
+          >
+            <div
+              className="modal-header"
+              style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
+            >
+              <h3 style={{ margin: 0 }}>Add Contact</h3>
+              <button
+                type="button"
+                className="btn icon"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setAddOpen(false);
+                }}
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="modal-body contact-edit-grid">
+              <label className="stack">
+                <span className="muted">Name</span>
+                <input
+                  className="input"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  placeholder="Juan Dela Cruz"
+                />
+              </label>
+              <label className="stack">
+                <span className="muted">Email</span>
+                <input
+                  className="input"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="juan@example.com"
+                />
+              </label>
+              <label className="stack">
+                <span className="muted">Phone</span>
+                <input
+                  className="input"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+63…"
+                />
+              </label>
+            </div>
+
+            <div className="modal-footer" style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button
+                type="button"
+                className="btn outline"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setAddOpen(false);
+                  setName("");
+                  setEmail("");
+                  setPhone("");
+                }}
+              >
+                Cancel
+              </button>
+              <button type="submit" className="btn primary">
+                Save
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {/* Edit Modal */}
       {editOpen && (
         <div
@@ -550,33 +655,70 @@ export default function ContactsCenter({
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) setEditOpen(false);
           }}
+          style={{ zIndex: 1100 }}
         >
-          <form className="modal" onSubmit={onEditSubmit}>
+          <form
+            className="modal"
+            onMouseDown={(e) => e.stopPropagation()}
+            onSubmit={onEditSubmit}
+            style={{ position: "relative", zIndex: 1110 }}
+          >
             <div
               className="modal-header"
               style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
             >
               <h3 style={{ margin: 0 }}>Edit Contact</h3>
-              <button type="button" className="btn icon" onClick={() => setEditOpen(false)} aria-label="Close">
+              <button
+                type="button"
+                className="btn icon"
+                aria-label="Close"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditOpen(false); // <-- fix (was setOpen(false))
+                }}
+              >
                 ✕
               </button>
             </div>
             <div className="modal-body contact-edit-grid">
               <label className="stack">
                 <span className="muted">Name</span>
-                <input value={editName} onChange={(e) => setEditName(e.target.value)} required />
+                <input
+                  className="input"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  required
+                />
               </label>
               <label className="stack">
                 <span className="muted">Email</span>
-                <input type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} />
+                <input
+                  className="input"
+                  type="email"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                />
               </label>
               <label className="stack">
                 <span className="muted">Phone</span>
-                <input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} />
+                <input
+                  className="input"
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                />
               </label>
             </div>
             <div className="modal-footer" style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <button type="button" className="btn outline" onClick={() => setEditOpen(false)}>
+              <button
+                type="button"
+                className="btn outline"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditOpen(false);
+                }}
+              >
                 Cancel
               </button>
               <button type="submit" className="btn primary">
@@ -586,6 +728,13 @@ export default function ContactsCenter({
           </form>
         </div>
       )}
+
+      <ConfirmDeleteModal
+        isOpen={confirmOpen}
+        name={confirmRef.current.name}
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={confirmRef.current.onConfirm}
+      />
 
       {/* Toasts */}
       <div className="toast-stack">

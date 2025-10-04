@@ -336,7 +336,7 @@ body {
 
 .monthly-expense {
   flex: 0.7;
-  min-height: 300px;
+  min-height: 250px;
   min-width: 300px;
   display: flex;
   flex-direction: column;
@@ -347,6 +347,7 @@ body {
   display: flex;
   gap: 16px;
   min-height: 200px;
+  height: 280px;
   max-height: 280px;
   flex: 0.8;
 }
@@ -364,6 +365,18 @@ body {
   flex: 1;
   overflow-y: auto;
   min-height: 0;
+}
+
+.notification-panel {
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  padding: 20px;
+  box-shadow: 2px 3px 9px rgba(0, 0, 0, 0.113);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.050);
+  flex: 1;
+  min-height: 0;
+  border-radius: 20px;
 }
 
 /* TOP SELLING PRODUCTS - EXPANDABLE */
@@ -390,7 +403,6 @@ body {
   min-height: 0;
 }
 
-/* Right Panel - EXPANDABLE */
 .right-panel {
   flex: 1;
   display: flex;

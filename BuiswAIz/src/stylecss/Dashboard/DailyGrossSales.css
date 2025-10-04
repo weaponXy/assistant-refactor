@@ -289,7 +289,226 @@
   box-shadow: 0 4px 12px rgba(4, 180, 252, 0.4);
 }
 
-/* Responsive Design */
+/* Sales Details Modal - Dynamic Sizing */
+.sales-details-modal {
+  width: auto;
+  min-width: 650px;
+  max-width: 95vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sales-summary-info {
+  display: flex;
+  gap: 24px;
+  padding: 16px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  flex-shrink: 0;
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.summary-label {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.summary-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.sales-details-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 200px;
+  max-height: calc(90vh - 250px);
+}
+
+.sales-items-list {
+  width: 100%;
+}
+
+.sales-items-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+}
+
+.sales-items-table thead {
+  position: sticky;
+  top: 0;
+  background-color: #f8f9fa;
+  z-index: 1;
+}
+
+.sales-items-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: #374151;
+  border-bottom: 2px solid #e5e7eb;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.sales-items-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 13px;
+  color: #1f2937;
+  white-space: nowrap;
+}
+
+.sales-items-table tbody tr:hover {
+  background-color: #f9fafb;
+}
+
+/* Column specific widths */
+.sales-items-table th:first-child,
+.sales-items-table td:first-child {
+  min-width: 150px;
+  max-width: 250px;
+  white-space: normal;
+  word-wrap: break-word;
+}
+
+.sales-items-table th:nth-child(2),
+.sales-items-table td:nth-child(2) {
+  min-width: 100px;
+}
+
+.sales-items-table th:nth-child(3),
+.sales-items-table td:nth-child(3) {
+  width: 80px;
+}
+
+.sales-items-table th:nth-child(4),
+.sales-items-table td:nth-child(4) {
+  width: 110px;
+}
+
+.sales-items-table th:nth-child(5),
+.sales-items-table td:nth-child(5) {
+  width: 120px;
+}
+
+.product-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.product-name {
+  font-weight: 500;
+}
+  
+.product-thumbnail {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.product-thumbnail-placeholder {
+  width: 40px;
+  height: 40px;
+  background-color: #f3f4f6;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  color: #9ca3af;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.total-amount {
+  font-weight: 600;
+  color: #04B4FC;
+}
+
+.empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.product-category {
+  color: #000000;
+  font-size: 13px;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.modal-actions {
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+.modal-sheet {
+  background: #fff;
+  border-radius: 12px;
+  width: 80%;       
+  max-width: 1500px; 
+  height: 800px;  
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+  overflow-y: auto; 
+  padding: 20px;
+  position: relative;
+}
+
+.modal-actions button {
+  padding: 10px 24px;
+  border: 2px solid #04B4FC;
+  border-radius: 8px;
+  background-color: #04B4FC;
+  color: white;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  font-family: 'Montserrat', sans-serif;
+  box-shadow: 0 2px 6px rgba(4, 180, 252, 0.3);
+  transition: all 0.2s ease;
+}
+
+.modal-actions button:hover {
+  background-color: #0290c4;
+  border-color: #0290c4;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(4, 180, 252, 0.4);
+}
+
 @media (max-width: 1024px) {
   .chart-bars-container {
     gap: 2px;
@@ -340,6 +559,33 @@
     padding: 6px 12px;
     font-size: 12px;
   }
+
+  .sales-details-modal {
+    min-width: 95vw;
+    width: 95vw;
+  }
+  
+  .sales-summary-info {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .sales-items-table th,
+  .sales-items-table td {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+  
+  .product-thumbnail,
+  .product-thumbnail-placeholder {
+    width: 32px;
+    height: 32px;
+  }
+
+  .product-category {
+    font-size: 10px;
+    padding: 3px 8px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -367,4 +613,82 @@
     width: 100%;
     text-align: center;
   }
+
+  .sales-details-modal {
+    min-width: 100vw;
+  }
+
+  .sales-items-table th,
+  .sales-items-table td {
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+}
+
+
+/* Toolbar wrapper */
+.template-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 12px 0;
+  padding: 10px 12px;
+  background: #0f172a0f; /* subtle slate overlay */
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+}
+
+/* Nice, modern pill button */
+.download-template-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 9999px;
+  border: 1px solid #0ea5e9;           /* sky-500 */
+  background: #0ea5e914;                /* faint sky fill */
+  color: #0369a1;                        /* sky-700 for text/icon */
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+
+.download-template-btn:hover {
+  background: #0ea5e926; /* slightly stronger */
+  box-shadow: 0 6px 20px rgba(14,165,233,0.18);
+  transform: translateY(-1px);
+}
+
+.download-template-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 3px 10px rgba(14,165,233,0.14);
+}
+
+.download-template-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(14,165,233,0.25);
+}
+
+/* SVG icon inside the button */
+.download-template-btn .icon {
+  display: block;
+}
+
+/* Helper text on the right */
+.template-help {
+  font-size: 12.5px;
+  color: #374151;
+  opacity: 0.9;
+  line-height: 1.3;
+}
+
+.template-help code {
+  background: #1118270e;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 2px 6px;
+  margin-right: 4px;
+  display: inline-block;
 }

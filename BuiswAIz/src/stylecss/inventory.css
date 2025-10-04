@@ -111,7 +111,7 @@ table {
   border-spacing: 0 10px;
 }
 
-thead th {
+.inventory-container thead th {
   text-align: left;
   font-size: 13px;
   color: #666;
@@ -158,9 +158,11 @@ tbody td {
   flex-direction: column;
   background: #fff;
   padding: 20px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
+  box-shadow: 2px 3px 9px rgba(0, 0, 0, 0.113);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.050);
   flex: 1;
   min-height: 0;
+  border-radius: 20px;
 }
 
 .activity-container {
@@ -238,7 +240,7 @@ tbody td {
   padding: 6px;
 }
 
-.product-thumbnail {
+.I-product-thumbnail {
   width: 42px;
   height: 42px;
   object-fit: cover;
