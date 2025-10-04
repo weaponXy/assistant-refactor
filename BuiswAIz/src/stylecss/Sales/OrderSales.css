@@ -43,6 +43,25 @@
   transform: translateY(-1px);
 }
 
+.export-csv-btn {
+  padding: 12px 24px;
+  border: 2px solid #28a74688;
+  border-radius: 8px;
+  background-color: #28a745;
+  color: white;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  font-family: 'Montserrat', sans-serif;
+  box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3);
+}
+
+.export-csv-btn:hover {
+  background-color: #1f7e36;
+  border-color: #28a745;
+  transform: translateY(-1px);
+}
+
 /* For sorting css */
 /* Custom Dropdown Wrapper */
 .custom-dropdown-wrapper {
@@ -132,7 +151,7 @@
 
 /* Table filters */
 .table-filter-header {
-  padding: 8px 10px;
+  padding: 8px 20px;
   background-color: rgb(214, 241, 251);
 }
 
@@ -145,10 +164,9 @@
   cursor: pointer;
   outline: none;
   padding: 6px 12px;
-  border-radius: 10px;
   font-family: 'Montserrat', sans-serif;
   transition: all 0.2s ease;
-  width: 50%;
+  width: 80%;
   text-align: center;
   appearance: none;
   background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
@@ -173,7 +191,8 @@
   color: #333;
   font-family: 'Montserrat', sans-serif;
   font-size: 12px;
-  padding: 8px 12px;
+  padding: 8px;
+  text-align: center;
 }
 
 .invoice-btn {
@@ -205,8 +224,7 @@
   text-transform: uppercase;
   cursor: pointer;
 }
-    
-/* Status badge for OrderSales table */
+
 .status-badge.status-completed {
   color: rgb(0, 47, 0);
   background-color: #a8ffa8;

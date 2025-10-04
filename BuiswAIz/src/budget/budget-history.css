@@ -151,7 +151,6 @@
 .table-wrap th, .table-wrap td { padding: 8px; border-bottom: 1px solid #e5e7eb; }
 
 /* modal basics (if not already present) */
-.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.15); display: grid; place-items: center; }
 .modal { background: #fff; border-radius: 14px; padding: 16px; border: 1px solid #e5e7eb; }
 .muted { color: #6b7280; }
 

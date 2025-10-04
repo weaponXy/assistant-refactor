@@ -92,6 +92,45 @@ const Notifications = () => {
         /* continue without orders */
       }
 
+        try {
+          const { data: purchaseOrders, error: purchaseError } = await supabase
+            .from('purchase_orders')
+            .select(`
+              purchaseorderid,
+              order_qty,
+              unit_cost,
+              status,
+              confirmed_at,
+              products (productname),
+              productcategory (color, agesize),
+              suppliers (suppliername)
+            `)
+            .in('status', ['Confirmed', 'Pending']) // <- fetch both
+            .order('confirmed_at', { ascending: false })
+            .limit(10);
+
+          if (!purchaseError && purchaseOrders?.length) {
+            purchaseOrders.forEach((order, index) => {
+              const variants = [];
+              if (order.productcategory?.color?.trim()) variants.push(`C: ${order.productcategory.color}`);
+              if (order.productcategory?.agesize?.trim()) variants.push(`S: ${order.productcategory.agesize}`);
+              const variantInfo = variants.length ? variants.join(', ') : null;
+
+              allNotifications.push({
+                id: `purchase-${order.purchaseorderid}-${index}-${Date.now()}`,
+                type: 'purchase-order', 
+                title: 'Purchase Order',
+                message: `${order.products?.productname || 'Unknown Product'}`,
+                variantInfo,
+                details: `Status: ${order.status} | Supplier: ${order.suppliers?.suppliername || 'Unknown'} | Qty: ${order.order_qty}`,
+                priority: 'medium',
+                timestamp: order.confirmed_at ? new Date(order.confirmed_at) : new Date(),
+                navigationPath: '/supplier'
+              });
+            });
+          }
+        } catch {}
+
       // 3. INVENTORY: Defective items
       try {
         const { data: defectiveItems, error: defectiveError } = await supabase

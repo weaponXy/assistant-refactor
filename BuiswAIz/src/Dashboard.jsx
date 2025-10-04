@@ -9,21 +9,17 @@ import TopSellingProducts from "./Dashboard/TopSellingProducts";
 import SalesSummary from "./Dashboard/SalesSummary";
 import DailyGrossSales from "./Dashboard/DailyGrossSales";
 import Notifications from "./Dashboard/Notifications";
-import UploadSheets from "./components/UploadSheets";
-
 import "./stylecss/Dashboard/Dashboard.css";
 
 const Dashboard = () => {
   const navigate = useNavigate(); 
 
   const [user, setUser] = useState(null);
-  const [showUploadModal, setShowUploadModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [topSellingProducts, setTopSellingProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(true);
   const [productsError, setProductsError] = useState(null);
   const [expenseChartData, setExpenseChartData] = useState([]);
-  const [activityLogs, setActivityLogs] = useState([]);
 
 
 function downloadTemplate() {
@@ -187,48 +183,6 @@ function downloadTemplate() {
     loadChartData();
   }, []);
 
-
-
-
-
-     const loadActivityLogs = async () => {
-      // Align table and relationship names with what your API logs show
-        const { data, error } = await supabase
-         .from("activitylog") // <- match your working Inventory page
-         .select("*, systemuser(username)")
-         .order("created_at", { ascending: false });
-
-      if (error) {
-        console.error("Failed to fetch activity logs:", error);
-        return;
-      }
-
-      setActivityLogs(data.slice(0, 50)); 
-
-      
-      if (data.length > 50) {
-        const logsToDelete = data.slice(50); 
-        const idsToDelete = logsToDelete.map(log => log.activity_id); 
-
-        const { error: deleteError } = await supabase
-          .from("activitylog")
-          .delete()
-          .in("activity_id", idsToDelete);
-
-        if (deleteError) {
-          console.error("Failed to delete old logs:", deleteError);
-        } else {
-          console.log(`Deleted ${idsToDelete.length} old logs.`);
-        }
-      }
-    };
-  // actually run it
-  useEffect(() => {
-   loadActivityLogs();
-    const id = setInterval(loadActivityLogs, 5000);
-    return () => clearInterval(id);
-  }, []);
-
   useEffect(() => {
     const getUser = async () => {
       const { data: { user }, error } = await supabase.auth.getUser();
@@ -360,19 +314,19 @@ function downloadTemplate() {
                 <div className="panel-content">
                   <DailyGrossSales/>
                 </div>
-                <button className="add-product-button" onClick={() => setShowUploadModal(true)}>Upload Sheets
-                </button>
 
               </div>
+            </div>
 
+            <div className="bottom-section">
               <div className="dashboard-panel monthly-expense">
-              <h3>Monthly Expense</h3>
+                <h3>Monthly Expense</h3>
 
                 <div className="panel-content" style={{ minWidth: 0 }}>
                   {expenseChartData.length === 0 ? (
                   <p style={{ padding: 12 }}>No expense data yet.</p>
                     ) : (
-                    <ResponsiveContainer width="100%" height={300}>
+                    <ResponsiveContainer width="100%" height={180}>
                       <LineChart data={expenseChartData}>
                         <XAxis dataKey="day" />
                         <YAxis domain={[0, (dataMax) => (dataMax && dataMax > 0 ? dataMax : 1)]} />
@@ -389,16 +343,6 @@ function downloadTemplate() {
                     </ResponsiveContainer>
 
                   )}
-                </div>
-              </div>
-
-            </div>
-
-            <div className="bottom-section">
-              <div className="dashboard-panel notifications">
-                <h3>Notifications</h3>
-                <div className="panel-content">
-                  <Notifications />
                 </div>
               </div>
 
@@ -442,67 +386,19 @@ function downloadTemplate() {
                   window.location.href = "/";
                 }}
               >
-                Logout
+                ⏻
               </button>
             </div>
 
-            <div className="activity-panel">
-              <h3>Recent Activity</h3>
+            <div className="notification-panel">
+              <h3>Notifications</h3>
               <div className="activity-container">
-                <ul>
-                  {activityLogs.length === 0 ? (
-                    <li className="activity-item">No recent activity</li>
-                  ) : (
-                    activityLogs.map((log, i) => (
-                      <li key={i} className="activity-item">
-                        <span>
-                          <span className="log-username">
-                            {log.systemuser?.username ? log.systemuser.username : "Someone"}
-                          </span>{" "}
-                          {log.action_desc}
-                        </span>
-                        <span className="time">
-                          {formatDistanceToNow(new Date(log.created_at), { addSuffix: true })}
-                        </span>
-                      </li>
-                    ))
-                  )}
-                </ul>
+                <Notifications />
               </div>
             </div>
           </div>
         </div>
       </div>
-      {showUploadModal && (
-  <div className="modal-overlay">
-    <div className="modal">
-      <div className="modal-header">
-        <h2>Upload Sales Spreadsheet</h2>
-        <button className="close-btn" onClick={() => setShowUploadModal(false)} aria-label="Close">✕</button>
-      </div>
-
-      {/* Sub-header actions (template download) */}
-      <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap', padding:'0 16px 10px' }}>
-        <button type="button" className="btn secondary" onClick={downloadTemplate}>
-          Download template
-        </button>
-        <small className="muted" style={{ lineHeight: 1.4 }}>
-          Columns: <code>orderid, orderdate, productname, color, agesize, quantity, unitprice, subtotal, amountpaid</code>.
-          Use <b>YYYY-MM-DD</b> for dates.
-        </small>
-      </div>
-
-      {/* The uploader */}
-      <UploadSheets />
-
-
-      <div className="modal-actions">
-        <button onClick={() => setShowUploadModal(false)}>Close</button>
-      </div>
-    </div>
-  </div>
-)}
-
     </div>
   );
 };
