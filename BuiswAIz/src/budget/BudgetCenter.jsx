@@ -10,6 +10,7 @@ import {
 } from "../services/budgetService";
 import BudgetCategoryPie from "./BudgetCategoryPie";
 import "./budget-history.css";
+import "../stylecss/Dashboard/Dashboard.css";
 
 /* ---------- small helpers ---------- */
 function currency(n, min = 2, max = 2) {
@@ -270,43 +271,16 @@ export default function BudgetCenter({
       </button>
 
       {!open ? null : (
-        <div
-          className="modal-overlay"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setOpen(false);
-          }}
-          style={{ zIndex: 1100 }}
-        >
-          <div
-            className="modal"
-            onMouseDown={(e) => e.stopPropagation()}
-            style={{
-              width: "min(980px, 94vw)",
-              maxHeight: "90vh",
-              overflow: "auto",
-              position: "relative",
-              zIndex: 1110,
-            }}
-          >
-            <div
-              className="header-bar"
-              style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
-            >
+
+        <div className="modal-overlay" style={{ zIndex: 1000 }} onMouseDown={(e) => { if (e.target === e.currentTarget) setOpen(false); }}>
+          <div className="modal" style={{ width: "min(980px, 94vw)", maxHeight: "90vh", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+            
+            <div className="header-bar modal-header" style={{ zIndex: 1001 }}>
               <h2 style={{ margin: 0 }}>Budgets</h2>
-              <button
-                type="button"
-                className="btn icon"
-                aria-label="Close"
-                onMouseDown={(e) => e.stopPropagation()}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setOpen(false);
-                }}
-              >
-                ✕
-              </button>
+              <button className="btn icon" onClick={() => setOpen(false)} aria-label="Close" style={{ position: "relative", zIndex: 1002, cursor: "pointer" }}>✕</button>
             </div>
 
+            <div style={{ overflow: "auto", flex: 1, padding: "0 20px 20px 20px" }}>
             {/* Controls row: Year (left) + Add budget (right) */}
             <div
               className="controls-row"
@@ -593,6 +567,7 @@ export default function BudgetCenter({
                 </div>
               </div>
             )}
+            </div>
           </div>
         </div>
       )}
