@@ -55,9 +55,17 @@ const OrderSales = ({ orderData, onInvoiceSelect, onAddSale }) => {
       case 'amount-desc':
         return sortedData.sort((a, b) => b.subtotal - a.subtotal);
       case 'date-asc':
-        return sortedData.sort((a, b) => new Date(a.createdat) - new Date(b.createdat));
+        return sortedData.sort((a, b) => {
+          const dateA = new Date(a.orders?.orderdate || a.createdat);
+          const dateB = new Date(b.orders?.orderdate || b.createdat);
+          return dateA - dateB;
+        });
       case 'date-desc':
-        return sortedData.sort((a, b) => new Date(b.createdat) - new Date(a.createdat));
+        return sortedData.sort((a, b) => {
+          const dateA = new Date(a.orders?.orderdate || a.createdat);
+          const dateB = new Date(b.orders?.orderdate || b.createdat);
+          return dateB - dateA;
+        });
       default:
         return sortedData;
     }
@@ -74,17 +82,20 @@ const OrderSales = ({ orderData, onInvoiceSelect, onAddSale }) => {
     };
 
     const filtered = data.filter(item => {
-      // Parse the date - handle different date formats
+      // FIXED: Use orders.orderdate first, fallback to createdat
+      // This matches the Bestseller component logic
       let date;
-      if (item.createdat) {
-        date = new Date(item.createdat);
+      const orderDate = item.orders?.orderdate || item.createdat;
+      
+      if (orderDate) {
+        date = new Date(orderDate);
         // Check if date is invalid
         if (isNaN(date.getTime())) {
           console.warn('Invalid date format for item:', item);
           return false;
         }
       } else {
-        console.warn('No createdat field for item:', item);
+        console.warn('No date field for item:', item);
         return false;
       }
 
@@ -200,15 +211,18 @@ const OrderSales = ({ orderData, onInvoiceSelect, onAddSale }) => {
     const headers = ['Product Name', 'Order Code', 'Status', 'Quantity', 'Price', 'Total Amount', 'Date'];
     
     // Create sheet rows from filtered data
-    const rows = filteredData.map(item => [
-      item.products?.productname || 'N/A',
-      item.orderid,
-      getOrderStatus(item),
-      item.quantity,
-      item.unitprice,
-      item.subtotal,
-      new Date(item.createdat).toLocaleString()
-    ]);
+    const rows = filteredData.map(item => {
+      const orderDate = item.orders?.orderdate || item.createdat;
+      return [
+        item.products?.productname || 'N/A',
+        item.orderid,
+        getOrderStatus(item),
+        item.quantity,
+        item.unitprice,
+        item.subtotal,
+        new Date(orderDate).toLocaleString()
+      ];
+    });
     
     // Combine headers and rows
     const csvContent = [
@@ -233,6 +247,7 @@ const OrderSales = ({ orderData, onInvoiceSelect, onAddSale }) => {
   return (
     <div className="sales-table-wrapper">
       <div className="table-header">
+        <h3>Sales Orders</h3>
         <button 
           className="add-sale-btn"
           onClick={onAddSale}
@@ -282,8 +297,6 @@ const OrderSales = ({ orderData, onInvoiceSelect, onAddSale }) => {
           onChange={handleSearch}
         />
       </div>
-
-      <h3>Sales Orders</h3>
       <div className="table-scroll-box">
         <table>
           <thead>

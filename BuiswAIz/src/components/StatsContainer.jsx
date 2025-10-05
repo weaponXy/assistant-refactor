@@ -5,85 +5,120 @@ const StatsContainer = ({ totalEarnings, totalCustomers, statsFilter, onStatsFil
   const [percentageChange, setPercentageChange] = useState(0);
   const [isIncreasing, setIsIncreasing] = useState(null);
 
+  // Get available years from orderData
+  const getAvailableYears = () => {
+    const years = new Set();
+    const currentYear = new Date().getFullYear();
+    orderData.forEach(item => {
+      const date = new Date(item.createdat);
+      if (!isNaN(date.getTime())) {
+        years.add(date.getFullYear());
+      }
+    });
+    return Array.from(years).sort((a, b) => b - a).map(year => ({
+      value: `year-${year}`,
+      label: year === currentYear ? 'This Year' : year.toString()
+    }));
+  };
+
+  const availableYears = getAvailableYears();
+
   useEffect(() => {
-    if (orderData && orderData.length > 0) {
+    if (statsFilter === 'all') {
+      // Reset comparison values when "All Time" is selected
+      setPercentageChange(0);
+      setIsIncreasing(null);
+    } else if (orderData && orderData.length > 0) {
       calculatePreviousPeriodEarnings();
     }
-  });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderData, statsFilter, totalEarnings]);
 
   const calculatePreviousPeriodEarnings = () => {
     const now = new Date();
     let previousPeriodData = [];
 
-    switch (statsFilter) {
-      case 'today': {
-        // Compare today vs yesterday
-        const yesterday = new Date(now);
-        yesterday.setDate(yesterday.getDate() - 1);
-        previousPeriodData = orderData.filter(item => {
-          const date = new Date(item.createdat);
-          return date.toDateString() === yesterday.toDateString();
-        });
-        break;
-      }
+    // Check if statsFilter is a year
+    if (statsFilter.startsWith('year-')) {
+      const selectedYear = parseInt(statsFilter.replace('year-', ''));
+      const previousYear = selectedYear - 1;
+      
+      previousPeriodData = orderData.filter(item => {
+        const date = new Date(item.createdat);
+        return date.getFullYear() === previousYear;
+      });
+    } else {
+      switch (statsFilter) {
+        case 'today': {
+          // Compare today vs yesterday
+          const yesterday = new Date(now);
+          yesterday.setDate(yesterday.getDate() - 1);
+          previousPeriodData = orderData.filter(item => {
+            const date = new Date(item.createdat);
+            return date.toDateString() === yesterday.toDateString();
+          });
+          break;
+        }
 
-      case 'week1': {
-        // Compare first week of current month vs first week of last month
-        const lastMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
-        const lastYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
-        
-        previousPeriodData = orderData.filter(item => {
-          const date = new Date(item.createdat);
-          return date.getDate() <= 7 && 
-                 date.getMonth() === lastMonth && 
-                 date.getFullYear() === lastYear;
-        });
-        break;
-      }
+        case 'week1': {
+          // Compare first week of current month vs first week of last month
+          const lastMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+          const lastYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+          
+          previousPeriodData = orderData.filter(item => {
+            const date = new Date(item.createdat);
+            return date.getDate() <= 7 && 
+                   date.getMonth() === lastMonth && 
+                   date.getFullYear() === lastYear;
+          });
+          break;
+        }
 
-      case 'week2': {
-        // Compare second week vs first week of current month
-        previousPeriodData = orderData.filter(item => {
-          const date = new Date(item.createdat);
-          return date.getDate() <= 7 && 
-                 date.getMonth() === now.getMonth() && 
-                 date.getFullYear() === now.getFullYear();
-        });
-        break;
-      }
+        case 'week2': {
+          // Compare second week vs first week of current month
+          previousPeriodData = orderData.filter(item => {
+            const date = new Date(item.createdat);
+            return date.getDate() <= 7 && 
+                   date.getMonth() === now.getMonth() && 
+                   date.getFullYear() === now.getFullYear();
+          });
+          break;
+        }
 
-      case 'week3': {
-        // Compare third week vs second week of current month
-        previousPeriodData = orderData.filter(item => {
-          const date = new Date(item.createdat);
-          return date.getDate() > 7 && date.getDate() <= 14 && 
-                 date.getMonth() === now.getMonth() && 
-                 date.getFullYear() === now.getFullYear();
-        });
-        break;
-      }
+        case 'week3': {
+          // Compare third week vs second week of current month
+          previousPeriodData = orderData.filter(item => {
+            const date = new Date(item.createdat);
+            return date.getDate() > 7 && date.getDate() <= 14 && 
+                   date.getMonth() === now.getMonth() && 
+                   date.getFullYear() === now.getFullYear();
+          });
+          break;
+        }
 
-      case 'month': {
-        // Compare this month vs last month
-        const lastMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
-        const lastYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
-        
-        previousPeriodData = orderData.filter(item => {
-          const date = new Date(item.createdat);
-          return date.getMonth() === lastMonth && 
-                 date.getFullYear() === lastYear;
-        });
-        break;
-      }
+        case 'month': {
+          // Compare this month vs last month
+          const lastMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+          const lastYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+          
+          previousPeriodData = orderData.filter(item => {
+            const date = new Date(item.createdat);
+            return date.getMonth() === lastMonth && 
+                   date.getFullYear() === lastYear;
+          });
+          break;
+        }
 
-      case 'all':
-      default: {
-        // Compare all time vs previous year
-        previousPeriodData = orderData.filter(item => {
-          const date = new Date(item.createdat);
-          return date.getFullYear() === now.getFullYear() - 1;
-        });
-        break;
+        case 'all':
+        default: {
+          // Compare all time vs previous year
+          const currentYear = now.getFullYear();
+          previousPeriodData = orderData.filter(item => {
+            const date = new Date(item.createdat);
+            return date.getFullYear() === currentYear - 1;
+          });
+          break;
+        }
       }
     }
 
@@ -108,13 +143,19 @@ const StatsContainer = ({ totalEarnings, totalCustomers, statsFilter, onStatsFil
   };
 
   const getPeriodLabel = () => {
+    // Check if it's a year filter
+    if (statsFilter.startsWith('year-')) {
+      const selectedYear = parseInt(statsFilter.replace('year-', ''));
+      return `vs ${selectedYear - 1}`;
+    }
+
     switch (statsFilter) {
       case 'today': return 'vs Yesterday';
       case 'week1': return 'vs Last Month (7 Days)';
       case 'week2': return 'vs Last 7 Days';
       case 'week3': return 'vs Last 14 Days';
       case 'month': return 'vs Last 21 Days';
-      case 'all': return 'vs Last Year';
+      case 'all': return 'All Time Data';
       default: return 'vs Previous Period';
     }
   };
@@ -152,6 +193,9 @@ const StatsContainer = ({ totalEarnings, totalCustomers, statsFilter, onStatsFil
           <option value="week2">14 Days</option>
           <option value="week3">21 Days</option>
           <option value="month">This Month</option>
+          {availableYears.map(yearObj => (
+            <option key={yearObj.value} value={yearObj.value}>{yearObj.label}</option>
+          ))}
         </select>
       </div>
       
@@ -182,7 +226,7 @@ const StatsContainer = ({ totalEarnings, totalCustomers, statsFilter, onStatsFil
 
         <div className="sales-comparison-box">
           <div className="stats-box-header">
-            {getTrendIcon() && (
+            {getTrendIcon() && statsFilter !== 'all' && (
               <img 
                 src={getTrendIcon()} 
                 alt={`Sales ${getTrendText()}`}
@@ -191,17 +235,28 @@ const StatsContainer = ({ totalEarnings, totalCustomers, statsFilter, onStatsFil
             )}
             <h3>Sales Trend</h3>
           </div>
-          <div className="trend-content">
-            <p style={{ color: getTrendColor(), fontSize: '1.8rem', fontWeight: 'bold', margin: '5px 0' }}>
-              {percentageChange.toFixed(1)}%
-            </p>
-            <span style={{ color: getTrendColor(), fontSize: '0.9rem', fontWeight: '600' }}>
-              {getTrendText()}
-            </span>
-            <div className="comparison-period" style={{ fontSize: '0.8rem', color: '#666', marginTop: '5px' }}>
-              {getPeriodLabel()}
+          {statsFilter === 'all' ? (
+            <div className="trend-content">
+              <p>
+                Total Historical Data
+              </p>
+              <span>
+                No comparison available
+              </span>
             </div>
-          </div>
+          ) : (
+            <div className="trend-content">
+              <p style={{ color: getTrendColor(), fontSize: '1.8rem', fontWeight: 'bold', margin: '5px 0' }}>
+                {percentageChange.toFixed(1)}%
+              </p>
+              <span style={{ color: getTrendColor(), fontSize: '0.9rem', fontWeight: '600' }}>
+                {getTrendText()}
+              </span>
+              <div className="comparison-period" style={{ fontSize: '0.8rem', color: '#666', marginTop: '5px' }}>
+                {getPeriodLabel()}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

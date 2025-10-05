@@ -14,9 +14,50 @@
   width: 100%; 
 }
 
+.bestseller-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
 .bestseller-table-wrapper h3 {
   margin: 0 0 0.1px 0;
   flex-shrink: 0;
+  flex: 1;
+}
+
+.bestseller-filter {
+  border-radius: 6px;
+  padding: 6px 12px;
+  border: 1px solid #d0d7e2;
+  background: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  outline: none;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  align-items: right;
+}
+
+/* Hover */
+.bestseller-filter:hover {
+  border-color: #04B4FC;
+  box-shadow: 0 0 6px rgba(4,180,252,0.3);
+}
+
+/* Focus (when clicked/active) */
+.bestseller-filter:focus {
+  border-color: #04B4FC;
+  background: #f9fcff;
+  box-shadow: 0 0 8px rgba(4,180,252,0.4);
+}
+
+/* If it's a select element */
+.bestseller-filter option {
+  padding: 6px;
+  text-align: center;
+  border-radius: 1px;
 }
 
 .table-scroll-box1 {
@@ -27,8 +68,9 @@
   background-color: #fff;
   scrollbar-width: thin;
   scrollbar-color: #04B4FC #f1f1f1;
-  max-height: 280px;
+  max-height: 330px;
   min-height: 203px;
+  height: 100%;
 }
 
 .table-scroll-box1::-webkit-scrollbar {

@@ -69,9 +69,17 @@ const TablePage = () => {
     const now = new Date();
     const filteredData = orderData.filter(item => {
       // Use orderdate from orders table instead of createdat from orderitems
-      const date = new Date(item.orders?.orderdate || item.createdat);
+      const date = new Date(item.orders?.orderdate || item.orderdata);
       
+      // Check if statsFilter is a year
+      if (statsFilter.startsWith('year-')) {
+        const year = parseInt(statsFilter.replace('year-', ''));
+        return date.getFullYear() === year;
+      }
+
       switch (statsFilter) {
+        case 'all':
+          return true; // Show all data
         case 'today':
           return date.toDateString() === now.toDateString();
         case 'week1':
@@ -611,14 +619,13 @@ const TablePage = () => {
       } catch (stockUpdateError) {
         console.error('CRITICAL ERROR updating inventory:', stockUpdateError);
         alert(`CRITICAL ERROR: Sale was recorded but inventory update failed: ${stockUpdateError.message}\n\nPlease check the console for details and contact support.`);
-        return; // Don't continue if inventory update failed
+        return;
       }
 
-      // FIXED: Always refresh products data after any sale, not just when new products are created
-      // This ensures the dropdown shows updated stock levels
+      // Always refresh products data after any sale
       const refreshPromises = [
         fetchOrderData(),
-        fetchProducts() // Always fetch products to get updated stock levels
+        fetchProducts()
       ];
       
       await Promise.all(refreshPromises);
@@ -727,7 +734,7 @@ const TablePage = () => {
           orderStatus: transformedOrderItems[0]?.orders?.orderstatus || 'INCOMPLETE',
           amount_paid: transformedOrderItems[0]?.orders?.amount_paid,
           change: transformedOrderItems[0]?.orders?.change,
-          orderdate: transformedOrderItems[0]?.orders?.orderdate, // Add orderdate
+          orderdate: transformedOrderItems[0]?.orders?.orderdate,
           orders: {
             totalamount: transformedOrderItems[0]?.orders?.totalamount,
             orderstatus: transformedOrderItems[0]?.orders?.orderstatus,
@@ -783,7 +790,6 @@ const TablePage = () => {
         </aside>
 
         <div className="main-content">
-          <div className="sales-panel">
             {loading ? (
               <div className="loading-states">
               </div>
@@ -808,23 +814,28 @@ const TablePage = () => {
                         ⏻
                       </button>
                     </div>
-                    <Bestseller bestsellers={bestsellers} />
+                    <Bestseller bestsellers={bestsellers} orderData={orderData} />
                   </div>
-                </div>
+                
 
-                <div className="bottom-analytics-wrapper">
-                  <StatsContainer 
-                    totalEarnings={totalEarnings}
-                    totalCustomers={totalCustomers}
-                    statsFilter={statsFilter}
-                    onStatsFilterChange={handleStatsFilter}
-                    orderData={orderData}
-                  />
-                  <PeakHours orderData={orderData} />
+                  <div className="bottom-analytics-wrapper">
+                    <StatsContainer 
+                      totalEarnings={totalEarnings}
+                      totalCustomers={totalCustomers}
+                      statsFilter={statsFilter}
+                      onStatsFilterChange={handleStatsFilter}
+                      orderData={orderData}
+                    />
+                    <PeakHours orderData={orderData} />
+                  </div>
+                  <div className="net-income">
+                    <h3> Net Income </h3>
+
+
+                  </div>
                 </div>
               </>
             )}
-          </div>
         </div>
       </div>
 

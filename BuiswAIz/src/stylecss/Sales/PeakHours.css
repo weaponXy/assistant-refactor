@@ -1,18 +1,18 @@
-/* Updated PeakHours for side-by-side layout with StatsContainer */
 .peak-hours-wrapper {
-  grid-column: 2; /* Takes the right side in bottom-analytics-wrapper */
+  grid-column: 2; 
   grid-row: 1;
   border: 1px solid #ddd;
   padding: 20px;
   background-color: #fff;
   display: grid;
-  grid-template-columns: 1fr;
-  grid-template-rows: auto 1fr auto;
-  gap: 13px;
   overflow: hidden;
   border-radius: 20px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   min-height: 150px;
+  max-width: 350px;
+  width: 100%;
+  flex: 2;
+  
 }
 
 .peak-hours-header {

@@ -1,26 +1,25 @@
 .sales-table-wrapper {
-  grid-column: 1;
-  grid-row: 1;
   border: 1px solid #ddd;
   padding: 20px;
   background-color: #fff;
   display: grid;
-  grid-template-columns: 1fr;
-  grid-template-rows: auto auto 1fr;
   gap: 15px;
   overflow: hidden;
+  overflow-x: visible;
   border-radius: 20px;
-  min-width: 500px; /* Prevent shrinking below this width */
-  width: 100%; /* Maintain full width within grid */
 }
 
 .table-header {
-  justify-content: flex-end;
+  justify-content: center;
   position: relative; 
   display: flex; 
-  align-items: center; 
+  align-items:first baseline;
   gap: 15px;
   margin-bottom: 20px; 
+}
+
+.table-header h3 {
+  flex: 1;
 }
 
 /* Add Sale Button */
@@ -35,6 +34,7 @@
   font-size: 14px;
   font-family: 'Montserrat', sans-serif;
   box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3);
+
 }
 
 .add-sale-btn:hover {
