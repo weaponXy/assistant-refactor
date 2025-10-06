@@ -1,6 +1,6 @@
 .peak-hours-wrapper {
   grid-column: 2; 
-  grid-row: 1;
+  grid-row: 2;
   border: 1px solid #ddd;
   padding: 20px;
   background-color: #fff;
@@ -9,7 +9,7 @@
   border-radius: 20px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   min-height: 150px;
-  max-width: 350px;
+  min-width: 300px;
   width: 100%;
   flex: 2;
   

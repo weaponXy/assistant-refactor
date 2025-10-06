@@ -99,8 +99,8 @@ const PointOfSales = () => {
         agesize: item.agesize,
         currentstock: item.currentstock,
         reorderpoint: item.reorderpoint,
-        // Create category label from color and agesize
-        categoryLabel: [item.color, item.agesize].filter(Boolean).join(' - ') || 'Uncategorized',
+        // Create category label from agesize only
+        categoryLabel: item.agesize || 'Uncategorized',
         displayName: [
           item.products?.productname,
           item.color && `(${item.color})`,
@@ -110,10 +110,10 @@ const PointOfSales = () => {
       
       setProducts(transformedProducts);
       
-      // Extract unique categories from color and agesize combinations
+      // Extract unique categories from agesize only
       const uniqueCategories = ['All', ...new Set(
         transformedProducts
-          .map(p => p.categoryLabel)
+          .map(p => p.agesize)
           .filter(Boolean)
       )].sort();
       setCategories(uniqueCategories);
