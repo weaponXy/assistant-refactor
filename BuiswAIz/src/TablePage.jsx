@@ -60,14 +60,16 @@ const TablePage = () => {
       .sort((a, b) => b.totalQuantity - a.totalQuantity);
   }, [orderData]);
 
-  // Memoize stats calculation with debouncing - now using orderdate from orders table
   const { earnings, customers } = useMemo(() => {
     if (!orderData.length) return { earnings: 0, customers: 0 };
 
     const now = new Date();
     const filteredData = orderData.filter(item => {
-      // Use orderdate from orders table instead of createdat from orderitems
-      const date = new Date(item.orders?.orderdate || item.orderdata);
+      // Use orderdate from orders table consistently
+      const orderDate = item.orders?.orderdate;
+      if (!orderDate) return false;
+      
+      const date = new Date(orderDate);
       
       // Check if statsFilter is a year
       if (statsFilter.startsWith('year-')) {
@@ -81,11 +83,11 @@ const TablePage = () => {
         case 'today':
           return date.toDateString() === now.toDateString();
         case 'week1':
-          return date.getDate() <= 7 && date.getMonth() === now.getMonth();
+          return date.getDate() <= 7 && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
         case 'week2':
-          return date.getDate() > 7 && date.getDate() <= 14 && date.getMonth() === now.getMonth();
+          return date.getDate() > 7 && date.getDate() <= 14 && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
         case 'week3':
-          return date.getDate() > 14 && date.getDate() <= 21 && date.getMonth() === now.getMonth();
+          return date.getDate() > 14 && date.getDate() <= 21 && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
         case 'month':
           return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
         default:
@@ -93,10 +95,19 @@ const TablePage = () => {
       }
     });
 
-    const earnings = filteredData.reduce((sum, item) => sum + (item.subtotal || 0), 0);
-    const uniqueOrderIds = new Set(filteredData.map(item => item.orderid));
+    // Calculate earnings using the same method as NetIncome (sum of unique order totals)
+    const uniqueOrders = new Map();
+    filteredData.forEach(item => {
+      if (!uniqueOrders.has(item.orderid)) {
+        uniqueOrders.set(item.orderid, item.orders?.totalamount || 0);
+      }
+    });
+    const earnings = Array.from(uniqueOrders.values()).reduce((sum, amount) => sum + amount, 0);
     
-    return { earnings, customers: uniqueOrderIds.size };
+    // Count unique orders as customers
+    const customers = uniqueOrders.size;
+    
+    return { earnings, customers };
   }, [orderData, statsFilter]);
 
   // Update stats when calculated values change

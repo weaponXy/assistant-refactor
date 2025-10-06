@@ -10,7 +10,7 @@ const StatsContainer = ({ totalEarnings, totalCustomers, statsFilter, onStatsFil
     const years = new Set();
     const currentYear = new Date().getFullYear();
     orderData.forEach(item => {
-      const date = new Date(item.createdat);
+      const date = new Date(item.orderdate);
       if (!isNaN(date.getTime())) {
         years.add(date.getFullYear());
       }
@@ -114,7 +114,7 @@ const StatsContainer = ({ totalEarnings, totalCustomers, statsFilter, onStatsFil
           // Compare all time vs previous year
           const currentYear = now.getFullYear();
           previousPeriodData = orderData.filter(item => {
-            const date = new Date(item.createdat);
+            const date = new Date(item.orderdate);
             return date.getFullYear() === currentYear - 1;
           });
           break;
