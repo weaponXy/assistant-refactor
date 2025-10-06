@@ -1,5 +1,5 @@
-/* Updated StatsContainer for side-by-side layout with PeakHours */
-.stats-container {
+/* Updated StatsContainer with sc- prefix to avoid conflicts */
+.sc-stats-container {
   background-color: #ffffff;
   border: 1px solid #ddd;
   padding: 20px;
@@ -13,7 +13,7 @@
   width: 100%;
 }
 
-.stats-container-header {
+.sc-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -21,13 +21,13 @@
   border-bottom: 1px solid #e0e0e0;
 }
 
-.stats-container-header h3 {
+.sc-header h3 {
   margin: 0;
   color: #333;
   font-size: 1.2rem;
 }
 
-.stats-container-filter {
+.sc-filter {
   color: #333;
   border: 1px solid #ddd;
   background-color: #fff;
@@ -49,17 +49,17 @@
   min-width: 120px;
 }
 
-.stats-container-filter:focus {
+.sc-filter:focus {
   border-color: #04B4FC;
   box-shadow: 0 0 4px rgba(4, 180, 252, 0.3);
 }
 
-.stats-container-filter:hover {
+.sc-filter:hover {
   border-color: #04B4FC;
   background-color: rgba(4, 180, 252, 0.05);
 }
 
-.stats-container-filter option {
+.sc-filter option {
   background-color: #ffffff;
   color: #333;
   font-family: 'Montserrat', sans-serif;
@@ -67,7 +67,7 @@
   padding: 8px 12px;
 }
 
-.stats-boxes {
+.sc-stats-boxes {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 20px;
@@ -76,9 +76,9 @@
 }
 
 /* Individual stats boxes */
-.earnings-box,
-.customers-box,
-.sales-comparison-box {
+.sc-earnings-box,
+.sc-customers-box,
+.sc-sales-comparison-box {
   background-color: #f8f9fa;
   padding: 15px;
   border-radius: 15px;
@@ -86,7 +86,7 @@
   font-family: 'Montserrat', sans-serif;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   width: 100%;
-  max-width: 180px; /* Reduced from 200px to fit better */
+  max-width: 180px;
   min-height: 90px;
   display: flex;
   flex-direction: column;
@@ -94,43 +94,43 @@
   align-items: center;
 }
 
-.earnings-box {
+.sc-earnings-box {
   border: 3px solid green;
 }
 
-.customers-box {
+.sc-customers-box {
   border: 3px solid #04B4FC;
 }
 
-.sales-comparison-box {
+.sc-sales-comparison-box {
   border: 3px solid #ffc107;
 }
 
-.earnings-box:hover,
-.customers-box:hover,
-.sales-comparison-box:hover {
+.sc-earnings-box:hover,
+.sc-customers-box:hover,
+.sc-sales-comparison-box:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 /* Icons */
-.earnings-icon,
-.customers-icon,
-.trend-icon {
+.sc-earnings-icon,
+.sc-customers-icon,
+.sc-trend-icon {
   width: 24px;
   height: 24px;
   filter: brightness(0) saturate(100%) invert(20%) sepia(100%) saturate(2500%) hue-rotate(200deg) brightness(98%) contrast(95%);
   transition: transform 0.2s ease;
 }
 
-.earnings-box:hover .earnings-icon,
-.customers-box:hover .customers-icon,
-.sales-comparison-box:hover .trend-icon {
+.sc-earnings-box:hover .sc-earnings-icon,
+.sc-customers-box:hover .sc-customers-icon,
+.sc-sales-comparison-box:hover .sc-trend-icon {
   transform: scale(1.1);
 }
 
 /* Stats box headers and content */
-.stats-box-header {
+.sc-box-header {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -139,20 +139,21 @@
 }
 
 /* Trend content */
-.trend-content {
+.sc-trend-content {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 2px;
 }
 
-.trend-content p, span {
+.sc-trend-content p,
+.sc-trend-content span {
   text-align: center;
   font-weight: bold;
   color: green;
 }
 
-.comparison-period {
+.sc-comparison-period {
   background-color: rgba(255, 193, 7, 0.1);
   padding: 2px 8px;
   border-radius: 8px;
@@ -160,33 +161,33 @@
   border: 1px solid rgba(255, 193, 7, 0.3);
 }
 
-.earnings-box h3 {
+.sc-earnings-box h3 {
   margin: 0;
   font-size: 1rem;
   color: green;
 }
 
-.customers-box h3 {
+.sc-customers-box h3 {
   margin: 0;
   font-size: 1rem;
   color: #04B4FC;
 }
 
-.sales-comparison-box h3 {
+.sc-sales-comparison-box h3 {
   margin: 0;
   font-size: 1rem;
   color: #ffc107;
 }
 
-.earnings-box p {
-  font-size: 1.6rem; /* Reduced from 1.8rem */
+.sc-earnings-box p {
+  font-size: 1.6rem;
   font-weight: bold;
   margin: 0;
   color: green;
 }
 
-.customers-box p {
-  font-size: 1.6rem; /* Reduced from 1.8rem */
+.sc-customers-box p {
+  font-size: 1.6rem;
   font-weight: bold;
   margin: 0;
   color: #04B4FC;
@@ -194,116 +195,73 @@
 
 /* Responsive Design */
 @media (max-width: 1200px) {
-  .stats-boxes {
+  .sc-stats-boxes {
     gap: 15px;
   }
   
-  .earnings-box,
-  .customers-box,
-  .sales-comparison-box {
+  .sc-earnings-box,
+  .sc-customers-box,
+  .sc-sales-comparison-box {
     max-width: 160px;
     padding: 15px;
   }
   
-  .earnings-box p,
-  .customers-box p {
+  .sc-earnings-box p,
+  .sc-customers-box p {
     font-size: 1.4rem;
   }
 }
 
 @media (max-width: 991px) {
-  .stats-container {
+  .sc-stats-container {
     min-height: 150px;
   }
   
-  .stats-boxes {
+  .sc-stats-boxes {
     gap: 10px;
   }
   
-  .earnings-box,
-  .customers-box,
-  .sales-comparison-box {
+  .sc-earnings-box,
+  .sc-customers-box,
+  .sc-sales-comparison-box {
     max-width: 140px;
     min-height: 100px;
     padding: 12px;
   }
   
-  .earnings-box h3,
-  .customers-box h3,
-  .sales-comparison-box h3 {
+  .sc-earnings-box h3,
+  .sc-customers-box h3,
+  .sc-sales-comparison-box h3 {
     font-size: 0.9rem;
   }
   
-  .earnings-box p,
-  .customers-box p {
+  .sc-earnings-box p,
+  .sc-customers-box p {
     font-size: 1.3rem;
   }
 }
 
 @media (max-width: 767px) {
-  .stats-container {
+  .sc-stats-container {
     grid-column: 1;
     grid-row: 1;
     min-height: 200px;
   }
   
-  .stats-boxes {
+  .sc-stats-boxes {
     grid-template-columns: 1fr 1fr;
     grid-template-rows: auto auto;
     gap: 15px;
   }
   
-  .sales-comparison-box {
+  .sc-sales-comparison-box {
     grid-column: 1 / -1;
   }
   
-  .earnings-box,
-  .customers-box,
-  .sales-comparison-box {
+  .sc-earnings-box,
+  .sc-customers-box,
+  .sc-sales-comparison-box {
     max-width: 100%;
     width: 100%;
-  }
-}
-
-@media (max-width: 575px) {
-  .stats-container {
-    padding: 15px;
-  }
-  
-  .stats-container-header {
-    flex-direction: column;
-    gap: 10px;
-    align-items: stretch;
-  }
-  
-  .stats-container-filter {
-    width: 100%;
-  }
-  
-  .stats-boxes {
-    grid-template-columns: 1fr;
-    gap: 15px;
-  }
-  
-  .sales-comparison-box {
-    grid-column: 1;
-  }
-  
-  .earnings-box,
-  .customers-box,
-  .sales-comparison-box {
-    padding: 15px;
-    min-height: 100px;
-  }
-  
-  .earnings-box h3,
-  .customers-box h3,
-  .sales-comparison-box h3 {
-    font-size: 0.9rem;
-  }
-  
-  .earnings-box p,
-  .customers-box p {
-    font-size: 1.4rem;
   }
 }

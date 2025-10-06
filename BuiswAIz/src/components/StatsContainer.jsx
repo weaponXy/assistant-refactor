@@ -179,11 +179,11 @@ const StatsContainer = ({ totalEarnings, totalCustomers, statsFilter, onStatsFil
   };
 
   return (
-    <div className="stats-container">
-      <div className="stats-container-header">
+    <div className="sc-stats-container">
+      <div className="sc-header">
         <h3>Summary Panel</h3>
         <select 
-          className="stats-container-filter" 
+          className="sc-filter" 
           value={statsFilter} 
           onChange={onStatsFilterChange}
         >
@@ -199,44 +199,44 @@ const StatsContainer = ({ totalEarnings, totalCustomers, statsFilter, onStatsFil
         </select>
       </div>
       
-      <div className="stats-boxes">
-        <div className="earnings-box">
-          <div className="stats-box-header">
+      <div className="sc-stats-boxes">
+        <div className="sc-earnings-box">
+          <div className="sc-box-header">
             <img 
               src="https://cdn-icons-png.flaticon.com/512/10997/10997940.png" 
               alt="Earnings Icon" 
-              className="earnings-icon"
+              className="sc-earnings-icon"
             />
             <h3>Total Earnings</h3>
           </div>
           <p>₱{totalEarnings.toLocaleString()}</p>
         </div>
         
-        <div className="customers-box">
-          <div className="stats-box-header">
+        <div className="sc-customers-box">
+          <div className="sc-box-header">
             <img 
               src="https://www.pikpng.com/pngl/b/75-757195_customer-clipart-end-user-customer-blue-icon-png.png" 
               alt="Customers Icon" 
-              className="customers-icon"
+              className="sc-customers-icon"
             />
             <h3>Total Customers</h3>
           </div>
           <p>{totalCustomers.toLocaleString()}</p>
         </div>
 
-        <div className="sales-comparison-box">
-          <div className="stats-box-header">
+        <div className="sc-sales-comparison-box">
+          <div className="sc-box-header">
             {getTrendIcon() && statsFilter !== 'all' && (
               <img 
                 src={getTrendIcon()} 
                 alt={`Sales ${getTrendText()}`}
-                className="trend-icon"
+                className="sc-trend-icon"
               />
             )}
             <h3>Sales Trend</h3>
           </div>
           {statsFilter === 'all' ? (
-            <div className="trend-content">
+            <div className="sc-trend-content">
               <p>
                 Total Historical Data
               </p>
@@ -245,14 +245,14 @@ const StatsContainer = ({ totalEarnings, totalCustomers, statsFilter, onStatsFil
               </span>
             </div>
           ) : (
-            <div className="trend-content">
+            <div className="sc-trend-content">
               <p style={{ color: getTrendColor(), fontSize: '1.8rem', fontWeight: 'bold', margin: '5px 0' }}>
                 {percentageChange.toFixed(1)}%
               </p>
               <span style={{ color: getTrendColor(), fontSize: '0.9rem', fontWeight: '600' }}>
                 {getTrendText()}
               </span>
-              <div className="comparison-period" style={{ fontSize: '0.8rem', color: '#666', marginTop: '5px' }}>
+              <div className="sc-comparison-period" style={{ fontSize: '0.8rem', color: '#666', marginTop: '5px' }}>
                 {getPeriodLabel()}
               </div>
             </div>
