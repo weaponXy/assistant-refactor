@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 
-const OrderSales = ({ orderData, onInvoiceSelect, onAddSale }) => {
+const OrderSales = ({ orderData, onInvoiceSelect }) => {
   const [filteredData, setFilteredData] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTime, setFilterTime] = useState('all');
@@ -248,12 +248,6 @@ const OrderSales = ({ orderData, onInvoiceSelect, onAddSale }) => {
     <div className="sales-table-wrapper">
       <div className="table-header">
         <h3>Sales Orders</h3>
-        <button 
-          className="add-sale-btn"
-          onClick={onAddSale}
-        >
-          + Add Sale
-        </button>
         
         <button 
           className="export-csv-btn"
@@ -281,7 +275,6 @@ const OrderSales = ({ orderData, onInvoiceSelect, onAddSale }) => {
                   className={`dropdown-item ${sortOption === option.value ? 'selected' : ''}`}
                   onClick={() => handleSortSelect(option.value)}
                 >
-                  <span className="item-icon">{option.icon}</span>
                   <span className="item-text">{option.label}</span>
                 </div>
               ))}
