@@ -10,7 +10,9 @@ const StatsContainer = ({ totalEarnings, totalCustomers, statsFilter, onStatsFil
     const years = new Set();
     const currentYear = new Date().getFullYear();
     orderData.forEach(item => {
-      const date = new Date(item.orderdate);
+      const orderDate = item.orders?.orderdate;
+      if (!orderDate) return;
+      const date = new Date(orderDate);
       if (!isNaN(date.getTime())) {
         years.add(date.getFullYear());
       }
@@ -44,7 +46,9 @@ const StatsContainer = ({ totalEarnings, totalCustomers, statsFilter, onStatsFil
       const previousYear = selectedYear - 1;
       
       previousPeriodData = orderData.filter(item => {
-        const date = new Date(item.createdat);
+        const orderDate = item.orders?.orderdate;
+        if (!orderDate) return false;
+        const date = new Date(orderDate);
         return date.getFullYear() === previousYear;
       });
     } else {
@@ -54,7 +58,9 @@ const StatsContainer = ({ totalEarnings, totalCustomers, statsFilter, onStatsFil
           const yesterday = new Date(now);
           yesterday.setDate(yesterday.getDate() - 1);
           previousPeriodData = orderData.filter(item => {
-            const date = new Date(item.createdat);
+            const orderDate = item.orders?.orderdate;
+            if (!orderDate) return false;
+            const date = new Date(orderDate);
             return date.toDateString() === yesterday.toDateString();
           });
           break;
@@ -66,7 +72,9 @@ const StatsContainer = ({ totalEarnings, totalCustomers, statsFilter, onStatsFil
           const lastYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
           
           previousPeriodData = orderData.filter(item => {
-            const date = new Date(item.createdat);
+            const orderDate = item.orders?.orderdate;
+            if (!orderDate) return false;
+            const date = new Date(orderDate);
             return date.getDate() <= 7 && 
                    date.getMonth() === lastMonth && 
                    date.getFullYear() === lastYear;
@@ -77,7 +85,9 @@ const StatsContainer = ({ totalEarnings, totalCustomers, statsFilter, onStatsFil
         case 'week2': {
           // Compare second week vs first week of current month
           previousPeriodData = orderData.filter(item => {
-            const date = new Date(item.createdat);
+            const orderDate = item.orders?.orderdate;
+            if (!orderDate) return false;
+            const date = new Date(orderDate);
             return date.getDate() <= 7 && 
                    date.getMonth() === now.getMonth() && 
                    date.getFullYear() === now.getFullYear();
@@ -88,7 +98,9 @@ const StatsContainer = ({ totalEarnings, totalCustomers, statsFilter, onStatsFil
         case 'week3': {
           // Compare third week vs second week of current month
           previousPeriodData = orderData.filter(item => {
-            const date = new Date(item.createdat);
+            const orderDate = item.orders?.orderdate;
+            if (!orderDate) return false;
+            const date = new Date(orderDate);
             return date.getDate() > 7 && date.getDate() <= 14 && 
                    date.getMonth() === now.getMonth() && 
                    date.getFullYear() === now.getFullYear();
@@ -102,7 +114,9 @@ const StatsContainer = ({ totalEarnings, totalCustomers, statsFilter, onStatsFil
           const lastYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
           
           previousPeriodData = orderData.filter(item => {
-            const date = new Date(item.createdat);
+            const orderDate = item.orders?.orderdate;
+            if (!orderDate) return false;
+            const date = new Date(orderDate);
             return date.getMonth() === lastMonth && 
                    date.getFullYear() === lastYear;
           });
@@ -114,7 +128,9 @@ const StatsContainer = ({ totalEarnings, totalCustomers, statsFilter, onStatsFil
           // Compare all time vs previous year
           const currentYear = now.getFullYear();
           previousPeriodData = orderData.filter(item => {
-            const date = new Date(item.orderdate);
+            const orderDate = item.orders?.orderdate;
+            if (!orderDate) return false;
+            const date = new Date(orderDate);
             return date.getFullYear() === currentYear - 1;
           });
           break;
@@ -122,8 +138,14 @@ const StatsContainer = ({ totalEarnings, totalCustomers, statsFilter, onStatsFil
       }
     }
 
-    // Calculate previous period earnings
-    const previousTotal = previousPeriodData.reduce((sum, item) => sum + (item.subtotal || 0), 0);
+    // Calculate previous period earnings using totalamount from unique orders
+    const uniqueOrders = new Map();
+    previousPeriodData.forEach(item => {
+      if (!uniqueOrders.has(item.orderid)) {
+        uniqueOrders.set(item.orderid, item.orders?.totalamount || 0);
+      }
+    });
+    const previousTotal = Array.from(uniqueOrders.values()).reduce((sum, amount) => sum + amount, 0);
     setPreviousEarnings(previousTotal);
 
     // Calculate percentage change and trend

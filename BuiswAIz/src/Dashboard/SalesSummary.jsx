@@ -22,47 +22,42 @@ const SalesSummary = () => {
     try {
       setLoading(true);
       
-      // Get current date in Philippine timezone (UTC+8) using reliable method
+      // Get current date in Philippine timezone (UTC+8)
       const now = new Date();
-      const formatter = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'Asia/Manila',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-      });
-      
-      const todayString = formatter.format(now); // Returns "YYYY-MM-DD" format
-      
-      // Calculate yesterday and tomorrow using Philippine time
       const phTimeFormatter = new Intl.DateTimeFormat('en-PH', {
         timeZone: 'Asia/Manila',
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
         hour12: false
       });
       
       const phTimeParts = phTimeFormatter.formatToParts(now);
       const currentYear = parseInt(phTimeParts.find(p => p.type === 'year').value);
-      const currentMonth = parseInt(phTimeParts.find(p => p.type === 'month').value) - 1; // 0-indexed
+      const currentMonth = parseInt(phTimeParts.find(p => p.type === 'month').value);
       const currentDay = parseInt(phTimeParts.find(p => p.type === 'day').value);
       
-      const phTime = new Date(currentYear, currentMonth, currentDay);
+      // Create date strings in YYYY-MM-DD format
+      const todayString = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(currentDay).padStart(2, '0')}`;
+      
+      // Calculate yesterday by creating a proper date object
+      const todayDate = new Date(currentYear, currentMonth - 1, currentDay);
+      const yesterdayDate = new Date(todayDate);
+      yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+      
+      const yesterdayString = `${yesterdayDate.getFullYear()}-${String(yesterdayDate.getMonth() + 1).padStart(2, '0')}-${String(yesterdayDate.getDate()).padStart(2, '0')}`;
+      
+      // Calculate month boundaries
+      const startOfMonthString = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`;
+      const lastDayOfMonth = new Date(currentYear, currentMonth, 0);
+      const endOfMonthString = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(lastDayOfMonth.getDate()).padStart(2, '0')}`;
 
-      const yesterday = new Date(phTime);
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayString = yesterday.toISOString().split('T')[0];
-      
-      // Calculate month boundaries using Philippine timezone
-      // First day of current month (October 1, 2025 for example)
-      const startOfMonthString = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`;
-      
-      // Last day of current month (handles 28, 29, 30, or 31 days automatically)
-      const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0);
-      const endOfMonthString = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(lastDayOfMonth.getDate()).padStart(2, '0')}`;
+      console.log('Date Debug:', {
+        today: todayString,
+        yesterday: yesterdayString,
+        monthStart: startOfMonthString,
+        monthEnd: endOfMonthString
+      });
 
       // ================================
       // Daily Sales - Using orders table with orderdate and totalamount
@@ -71,35 +66,32 @@ const SalesSummary = () => {
       let yesterdaysSale = 0;
       let dailyTransactions = 0;
 
-      // Create datetime ranges for accurate filtering
-      const todayStart = `${todayString} 00:00:00`;
-      const todayEnd = `${todayString} 23:59:59`;
-
       // Fetch today's sales from orders table
       const { data: todaysOrders, error: todaysError } = await supabase
         .from('orders')
         .select('totalamount, orderdate, orderid')
-        .gte('orderdate', todayStart)
-        .lte('orderdate', todayEnd);
+        .gte('orderdate', `${todayString} 00:00:00`)
+        .lte('orderdate', `${todayString} 23:59:59`);
 
       if (todaysError) {
         console.warn('Failed to fetch today\'s orders:', todaysError);
       } else if (todaysOrders) {
+        console.log('Today\'s Orders:', todaysOrders);
         todaysSale = todaysOrders.reduce((sum, order) => sum + (parseFloat(order.totalamount) || 0), 0);
         dailyTransactions = todaysOrders.length;
       }
 
       // Fetch yesterday's sales from orders table
-      // Use a more flexible query that handles different date formats
       const { data: yesterdaysOrders, error: yesterdaysError } = await supabase
         .from('orders')
-        .select('totalamount, orderdate')
-        .gte('orderdate', yesterdayString)
-        .lt('orderdate', todayString);
+        .select('totalamount, orderdate, orderid')
+        .gte('orderdate', `${yesterdayString} 00:00:00`)
+        .lte('orderdate', `${yesterdayString} 23:59:59`);
 
       if (yesterdaysError) {
         console.warn('Failed to fetch yesterday\'s orders:', yesterdaysError);
       } else if (yesterdaysOrders) {
+        console.log('Yesterday\'s Orders:', yesterdaysOrders);
         yesterdaysSale = yesterdaysOrders.reduce((sum, order) => sum + (parseFloat(order.totalamount) || 0), 0);
       }
 
@@ -109,16 +101,12 @@ const SalesSummary = () => {
       let monthlyTotalSales = 0;
       let monthlyExpensesTotal = 0;
 
-      // Create datetime ranges for monthly filtering
-      const monthStart = `${startOfMonthString} 00:00:00`;
-      const monthEnd = `${endOfMonthString} 23:59:59`;
-
-      // Get monthly sales from orders table using orderdate and totalamount
+      // Get monthly sales from orders table
       const { data: monthlyOrders, error: monthlyOrdersError } = await supabase
         .from('orders')
         .select('totalamount, orderdate')
-        .gte('orderdate', monthStart)
-        .lte('orderdate', monthEnd);
+        .gte('orderdate', `${startOfMonthString} 00:00:00`)
+        .lte('orderdate', `${endOfMonthString} 23:59:59`);
 
       if (monthlyOrdersError) {
         console.warn('Monthly sales lookup failed:', monthlyOrdersError);
@@ -126,7 +114,7 @@ const SalesSummary = () => {
         monthlyTotalSales = monthlyOrders.reduce((sum, order) => sum + (parseFloat(order.totalamount) || 0), 0);
       }
 
-      // Get monthly expenses from expenses table using occurred_on and amount
+      // Get monthly expenses from expenses table
       const { data: monthlyExpenses, error: monthlyExpensesError } = await supabase
         .from('expenses')
         .select('amount, occurred_on')
@@ -149,6 +137,12 @@ const SalesSummary = () => {
       } else if (todaysSale > 0) {
         percentageChange = 100;
       }
+
+      console.log('Sales Calculation:', {
+        todaysSale,
+        yesterdaysSale,
+        percentageChange
+      });
 
       setSalesData({
         todaysSale,
