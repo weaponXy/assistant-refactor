@@ -34,9 +34,14 @@
 
 .A-center {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 20px;
-  min-width: 0;
+  grid-template-columns: 1fr; 
+  background-color:  #ffffff;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+  border-radius: 20px;
+  gap: 5px; /* small partition space */
+  align-items: stretch; 
+  height: 100%; 
+  padding: 16px;
 }
 
 /* ===================== USER INFO CARD ===================== */
@@ -74,7 +79,6 @@
   flex: 1.2;                  /* slightly larger than other grid column */
   min-width: 320px;            /* prevent it from getting too narrow */
   max-width: 700px;            /* comfortable max width */
-  min-height: 800px;
   max-height: 100%;
   background: #fff;
   border-radius: 20px;
@@ -100,13 +104,20 @@
 }
 
 /* ===================== REPORT SPOTLIGHT ===================== */
+/* ===================== REPORT SPOTLIGHT ===================== */
 .report-spotlight {
   background: #fff;
   border: 1px solid #e7ecf5;
   border-radius: 16px;
   padding: 16px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.03);
+  height: 45vh;          
+  max-height: 45vh;       
+  display: flex;
+  flex-direction: column;  
+  overflow: hidden;       
 }
+
 .report-empty {
   background: #f7f9ff;
   border: 1px dashed #d7e6ff;
@@ -115,11 +126,34 @@
   border-radius: 12px;
   text-align: center;
 }
+
+/* ===================== Report Grid ===================== */
 .report-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 14px;
+  gap: 8px;
+  flex: 1;                 /* ✅ fills remaining space in .report-spotlight */
+  overflow-y: auto;         /* ✅ scrolls within fixed height */
+  padding-right: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: #c9d5f2 #f7f9ff;
+  background: #f5f7fa;
 }
+
+/* Optional scrollbar styling */
+.report-grid::-webkit-scrollbar {
+  width: 6px;
+}
+.report-grid::-webkit-scrollbar-track {
+  background: #f7f9ff;
+  border-radius: 10px;
+}
+.report-grid::-webkit-scrollbar-thumb {
+  background-color: #c9d5f2;
+  border-radius: 10px;
+}
+
+/* ===================== Report Cards ===================== */
 .report-card {
   border: 1px solid #eef2f8;
   border-radius: 14px;
@@ -131,11 +165,16 @@
   gap: 12px;
   box-shadow: 0 4px 12px rgba(16, 24, 40, 0.04);
   transition: all 0.2s ease-in-out;
+
+  height: 100px; /* consistent card height */
+  flex-shrink: 0;
 }
+
 .report-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 20px rgba(16,24,40,0.08);
 }
+
 .report-card-header {
   display: flex;
   align-items: center;
@@ -210,7 +249,15 @@
   padding: 16px;
   box-shadow: 0 6px 20px rgba(16, 24, 40, 0.05);
   transition: all 0.2s ease;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;     
+  min-height: 350px; 
+  max-height: 100%;   
+  overflow: hidden;  
 }
+
 .forecast-panel:hover {
   box-shadow: 0 10px 25px rgba(16,24,40,0.08);
 }

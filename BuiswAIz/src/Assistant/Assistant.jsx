@@ -121,14 +121,14 @@ const Assistant = () => {
     };
   }, [navigate]);
 
-  // Preload Spotlight + Forecast cards
+  // Preload Spotlight Adjust ko to pag okay na backend 
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
         const [r, f] = await Promise.all([
-          fetchRecentReports(2, "sales"),
-          fetchRecentForecasts(2, "sales")
+          fetchRecentReports(5, "sales"),
+          fetchRecentForecasts(5, "sales")
         ]);
         if (!alive) return;
         setReports(r);
