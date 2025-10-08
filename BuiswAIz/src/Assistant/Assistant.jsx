@@ -12,10 +12,7 @@ import ExpensesWindow from "../components/ExpensesWindow";
 // NEW: bring in your forecast popup component
 import SalesForecastWindow from "../components/SalesForecastWindow";
 
-const API_BASE =
-  import.meta.env.VITE_API_ASSISTANT_URL
-  ?? import.meta.env.VITE_API_BASE
-  ?? "http://localhost:5115";
+const API_BASE = import.meta.env.VITE_API_ASSISTANT_URL
 
 const newId = () =>
   (crypto?.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()));
@@ -439,6 +436,17 @@ const Assistant = () => {
                   {user ? user.username || user.email : "Loading."}
                 </div>
               </div>
+               <button
+                  className="logout-button"
+                  onClick={async () => {
+                    await supabase.auth.signOut();
+                    localStorage.removeItem("userProfile"); 
+                    localStorage.removeItem('lastActive');
+                    navigate = "/login"; 
+                  }}
+                >
+                  ⏻
+                </button>
             </div>
             <AssistantChat
               messages={messages}

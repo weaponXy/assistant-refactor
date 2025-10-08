@@ -1,9 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 
-const API_BASE =
-  import.meta.env.VITE_API_ASSISTANT_URL
-  ?? import.meta.env.VITE_API_BASE
-  ?? "http://localhost:5115";
+const API_BASE = import.meta.env.VITE_API_ASSISTANT_URL
 
 /**
  * Props:
