@@ -89,9 +89,9 @@ const PeakHours = ({ orderData }) => {
             <LineChart
               data={peakHoursData}
               margin={{
-                top: 20,
-                right: 30,
-                left: 20,
+                top: 10,
+                right: 10,
+                left: 0,
                 bottom: 20
               }}
             >

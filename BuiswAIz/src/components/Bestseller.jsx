@@ -22,20 +22,22 @@ const Bestseller = ({ bestsellers, orderData }) => {
         case 'today':
           return date.toDateString() === now.toDateString();
         
-        case 'weekly':
+        case 'weekly': {
           const oneWeekAgo = new Date(now);
           oneWeekAgo.setDate(now.getDate() - 7);
           return date >= oneWeekAgo;
+        }
         
         case 'monthly':
           return date.getMonth() === now.getMonth() && 
                  date.getFullYear() === now.getFullYear();
         
-        case 'quarterly':
+        case 'quarterly': {
           const currentQuarter = Math.floor(now.getMonth() / 3);
           const itemQuarter = Math.floor(date.getMonth() / 3);
           return itemQuarter === currentQuarter && 
                  date.getFullYear() === now.getFullYear();
+        }
         
         case 'yearly':
           return date.getFullYear() === now.getFullYear();
@@ -105,7 +107,7 @@ const Bestseller = ({ bestsellers, orderData }) => {
           <tbody>
             {filteredBestsellers.length === 0 ? (
               <tr>
-                <td colSpan="3" style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
+                <td colSpan="3" style={{ textAlign: 'center', color: '#999' }}>
                   No sales data for this period
                 </td>
               </tr>

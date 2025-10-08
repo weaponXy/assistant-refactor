@@ -3,31 +3,27 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from './supabase';
 import OrderSales from './components/OrderSales';
 import Bestseller from './components/Bestseller';
-import StatsContainer from './components/StatsContainer';
 import InvoiceModal from './components/InvoiceModal';
 import SalesSuccessModal from './components/SalesSuccessModal';
 import PeakHours from './components/PeakHours';
-import NetIncome from './components/NetIncome';
+import SalesSummary from './components/SalesSummary';
 import './stylecss/TablePage.css';
 import './stylecss/Sales/OrderSales.css';
-import './stylecss/Sales/StatsContainer.css';
 import './stylecss/Sales/InvoiceModal.css';
 import './stylecss/Sales/Bestseller.css';
 import './stylecss/Sales/PeakHours.css';
-import './stylecss/Sales/NetIncome.css';
+import './stylecss/Sales/SalesSummary.css';
 
 const TablePage = () => {
   const navigate = useNavigate();
   const [orderData, setOrderData] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [totalEarnings, setTotalEarnings] = useState(0);
-  const [totalCustomers, setTotalCustomers] = useState(0);
+  const [_products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [statsFilter, setStatsFilter] = useState('all');
   const [showSalesSuccessModal, setShowSalesSuccessModal] = useState(false);
   const [salesSuccessData, setSalesSuccessData] = useState(null);
-  const [user, setUser] = useState(null);
+  const [_user, setUser] = useState(null);
 
   // Updated bestsellers calculation to group by product name instead of productcategoryid
   const bestsellers = useMemo(() => {
@@ -59,62 +55,6 @@ const TablePage = () => {
       }))
       .sort((a, b) => b.totalQuantity - a.totalQuantity);
   }, [orderData]);
-
-  const { earnings, customers } = useMemo(() => {
-    if (!orderData.length) return { earnings: 0, customers: 0 };
-
-    const now = new Date();
-    const filteredData = orderData.filter(item => {
-      // Use orderdate from orders table consistently
-      const orderDate = item.orders?.orderdate;
-      if (!orderDate) return false;
-      
-      const date = new Date(orderDate);
-      
-      // Check if statsFilter is a year
-      if (statsFilter.startsWith('year-')) {
-        const year = parseInt(statsFilter.replace('year-', ''));
-        return date.getFullYear() === year;
-      }
-
-      switch (statsFilter) {
-        case 'all':
-          return true; // Show all data
-        case 'today':
-          return date.toDateString() === now.toDateString();
-        case 'week1':
-          return date.getDate() <= 7 && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-        case 'week2':
-          return date.getDate() > 7 && date.getDate() <= 14 && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-        case 'week3':
-          return date.getDate() > 14 && date.getDate() <= 21 && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-        case 'month':
-          return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-        default:
-          return true;
-      }
-    });
-
-    // Calculate earnings using the same method as NetIncome (sum of unique order totals)
-    const uniqueOrders = new Map();
-    filteredData.forEach(item => {
-      if (!uniqueOrders.has(item.orderid)) {
-        uniqueOrders.set(item.orderid, item.orders?.totalamount || 0);
-      }
-    });
-    const earnings = Array.from(uniqueOrders.values()).reduce((sum, amount) => sum + amount, 0);
-    
-    // Count unique orders as customers
-    const customers = uniqueOrders.size;
-    
-    return { earnings, customers };
-  }, [orderData, statsFilter]);
-
-  // Update stats when calculated values change
-  useEffect(() => {
-    setTotalEarnings(earnings);
-    setTotalCustomers(customers);
-  }, [earnings, customers]);
 
   // Optimize user authentication check
   useEffect(() => {
@@ -268,8 +208,7 @@ const TablePage = () => {
   }, [fetchOrderData, fetchProducts]);
 
   // Debounce stats filter changes
-  const handleStatsFilter = useCallback((e) => {
-    const value = e.target.value;
+  const handleStatsFilter = useCallback((value) => {
     // Use requestAnimationFrame to defer state update
     requestAnimationFrame(() => {
       setStatsFilter(value);
@@ -410,45 +349,38 @@ const TablePage = () => {
         </aside>
 
         <div className="main-content">
-            {loading ? (
-              <div className="loading-states">
-              </div>
-            ) : (
-              <>
-                <div className="table-flex-wrapper">
-                  {/* Row 1 - Net Income (Full Width) */}
-                  <div className="net-income">
-                    <NetIncome 
-                      orderData={orderData}
-                      statsFilter={statsFilter}
-                    />
-                  </div>
-
-                  {/* Row 2, Column 1 - Order Sales */}
-                  <OrderSales 
+          {loading ? (
+            <div className="loading-states">
+            </div>
+          ) : (
+            <>
+              <div className="table-flex-wrapper">
+                {/* Row 1 - Net Income (Full Width) - Now includes Total Customers and Sales Trend */}
+                <div className="net-income">
+                  <SalesSummary 
                     orderData={orderData}
-                    onInvoiceSelect={handleInvoiceSelect}
+                    statsFilter={statsFilter}
                   />
+                </div>
 
-                  {/* Row 2, Column 2 - User Info & Bestseller */}
-                  <div className="right-column-wrapper">
-                    <Bestseller bestsellers={bestsellers} orderData={orderData} />
-                  </div>
+                {/* Row 2, Column 1 - Order Sales */}
+                <OrderSales 
+                  orderData={orderData}
+                  onInvoiceSelect={handleInvoiceSelect}
+                />
 
-                  {/* Row 3 - Stats Container & Peak Hours (Full Width) */}
+                {/* Row 2, Column 2 - Bestseller */}
+                <div className="right-column-wrapper">
+                  <Bestseller bestsellers={bestsellers} orderData={orderData} />
                   <div className="bottom-analytics-wrapper">
-                    <StatsContainer 
-                      totalEarnings={totalEarnings}
-                      totalCustomers={totalCustomers}
-                      statsFilter={statsFilter}
-                      onStatsFilterChange={handleStatsFilter}
-                      orderData={orderData}
-                    />
-                    <PeakHours orderData={orderData} />
+                  <PeakHours orderData={orderData} />
                   </div>
                 </div>
-              </>
-            )}
+
+                {/* Row 3 - Peak Hours (Full Width) */}
+              </div>
+            </>
+          )}
         </div>
       </div>
 

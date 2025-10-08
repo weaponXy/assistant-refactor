@@ -139,7 +139,8 @@
   background-color: #fff;
   scrollbar-width: thin;
   scrollbar-color: #04B4FC #f1f1f1;
-  max-height: 500px;
+  max-height: 800px;
+  height: 100%;
 }
 
 /* Table filters */
@@ -234,31 +235,6 @@
   color: rgb(47, 47, 47);
   background-color: #f8f9fa;
   border: #dee2e6 1px solid;
-}
-
-/* Mobile responsive adjustments */
-@media (max-width: 768px) {
-  .modal-header {
-    flex-direction: column;
-    gap: 10px;
-    align-items: stretch;
-  }
-  
-  .update-order-btn {
-    width: 100%;
-    justify-content: center;
-    padding: 12px;
-    font-size: 14px;
-  }
-  
-  .update-form .form-group {
-    max-width: 100%;
-  }
-  
-  .status-indicator {
-    text-align: center;
-    padding: 6px 12px;
-  }
 }
 
 .sales-table-wrapper table th:first-child,
@@ -477,49 +453,4 @@
 
 .item-text {
   flex: 1;
-}
-
-/* Mobile responsive for modal dropdown */
-@media (max-width: 768px) {
-  .modal-custom-dropdown-button {
-    padding: 14px 16px;
-    font-size: 15px;
-  }
-
-  .modal-custom-dropdown-button .dropdown-button-content {
-    font-size: 15px;
-  }
-
-  .modal-custom-dropdown-list .dropdown-item {
-    padding: 14px 16px;
-    font-size: 15px;
-  }
-
-  .modal-custom-dropdown-list {
-    max-height: 180px;
-  }
-}
-
-/* Mobile responsive (General) */
-@media (max-width: 768px) {
-  .custom-dropdown-button {
-    width: 100%;
-    min-width: auto;
-    margin-bottom: 10px;
-    padding: 14px 16px;
-  }
-
-  .dropdown-button-content {
-    font-size: 15px;
-  }
-
-  .dropdown-item {
-    padding: 14px 16px;
-    font-size: 15px;
-  }
-
-  .item-icon {
-    font-size: 18px;
-    width: 24px;
-  }
 }
