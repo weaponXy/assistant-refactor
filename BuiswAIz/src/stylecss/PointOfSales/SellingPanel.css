@@ -270,3 +270,69 @@
   border-color: #ff6b6b;
   color: #ff6b6b;
 }
+
+.datetime-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 15px;
+  background: linear-gradient(135deg, #f8faff 0%, #ffffff 100%);
+  border-radius: 12px;
+  border: 2px solid #e8efff;
+  margin-bottom: 15px;
+}
+
+.datetime-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.datetime-group label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-family: 'Montserrat', 'Segoe UI', sans-serif;
+}
+
+.datetime-input {
+  padding: 10px 12px;
+  border: 2px solid #d0d7e2;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #1a1a1a;
+  background: white;
+  transition: all 0.3s ease;
+  font-family: 'Montserrat', 'Segoe UI', sans-serif;
+  cursor: pointer;
+}
+
+.datetime-input:hover {
+  border-color: #04B4FC;
+  box-shadow: 0 2px 8px rgba(4, 180, 252, 0.15);
+}
+
+.datetime-input:focus {
+  outline: none;
+  border-color: #04B4FC;
+  box-shadow: 0 0 0 3px rgba(4, 180, 252, 0.1);
+}
+
+/* Date input calendar icon styling */
+.datetime-input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  filter: brightness(0) saturate(100%) invert(48%) sepia(79%) saturate(2476%) hue-rotate(186deg) brightness(97%) contrast(101%);
+  transition: all 0.2s ease;
+}
+
+.datetime-input::-webkit-calendar-picker-indicator:hover {
+  transform: scale(1.1);
+}
+
+/* Time input clock icon styling */
+.datetime-input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: brightness(0) saturate(100%) invert(48%) sepia(79%) saturate(2476%) hue-rotate(186deg) brightness(97%) contrast(101%);
+}

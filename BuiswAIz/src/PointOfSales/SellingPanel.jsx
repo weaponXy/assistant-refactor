@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import '../stylecss/PointOfSales/SellingPanel.css';
 
 const SellingPanel = ({ 
@@ -10,9 +10,47 @@ const SellingPanel = ({
   onCompleteTransaction, 
   onClearCart 
 }) => {
+  const [orderDate, setOrderDate] = useState('');
+  const [orderTime, setOrderTime] = useState('');
+
+  // Initialize date and time when component mounts
+  useEffect(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    
+    setOrderDate(`${year}-${month}-${day}`);
+    setOrderTime(`${hours}:${minutes}`);
+  }, []);
+
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const total = subtotal;
   const change = amountPaid ? (parseFloat(amountPaid) - total) : 0;
+
+  const handleCompleteTransaction = () => {
+    if (!orderDate || !orderTime) {
+      alert('Please select date and time for the transaction.');
+      return;
+    }
+    onCompleteTransaction({ orderDate, orderTime });
+  };
+
+  const handleClearCart = () => {
+    onClearCart();
+    // Reset date and time to current when clearing cart
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    
+    setOrderDate(`${year}-${month}-${day}`);
+    setOrderTime(`${hours}:${minutes}`);
+  };
 
   return (
     <div className="pos-order-section">
@@ -74,11 +112,34 @@ const SellingPanel = ({
 
       {cart.length > 0 && (
         <div className="order-summary">
+          {/* Date and Time Section */}
+          <div className="datetime-section">
+            <div className="datetime-group">
+              <label htmlFor="orderDate">Date:</label>
+              <input
+                type="date"
+                id="orderDate"
+                value={orderDate}
+                onChange={(e) => setOrderDate(e.target.value)}
+                className="datetime-input"
+              />
+            </div>
+            <div className="datetime-group">
+              <label htmlFor="orderTime">Time:</label>
+              <input
+                type="time"
+                id="orderTime"
+                value={orderTime}
+                onChange={(e) => setOrderTime(e.target.value)}
+                className="datetime-input"
+              />
+            </div>
+          </div>
+
           <div className="summary-row">
             <span>Subtotal:</span>
             <span>₱{subtotal.toFixed(2)}</span>
           </div>
-          {/* Tax row removed temporarily */}
           <div className="summary-row total">
             <span>Total:</span>
             <span>₱{total.toFixed(2)}</span>
@@ -117,10 +178,10 @@ const SellingPanel = ({
             </div>
           )}
 
-          <button className="checkout-btn" onClick={onCompleteTransaction}>
+          <button className="checkout-btn" onClick={handleCompleteTransaction}>
             Complete Transaction
           </button>
-          <button className="clear-btn" onClick={onClearCart}>
+          <button className="clear-btn" onClick={handleClearCart}>
             Clear Order
           </button>
         </div>

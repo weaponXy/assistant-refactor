@@ -195,8 +195,8 @@ const PointOfSales = () => {
     }
   };
 
-  // Complete transaction
-  const completeTransaction = async () => {
+  // Complete transaction - Updated to accept datetime parameter
+  const completeTransaction = async (dateTimeData) => {
     if (cart.length === 0) {
       alert('Cart is empty!');
       return;
@@ -207,8 +207,15 @@ const PointOfSales = () => {
       return;
     }
 
+    const { orderDate, orderTime } = dateTimeData;
+
+    if (!orderDate || !orderTime) {
+      alert('Please select date and time for the transaction.');
+      return;
+    }
+
     const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const total = subtotal; // Tax removed
+    const total = subtotal;
 
     // Determine order status based on payment
     const paidAmount = parseFloat(amountPaid);
@@ -218,17 +225,8 @@ const PointOfSales = () => {
     try {
       const uniqueOrderId = await generateUniqueOrderId();
       
-      const now = new Date();
-      const philippineTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
-      
-      const year = philippineTime.getFullYear();
-      const month = String(philippineTime.getMonth() + 1).padStart(2, '0');
-      const day = String(philippineTime.getDate()).padStart(2, '0');
-      const hours = String(philippineTime.getHours()).padStart(2, '0');
-      const minutes = String(philippineTime.getMinutes()).padStart(2, '0');
-      const seconds = String(philippineTime.getSeconds()).padStart(2, '0');
-      
-      const orderDateTime = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+      // Use the provided date and time
+      const orderDateTime = `${orderDate} ${orderTime}:00`;
 
       const orderRecord = {
         orderid: uniqueOrderId,
