@@ -175,6 +175,7 @@ const Supplier = () => {
               <li className="active">Supplier</li>
               <li onClick={() => navigate("/TablePage")}>Sales</li>
               <li onClick={() => navigate("/expenses")}>Expenses</li>
+              <li onClick={() => navigate("/PlannedPaymentsPage")}>Planned Payment</li>
               <li onClick={() => navigate("/assistant")}>AI Assistant</li>
             </ul>
             <p className="nav-header">SUPPORT</p>

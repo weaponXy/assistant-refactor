@@ -2,11 +2,24 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { listTaxedExpensesBetween, monthBounds, yearBounds } from "../api/tax";
 import "../stylecss/Dashboard/Dashboard.css";
+import "./taxCenter.css";
 
 function currency(n, min = 2, max = 2) {
   const v = Number(n || 0);
   return v.toLocaleString(undefined, { minimumFractionDigits: min, maximumFractionDigits: max });
 }
+
+function pct(part = 0, whole = 0) {
+  const w = Number(whole || 0);
+  const p = Number(part || 0);
+  return w > 0 ? (p / w) * 100 : 0;
+}
+
+const TYPE_LABEL = {
+  PERCENTAGE_TAX: "Percentage Tax",
+  VAT: "VAT",
+  NONE: "No Tax",
+};
 
 export default function TaxCenter({
   triggerLabel = "Tax",
@@ -46,6 +59,12 @@ export default function TaxCenter({
   }
 
   useEffect(() => { if (open) load(); /* eslint-disable-next-line */ }, [open, mode, month, year, customStart, customEnd, taxFilter]);
+
+  const periodLabel = useMemo(() => {
+    if (mode === "month") return new Date(`${month}-01T00:00:00Z`).toLocaleString(undefined, { month: "long", year: "numeric" });
+    if (mode === "year")  return `Year ${year}`;
+    return `${customStart} → ${customEnd}`;
+  }, [mode, month, year, customStart, customEnd]);
 
   // Summaries
   const summary = useMemo(() => {
@@ -108,136 +127,286 @@ export default function TaxCenter({
     URL.revokeObjectURL(url);
   }
 
+  const taxPct = pct(summary.totalTax, summary.totalGross);
+
   return (
     <>
       <button className={triggerClass} onClick={() => setOpen(true)}>{triggerLabel}</button>
       {!open ? null : (
-        <div className="modal-overlay">
-          <div className="modal" style={{ maxWidth: 1100, width: "95vw" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <h2>Tax Summary</h2>
+        <div
+          className="modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setOpen(false); }}
+        >
+          {/* Modal: capped height + internal scroll */}
+          <div
+            className="modal modal--tax"
+            style={{
+              maxWidth: 1100,
+              width: "95vw",
+              maxHeight: "88vh",
+              display: "flex",
+              flexDirection: "column",
+              padding: 0,
+              overflow: "hidden",
+            }}
+          >
+            {/* Header (non-scrolling) */}
+            <div
+              className="modal__header"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "12px 16px",
+                borderBottom: "1px solid #e5e7eb",
+                background: "#fff",
+                zIndex: 3
+              }}
+            >
+              <div>
+                <h2 style={{ margin: 0, lineHeight: 1.2 }}>Tax Summary</h2>
+                <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+                  Period: <span className="badge" style={{ padding: "2px 8px", borderRadius: 999, background: "#f3f4f6" }}>{periodLabel}</span>
+                </div>
+              </div>
               <div style={{ display: "flex", gap: 8 }}>
                 <button className="btn" onClick={exportCSV}>Export CSV</button>
                 <button className="icon-btn" onClick={() => setOpen(false)}>✕</button>
               </div>
             </div>
 
-            {/* Filters */}
-            <div className="fields-grid" style={{ marginTop: 8 }}>
-              <div className="field">
-                <label>Mode</label>
-                <select value={mode} onChange={(e) => setMode(e.target.value)}>
-                  <option value="month">Month</option>
-                  <option value="year">Year</option>
-                  <option value="custom">Custom</option>
-                </select>
-              </div>
-
-              {mode === "month" && (
-                <div className="field">
-                  <label>Month</label>
-                  <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
-                </div>
-              )}
-
-              {mode === "year" && (
-                <div className="field">
-                  <label>Year</label>
-                  <input type="number" value={year} onChange={(e) => setYear(e.target.value)} />
-                </div>
-              )}
-
-              {mode === "custom" && (
-                <>
+            {/* Content (scrolls) */}
+            <div
+              className="modal__content"
+              style={{
+                flex: "1 1 auto",
+                minHeight: 0,
+                overflow: "auto",
+                padding: 0,
+                background: "#fff"
+              }}
+            >
+              {/* Filters (sticky within the content scroller) */}
+              <div style={{
+                position: "sticky",
+                top: 0,
+                background: "#fff",
+                zIndex: 2,
+                borderBottom: "1px solid #e5e7eb"
+              }}>
+                <div className="fields-grid" style={{ margin: 0, padding: "10px 16px", gridTemplateColumns: "repeat(5, minmax(0,1fr))", gap: 12 }}>
                   <div className="field">
-                    <label>From</label>
-                    <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} />
+                    <label>Mode</label>
+                    <select value={mode} onChange={(e) => setMode(e.target.value)}>
+                      <option value="month">Month</option>
+                      <option value="year">Year</option>
+                      <option value="custom">Custom</option>
+                    </select>
                   </div>
+
+                  {mode === "month" && (
+                    <div className="field">
+                      <label>Month</label>
+                      <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+                    </div>
+                  )}
+
+                  {mode === "year" && (
+                    <div className="field">
+                      <label>Year</label>
+                      <input type="number" value={year} onChange={(e) => setYear(e.target.value)} />
+                    </div>
+                  )}
+
+                  {mode === "custom" && (
+                    <>
+                      <div className="field">
+                        <label>From</label>
+                        <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} />
+                      </div>
+                      <div className="field">
+                        <label>To</label>
+                        <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} />
+                      </div>
+                    </>
+                  )}
+
                   <div className="field">
-                    <label>To</label>
-                    <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} />
+                    <label>Tax Type</label>
+                    <select value={taxFilter} onChange={(e) => setTaxFilter(e.target.value)}>
+                      <option value="ALL">All</option>
+                      <option value="PERCENTAGE_TAX">Percentage Tax</option>
+                      <option value="VAT">VAT</option>
+                      <option value="NONE">No Tax</option>
+                    </select>
                   </div>
-                </>
-              )}
 
-              <div className="field">
-                <label>Tax Type</label>
-                <select value={taxFilter} onChange={(e) => setTaxFilter(e.target.value)}>
-                  <option value="ALL">All</option>
-                  <option value="PERCENTAGE_TAX">Percentage Tax</option>
-                  <option value="VAT">VAT</option>
-                  <option value="NONE">No Tax</option>
-                </select>
-              </div>
-
-              <div className="field" style={{ alignSelf: "end" }}>
-                <button className="btn" onClick={load} disabled={loading}>{loading ? "Loading…" : "Refresh"}</button>
-              </div>
-            </div>
-
-            {/* Summary cards */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginTop: 12 }}>
-              <div className="card small">
-                <div className="muted">Total Gross</div>
-                <div className="h3">₱ {currency(summary.totalGross)}</div>
-              </div>
-              <div className="card small">
-                <div className="muted">Total Net</div>
-                <div className="h3">₱ {currency(summary.totalNet)}</div>
-              </div>
-              <div className="card small">
-                <div className="muted">Total Tax</div>
-                <div className="h3">₱ {currency(summary.totalTax)}</div>
-              </div>
-              <div className="card small">
-                <div className="muted">Records</div>
-                <div className="h3">{summary.count}</div>
-              </div>
-            </div>
-
-            {/* Breakdown by type */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginTop: 12 }}>
-              {["PERCENTAGE_TAX", "VAT", "NONE"].map(t => (
-                <div className="card small" key={t}>
-                  <div className="muted">{t.replace("_", " ")}</div>
-                  <div>Count: {summary.byType[t].count}</div>
-                  <div>Tax: ₱ {currency(summary.byType[t].tax)}</div>
-                  <div>Gross: ₱ {currency(summary.byType[t].gross)}</div>
+                  <div className="field" style={{ alignSelf: "end" }}>
+                    <button className="btn" onClick={load} disabled={loading}>{loading ? "Loading…" : "Refresh"}</button>
+                  </div>
                 </div>
-              ))}
-            </div>
+              </div>
 
-            {/* Table */}
-            <div style={{ marginTop: 16, maxHeight: "50vh", overflow: "auto" }}>
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Date</th><th>Type</th><th>Rate</th><th>Incl</th><th>Net</th><th>Tax</th><th>Gross</th><th>Withhold</th><th>Category</th><th>Contact</th><th>Notes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map(r => {
-                    const t = r.tax_json || {};
-                    return (
-                      <tr key={r.id}>
-                        <td>{r.occurred_on}</td>
-                        <td>{t.type || ""}</td>
-                        <td>{typeof t.rate === "number" ? t.rate : ""}</td>
-                        <td>{t.is_inclusive ? "✓" : ""}</td>
-                        <td style={{ textAlign: "right" }}>{Number(t.net || 0).toFixed(2)}</td>
-                        <td style={{ textAlign: "right" }}>{Number(t.tax || 0).toFixed(2)}</td>
-                        <td style={{ textAlign: "right" }}>{Number(t.gross || 0).toFixed(2)}</td>
-                        <td style={{ textAlign: "right" }}>{Number(t.withholding || 0).toFixed(2)}</td>
-                        <td>{r.category_path || ""}</td>
-                        <td>{r.contact_name || ""}</td>
-                        <td>{r.notes || ""}</td>
+              {/* ===== PRETTIER KPI DECK ===== */}
+              <div className="kpi-deck">
+                {/* Total Gross */}
+                <div className="kpi-card interactive">
+                  <div className="kpi-top">
+                    <div className="kpi-icon kpi-icon--gross" aria-hidden>₱</div>
+                    <span className="kpi-chip">Gross</span>
+                  </div>
+                  <div className="kpi-metric">₱ {currency(summary.totalGross)}</div>
+                  <div className="kpi-sub">Tax as % of Gross</div>
+                  <div className="progress"><span style={{ width: `${taxPct}%` }} /></div>
+                  <div className="kpi-foot">
+                    <span className="kpi-foot-label">Tax/Gross</span>
+                    <span className="kpi-foot-value">{taxPct.toFixed(1)}%</span>
+                  </div>
+                </div>
+
+                {/* Total Net */}
+                <div className="kpi-card interactive">
+                  <div className="kpi-top">
+                    <div className="kpi-icon kpi-icon--net" aria-hidden>≡</div>
+                    <span className="kpi-chip">Net</span>
+                  </div>
+                  <div className="kpi-metric">₱ {currency(summary.totalNet)}</div>
+                  <div className="kpi-sub">Records in period</div>
+                  <div className="progress"><span style={{ width: `${pct(summary.count, Math.max(summary.count, 1)) * 100}%` }} /></div>
+                  <div className="kpi-foot">
+                    <span className="kpi-foot-label">Records</span>
+                    <span className="kpi-foot-value">{summary.count}</span>
+                  </div>
+                </div>
+
+                {/* Total Tax */}
+                <div className="kpi-card interactive">
+                  <div className="kpi-top">
+                    <div className="kpi-icon kpi-icon--tax" aria-hidden>%</div>
+                    <span className="kpi-chip">Tax</span>
+                  </div>
+                  <div className="kpi-metric">₱ {currency(summary.totalTax)}</div>
+                  <div className="kpi-sub">Avg tax / record</div>
+                  <div className="progress"><span style={{ width: `${pct(summary.totalTax, summary.totalGross || summary.totalTax || 1) * 100}%` }} /></div>
+                  <div className="kpi-foot">
+                    <span className="kpi-foot-label">Average</span>
+                    <span className="kpi-foot-value">₱ {currency(summary.count ? summary.totalTax / summary.count : 0)}</span>
+                  </div>
+                </div>
+
+                {/* Mix (donut for VAT share of gross) */}
+                <div className="kpi-card interactive">
+                  <div className="kpi-top">
+                    <div className="kpi-icon kpi-icon--mix" aria-hidden>◎</div>
+                    <span className="kpi-chip">Mix</span>
+                  </div>
+                  <div className="kpi-metric">VAT vs %Tax</div>
+                  <div className="kpi-sub">Share of Gross</div>
+                  <div className="kpi-mix">
+                    <div className="donut" style={{ ['--p']: pct(summary.byType.VAT.gross, summary.totalGross) }} />
+                    <div className="mix-legend">
+                      <div><span className="dot dot--vat" /> VAT: {pct(summary.byType.VAT.gross, summary.totalGross).toFixed(1)}%</div>
+                      <div><span className="dot dot--ptax" /> %Tax: {pct(summary.byType.PERCENTAGE_TAX.gross, summary.totalGross).toFixed(1)}%</div>
+                    </div>
+                  </div>
+                  <div className="kpi-foot">
+                    <span className="kpi-foot-label">Total Gross</span>
+                    <span className="kpi-foot-value">₱ {currency(summary.totalGross)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* ===== Breakdown by type (with mini donuts) ===== */}
+              <div className="breakdown-grid">
+                {["PERCENTAGE_TAX", "VAT", "NONE"].map(t => {
+                  const b = summary.byType[t];
+                  const share = pct(b.gross, summary.totalGross);
+                  return (
+                    <div className="card small breakdown-card" key={t}>
+                      <div className="breakdown-head">
+                        <div className="donut sm" style={{ ['--p']: share }} />
+                        <div className="breakdown-title">
+                          <div className="muted">{TYPE_LABEL[t]}</div>
+                          <div className="breakdown-chip">{b.count} rec</div>
+                        </div>
+                      </div>
+                      <div className="breakdown-rows">
+                        <div className="row">
+                          <span>Gross</span>
+                          <strong>₱ {currency(b.gross)}</strong>
+                        </div>
+                        <div className="row">
+                          <span>Tax</span>
+                          <strong>₱ {currency(b.tax)}</strong>
+                        </div>
+                        <div className="row">
+                          <span>Share of Gross</span>
+                          <strong>{share.toFixed(1)}%</strong>
+                        </div>
+                      </div>
+                      <div className="progress thin">
+                        <span style={{ width: `${share}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* ===== Table ===== */}
+              <div style={{ borderTop: "1px solid #e5e7eb" }}>
+                <table className="table" style={{ minWidth: 900 }}>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Type</th>
+                      <th>Rate</th>
+                      <th>Incl</th>
+                      <th style={{ textAlign: "right" }}>Net</th>
+                      <th style={{ textAlign: "right" }}>Tax</th>
+                      <th style={{ textAlign: "right" }}>Gross</th>
+                      <th style={{ textAlign: "right" }}>Withhold</th>
+                      <th>Category</th>
+                      <th>Contact</th>
+                      <th style={{ width: 240 }}>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.length === 0 && !loading && (
+                      <tr>
+                        <td colSpan={11} style={{ textAlign: "center", padding: 24, color: "#6b7280" }}>
+                          No records for this period/filter.
+                        </td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    )}
+                    {rows.map(r => {
+                      const t = r.tax_json || {};
+                      return (
+                        <tr key={r.id}>
+                          <td style={{ position: "sticky", left: 0, background: "#fff" }}>{r.occurred_on}</td>
+                          <td>{TYPE_LABEL[t.type] || ""}</td>
+                          <td>{typeof t.rate === "number" ? t.rate : ""}</td>
+                          <td>{t.is_inclusive ? "✓" : ""}</td>
+                          <td style={{ textAlign: "right" }}>{Number(t.net || 0).toFixed(2)}</td>
+                          <td style={{ textAlign: "right" }}>{Number(t.tax || 0).toFixed(2)}</td>
+                          <td style={{ textAlign: "right" }}>{Number(t.gross || 0).toFixed(2)}</td>
+                          <td style={{ textAlign: "right" }}>{Number(t.withholding || 0).toFixed(2)}</td>
+                          <td>{r.category_path || ""}</td>
+                          <td>{r.contact_name || ""}</td>
+                          <td
+                            title={r.notes || ""}
+                            style={{ maxWidth: 240, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                          >
+                            {r.notes || ""}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
-
           </div>
         </div>
       )}

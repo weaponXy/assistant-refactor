@@ -198,6 +198,9 @@ const ExpenseDashboard = () => {
   const [taxInclusive, setTaxInclusive] = useState(false);
   const [withholdingRate, setWithholdingRate] = useState(0);
 
+  const [editOriginalAmount, setEditOriginalAmount] = useState(0);
+
+
 
   // pickers
   const [mains, setMains] = useState([]);
@@ -287,6 +290,20 @@ async function deleteExpenseDeep(expenseId) {
     .eq("id", expenseId);
   if (delExpErr) throw delExpErr;
 }
+
+  // Ensure a label with given name exists; return its id.
+  // Also keeps local `labels` state fresh.
+  async function ensureLabelByName(name, color = "#ef4444") {
+    const existing = labels.find(l => (l.name || "").toLowerCase() === name.toLowerCase());
+    if (existing) return existing.id;
+
+    const created = await createLabel({ name, color });  // already imported
+    const next = await listLabels();
+    setLabels(next);
+    const again = next.find(l => (l.name || "").toLowerCase() === name.toLowerCase());
+    return again?.id || created?.id;
+  }
+
 
 
   // ======== Auth guard ========
@@ -511,6 +528,21 @@ async function deleteExpenseDeep(expenseId) {
                     };
                   })(),
           };
+      
+            // --- Budget guardrail + auto-label ---
+      let finalLabelIds = expanded ? [...labelIds] : [];
+      if (Number(budget || 0) > 0) {
+        const projected = Number(spent || 0) + amountNum;
+        if (projected > Number(budget)) {
+          const overBy = projected - Number(budget);
+          const ok = confirm(`⚠️ This will put you over budget by ₱${overBy.toFixed(2)}.\nProceed?`);
+          if (!ok) return; // cancel create
+          // Ensure "Over budget" label is present
+          const overId = await ensureLabelByName("Over budget", "#ef4444");
+          if (overId && !finalLabelIds.includes(overId)) finalLabelIds.push(overId);
+        }
+      }
+    
 
       const exp = await createExpense({
         tax_json: taxSnapshot,
@@ -520,7 +552,7 @@ async function deleteExpenseDeep(expenseId) {
         notes: expanded ? (notes || null) : null,
         status: expanded ? status : 'uncleared',
         contact_id: expanded && contactId ? contactId : null,
-        label_ids: expanded ? labelIds : [],
+        label_ids: finalLabelIds,
       });
 
       if (newFiles.length) {
@@ -587,7 +619,18 @@ async function deleteExpenseDeep(expenseId) {
                   })(),
           };
  
-          
+          // --- Budget guardrail + auto-label for EDIT ---
+    let finalEditLabelIds = [...labelIds];
+    if (Number(budget || 0) > 0) {
+      const projected = Number(spent || 0) - Number(editOriginalAmount || 0) + amountNum;
+      if (projected > Number(budget)) {
+        const overBy = projected - Number(budget);
+        const ok = confirm(`⚠️ This change will put you over budget by ₱${overBy.toFixed(2)}.\nProceed?`);
+        if (!ok) return; // cancel update
+        const overId = await ensureLabelByName("Over budget", "#ef4444");
+        if (overId && !finalEditLabelIds.includes(overId)) finalEditLabelIds.push(overId);
+      }
+    }   
 
       await updateExpense(editId, {
         tax_json: taxSnapshot,
@@ -597,7 +640,7 @@ async function deleteExpenseDeep(expenseId) {
         notes: notes || null,
         status,
         contact_id: contactId || null,
-        label_ids: labelIds,
+        label_ids: finalEditLabelIds,
       });
 
       if (editFiles.length) {
@@ -668,6 +711,7 @@ async function deleteExpenseDeep(expenseId) {
       setEditId(row.id);
       setOccurredOn(String(row.occurred_on).slice(0,10));
       setAmount(String(row.amount));
+      setEditOriginalAmount(Number(row.amount || 0));
       setStatus(row.status || 'uncleared');
       setContactId(row.contact_id || '');
       setNotes(row.notes || '');
@@ -1060,7 +1104,7 @@ function getInlineAttachmentsFromRow(row) {
                 ))}
                 {visibleExpenses.length === 0 && (
                   <tr>
-                    <td colSpan={8} style={{ padding: '20px', color: '#64748b' }}>
+                    <td colSpan={7} style={{ padding: '20px', color: '#64748b' }}>
                       No expenses in the selected range.
                     </td>
                   </tr>
