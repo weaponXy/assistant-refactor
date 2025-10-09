@@ -344,8 +344,8 @@ export default function BudgetCenter({
                           type="number"
                           min="0"
                           step="0.01"
-                          value={editAmount}
-                          onChange={(e) => setEditAmount(e.target.value)}
+                          value={addAmount}
+                          onChange={(e) => setAddAmount(e.target.value)}
                           required
                         />
                       </div>
