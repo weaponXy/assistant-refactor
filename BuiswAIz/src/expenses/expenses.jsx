@@ -19,7 +19,7 @@ import ContactsCenter from "../contacts/ContactsCenter";
 import { listLabels, createLabel, deleteLabel } from '../api/labels';
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import TaxCenter from "../tax/TaxCenter";
-import { calcTax } from "../lib/tax";
+import { calcTax } from "../libs/tax";
 
 
 
