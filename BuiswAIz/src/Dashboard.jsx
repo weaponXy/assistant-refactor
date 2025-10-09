@@ -6,7 +6,7 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar, ResponsiveContainer,
 } from 'recharts';
 import TopSellingProducts from "./Dashboard/TopSellingProducts";
-import SalesSummary from "./Dashboard/SalesSummary";
+import SalesSummaryDashboard from "./Dashboard/SalesSummaryDashboard";
 import DailyGrossSales from "./Dashboard/DailyGrossSales";
 import Notifications from "./Dashboard/Notifications";
 import "./stylecss/Dashboard/Dashboard.css";
@@ -232,7 +232,7 @@ const Dashboard = () => {
             <div className="dashboard-panel sales-summary">
               <h3>Sales Summary</h3>
               <div className="panel-content">
-                <SalesSummary />
+                <SalesSummaryDashboard />
               </div>
             </div>
 

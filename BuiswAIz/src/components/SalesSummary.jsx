@@ -471,7 +471,7 @@ const SalesSummary = ({ orderData, statsFilter }) => {
               <span className="expand-icon" onClick={toggleTransactions}>{isTransactionsExpanded ? '🗙' : '三'}</span>
             </div>
             <p className="metric-value customers-value">{financialMetrics.totalCustomers.toLocaleString()}</p>
-            <p className="metric-description">Click icon to view details</p>
+            <p className="metric-description">Number of Total Customers</p>
           </div>
           
           {isTransactionsExpanded && (
