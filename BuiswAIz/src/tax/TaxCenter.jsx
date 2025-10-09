@@ -9,6 +9,12 @@ function currency(n, min = 2, max = 2) {
   return v.toLocaleString(undefined, { minimumFractionDigits: min, maximumFractionDigits: max });
 }
 
+function clampPct(x) {
+  const n = Number(x || 0);
+  return Math.max(0, Math.min(100, n));
+}
+
+
 function pct(part = 0, whole = 0) {
   const w = Number(whole || 0);
   const p = Number(part || 0);
@@ -37,26 +43,61 @@ export default function TaxCenter({
   const [customEnd, setCustomEnd] = useState(new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 1)).toISOString().slice(0, 10));
   const [taxFilter, setTaxFilter] = useState("ALL"); // 'ALL' | 'VAT' | 'PERCENTAGE_TAX' | 'NONE'
 
+  
+
+    const [allRows, setAllRows] = useState([]); // all rows for the period (incl. NONE)
+
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState([]);
 
-  async function load() {
-    setLoading(true);
-    try {
-      let start, end;
-      if (mode === "month") ({ start, end } = monthBounds(month));
-      else if (mode === "year") ({ start, end } = yearBounds(year));
-      else { start = customStart; end = customEnd; }
-      const data = await listTaxedExpensesBetween(start, end);
-      const filtered = (taxFilter === "ALL") ? data : data.filter(r => (r.tax_json?.type === taxFilter));
-      setRows(filtered);
-    } catch (e) {
-      console.error(e);
-      setRows([]);
-    } finally {
-      setLoading(false);
-    }
+
+  
+
+async function load() {
+  setLoading(true);
+  try {
+    let start, end;
+    if (mode === "month") ({ start, end } = monthBounds(month));
+    else if (mode === "year") ({ start, end } = yearBounds(year));
+    else { start = customStart; end = customEnd; }
+
+    const data = await listTaxedExpensesBetween(start, end);
+
+    // 1) Normalize every row to have tax_json.{type,net,tax,gross,...}
+    const normalized = (data || []).map(r => {
+      // Prefer normalized columns if they exist; otherwise derive from tax_json; otherwise fallback
+      const typ = (r.tax_type ?? r.tax_json?.type ?? "NONE");
+      const net = Number(r.tax_net ?? r.tax_json?.net ?? r.amount ?? 0);
+      const tax = Number(r.tax_tax ?? r.tax_json?.tax ?? 0);
+      const gross = Number(r.tax_gross ?? r.tax_json?.gross ?? r.amount ?? 0);
+      const withholding = Number(r.tax_withholding ?? r.tax_json?.withholding ?? 0);
+      const is_inclusive = (r.tax_is_inclusive ?? r.tax_json?.is_inclusive ?? true);
+      const rate = Number(r.tax_rate ?? r.tax_json?.rate ?? 0);
+      return {
+        ...r,
+        tax_json: { type: typ || "NONE", net, tax, gross, withholding, is_inclusive, rate },
+      };
+    });
+
+    // 2) Save ALL rows for summaries & donuts
+    setAllRows(normalized);
+
+    // 3) Apply table filter AFTER normalization
+    const tf = String(taxFilter || "ALL").toUpperCase();
+    const filtered = tf === "ALL"
+      ? normalized
+      : normalized.filter(r => String(r.tax_json?.type || "NONE").toUpperCase() === tf);
+
+    setRows(filtered);
+  } catch (e) {
+    console.error(e);
+    setAllRows([]);
+    setRows([]);
+  } finally {
+    setLoading(false);
   }
+}
+
 
   useEffect(() => { if (open) load(); /* eslint-disable-next-line */ }, [open, mode, month, year, customStart, customEnd, taxFilter]);
 
@@ -80,16 +121,24 @@ export default function TaxCenter({
       },
     };
     for (const r of rows) {
-      const t = r.tax_json || {};
-      s.totalGross += Number(t.gross || 0);
-      s.totalNet   += Number(t.net || 0);
-      s.totalTax   += Number(t.tax || 0);
-      if (t.type && s.byType[t.type]) {
-        s.byType[t.type].count++;
-        s.byType[t.type].tax += Number(t.tax || 0);
-        s.byType[t.type].gross += Number(t.gross || 0);
-      }
+    const t = r.tax_json || {};
+    const typ = t.type || "NONE";
+
+    const gross = Number((t.gross ?? r.amount) || 0);
+    const net   = Number((t.net   ?? r.amount) || 0);
+    const tax   = Number(t.tax || 0);
+
+    s.totalGross += gross;
+    s.totalNet   += net;
+    s.totalTax   += tax;
+
+    if (s.byType[typ]) {
+        s.byType[typ].count += 1;
+        s.byType[typ].tax   += tax;
+        s.byType[typ].gross += gross;
     }
+    }
+
     return s;
   }, [rows]);
 
@@ -259,7 +308,7 @@ export default function TaxCenter({
                   </div>
                   <div className="kpi-metric">₱ {currency(summary.totalGross)}</div>
                   <div className="kpi-sub">Tax as % of Gross</div>
-                  <div className="progress"><span style={{ width: `${taxPct}%` }} /></div>
+                 <div className="progress"><span style={{ width: `${clampPct(taxPct)}%` }} /></div>
                   <div className="kpi-foot">
                     <span className="kpi-foot-label">Tax/Gross</span>
                     <span className="kpi-foot-value">{taxPct.toFixed(1)}%</span>
@@ -274,7 +323,7 @@ export default function TaxCenter({
                   </div>
                   <div className="kpi-metric">₱ {currency(summary.totalNet)}</div>
                   <div className="kpi-sub">Records in period</div>
-                  <div className="progress"><span style={{ width: `${pct(summary.count, Math.max(summary.count, 1)) * 100}%` }} /></div>
+                  <div className="progress"><span style={{ width: `${clampPct(pct(summary.totalNet, summary.totalGross))}%` }} /></div>
                   <div className="kpi-foot">
                     <span className="kpi-foot-label">Records</span>
                     <span className="kpi-foot-value">{summary.count}</span>
@@ -289,7 +338,7 @@ export default function TaxCenter({
                   </div>
                   <div className="kpi-metric">₱ {currency(summary.totalTax)}</div>
                   <div className="kpi-sub">Avg tax / record</div>
-                  <div className="progress"><span style={{ width: `${pct(summary.totalTax, summary.totalGross || summary.totalTax || 1) * 100}%` }} /></div>
+                  <div className="progress"><span style={{ width: `${clampPct(pct(summary.totalTax, summary.totalGross || summary.totalTax || 1))}%` }} /></div>
                   <div className="kpi-foot">
                     <span className="kpi-foot-label">Average</span>
                     <span className="kpi-foot-value">₱ {currency(summary.count ? summary.totalTax / summary.count : 0)}</span>
@@ -305,7 +354,7 @@ export default function TaxCenter({
                   <div className="kpi-metric">VAT vs %Tax</div>
                   <div className="kpi-sub">Share of Gross</div>
                   <div className="kpi-mix">
-                    <div className="donut" style={{ ['--p']: pct(summary.byType.VAT.gross, summary.totalGross) }} />
+                    <div className="donut" style={{ '--p': pct(summary.byType.VAT.gross, summary.totalGross) }} />
                     <div className="mix-legend">
                       <div><span className="dot dot--vat" /> VAT: {pct(summary.byType.VAT.gross, summary.totalGross).toFixed(1)}%</div>
                       <div><span className="dot dot--ptax" /> %Tax: {pct(summary.byType.PERCENTAGE_TAX.gross, summary.totalGross).toFixed(1)}%</div>
@@ -347,8 +396,8 @@ export default function TaxCenter({
                         </div>
                       </div>
                       <div className="progress thin">
-                        <span style={{ width: `${share}%` }} />
-                      </div>
+                        <span style={{ width: `${clampPct(share)}%` }} />
+                        </div>
                     </div>
                   );
                 })}
@@ -381,28 +430,31 @@ export default function TaxCenter({
                       </tr>
                     )}
                     {rows.map(r => {
-                      const t = r.tax_json || {};
-                      return (
+                    const t = r.tax_json || {};
+                    const typ = t.type || "NONE";
+                    const net = Number((t.net ?? r.amount) || 0).toFixed(2);
+                    const tax = Number(t.tax || 0).toFixed(2);
+                    const gross = Number((t.gross ?? r.amount) || 0).toFixed(2);
+                    return (
                         <tr key={r.id}>
-                          <td style={{ position: "sticky", left: 0, background: "#fff" }}>{r.occurred_on}</td>
-                          <td>{TYPE_LABEL[t.type] || ""}</td>
-                          <td>{typeof t.rate === "number" ? t.rate : ""}</td>
-                          <td>{t.is_inclusive ? "✓" : ""}</td>
-                          <td style={{ textAlign: "right" }}>{Number(t.net || 0).toFixed(2)}</td>
-                          <td style={{ textAlign: "right" }}>{Number(t.tax || 0).toFixed(2)}</td>
-                          <td style={{ textAlign: "right" }}>{Number(t.gross || 0).toFixed(2)}</td>
-                          <td style={{ textAlign: "right" }}>{Number(t.withholding || 0).toFixed(2)}</td>
-                          <td>{r.category_path || ""}</td>
-                          <td>{r.contact_name || ""}</td>
-                          <td
-                            title={r.notes || ""}
-                            style={{ maxWidth: 240, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
-                          >
+                        <td style={{ position:"sticky", left:0, background:"#fff" }}>{r.occurred_on}</td>
+                        <td>{TYPE_LABEL[typ] || "No Tax"}</td>
+                        <td>{Number.isFinite(t.rate) ? t.rate : ""}</td>
+                        <td>{t.is_inclusive ? "✓" : ""}</td>
+                        <td style={{ textAlign:"right" }}>{net}</td>
+                        <td style={{ textAlign:"right" }}>{tax}</td>
+                        <td style={{ textAlign:"right" }}>{gross}</td>
+                        <td style={{ textAlign:"right" }}>{Number(t.withholding || 0).toFixed(2)}</td>
+                        <td>{r.category_path || ""}</td>
+                        <td>{r.contact_name || ""}</td>
+                        <td title={r.notes || ""} style={{ maxWidth:240, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
                             {r.notes || ""}
-                          </td>
+                        </td>
                         </tr>
-                      );
+                    );
                     })}
+
+
                   </tbody>
                 </table>
               </div>

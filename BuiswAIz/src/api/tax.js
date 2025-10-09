@@ -6,7 +6,33 @@ const DATE_COL = 'occurred_on';
 /**
  * Fetch expenses between [startISO, endISO) that have tax_json.
  * Returns rows with id, occurred_on, amount, category_path, contact_name, notes, tax_json.
+ * 
+ * 
+ * 
  */
+
+
+export async function listAllExpensesBetween(start, end) {
+  // If you have the view:
+  // return supabase.from("expense_tax_export_v")
+  //   .select("*")
+  //   .gte("occurred_on", start)
+  //   .lt("occurred_on", end)
+  //   .order("occurred_on", { ascending: false })
+  //   .then(({ data, error }) => { if (error) throw error; return data; });
+
+  // If you don’t have the view, fallback to expenses (ensure LEFT JOINs server-side)
+  const { data, error } = await supabase
+    .from("expenses") // must include rows with null tax_json
+    .select("id, occurred_on, amount, notes, category_path, contact_name, tax_json, tax_type, tax_rate, tax_is_inclusive, tax_net, tax_tax, tax_gross, tax_withholding")
+    .gte("occurred_on", start)
+    .lt("occurred_on", end)
+    .order("occurred_on", { ascending: false });
+
+  if (error) throw error;
+  return data;
+}
+
 export async function listTaxedExpensesBetween(startISO, endISO) {
   const { data: u } = await supabase.auth.getUser();
   if (!u?.user) return [];
@@ -14,7 +40,6 @@ export async function listTaxedExpensesBetween(startISO, endISO) {
   const baseRes = await supabase
     .from('expenses')
     .select(`id, ${DATE_COL}, amount, notes, status, category_id, contact_id, tax_json`)
-    .not('tax_json', 'is', null)
     .gte(DATE_COL, startISO)
     .lt(DATE_COL, endISO)
     .order(DATE_COL, { ascending: false });
