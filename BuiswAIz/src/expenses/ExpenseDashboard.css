@@ -747,3 +747,211 @@ body {
 .status--cleared    { background: #ecfdf5; color: #065f46; border-color: #a7f3d0; }   /* green */
 .status--uncleared  { background: #fef2f2; color: #991b1b; border-color: #fecaca; }   /* red */
 .status--reconciled { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }   /* blue */
+
+
+/* ===== Emphasized money input + KPI bar ===== */
+.field--full { grid-column: 1 / -1; }
+
+.amount-field label {
+  font-size: 13px;
+  color: #0f172a;
+  font-weight: 700;
+  letter-spacing: .02em;
+}
+
+.money-group {
+  display: flex;
+  align-items: stretch;
+  border: 2px solid #0ea5e9;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #f0f9ff, #ffffff 40%);
+  box-shadow: 0 6px 18px rgba(14,165,233,0.12);
+}
+
+.money-prefix {
+  display: grid;
+  place-items: center;
+  padding: 0 14px;
+  font-weight: 800;
+  color: #0ea5e9;
+  border-right: 1px dashed rgba(14,165,233,.35);
+  user-select: none;
+}
+
+.money-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 16px 14px;
+  font-size: 28px;
+  line-height: 1.1;
+  font-weight: 800;
+  color: #0b1220;
+  outline: none;
+}
+.money-input::placeholder { color: #94a3b8; font-weight: 600; }
+
+.money-help {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* KPI row (Net / Tax / Gross) */
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 12px 0 4px;
+}
+
+.kpi {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  box-shadow: 0 2px 10px rgba(2, 6, 23, 0.05);
+}
+.kpi__label {
+  display: block;
+  font-size: 11px;
+  color: #64748b;
+  letter-spacing: .02em;
+  margin-bottom: 2px;
+}
+.kpi__value {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: .01em;
+}
+
+/* color accents */
+.kpi--net .kpi__value { color: #334155; }    /* slate */
+.kpi--tax .kpi__value { color: #be123c; }    /* rose */
+.kpi--gross .kpi__value { color: #047857; }  /* emerald */
+
+/* responsive: stack neatly on narrow screens */
+@media (max-width: 560px) {
+  .kpi-row { grid-template-columns: 1fr; }
+}
+
+/* --- modal section dividers & titles --- */
+.section-divider {
+  border: 0;
+  border-top: 1px solid #e2e8f0; /* slate-200 */
+  margin: 14px 0;
+}
+.section-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;               /* slate-500 */
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  margin: 2px 0 8px;
+}
+
+
+/* ===== Visual hierarchy upgrades ===== */
+
+/* A thin color strip to brand the modal content area */
+.accent-bar {
+  height: 3px;
+  background: linear-gradient(90deg, #0ea5e9, #22c55e);
+  border-radius: 0 0 6px 6px;
+  margin: -10px 18px 10px; /* t/lr/b inside .modal-body padding */
+}
+
+/* Subtle “card” around important sections (Tax, Attachments) */
+.fieldset-card {
+  grid-column: 1 / -1;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fcfdff;
+  box-shadow: 0 2px 10px rgba(2,6,23,.04);
+  padding: 12px;
+}
+
+/* Section header with optional icon slot */
+.section-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.section-head .title {
+  font-size: 12px; font-weight: 800; letter-spacing: .04em;
+  color: #475569; text-transform: uppercase;
+}
+.section-head .hint { margin: 0; }
+
+/* KPI row: make the numbers slightly larger for dominance */
+.kpi .kpi__value { font-size: 22px; }
+
+/* Status pills (Edit modal) */
+.pill-group { display: inline-flex; gap: 8px; }
+.pill {
+  border: 1px solid #e2e8f0; background: #fff;
+  color: #0f172a; border-radius: 999px; padding: 6px 10px; font-size: 12px;
+  cursor: pointer; transition: border-color .15s, box-shadow .15s, background .15s;
+}
+.pill:hover { border-color: #94a3b8; background: #f8fafc; }
+.pill.is-active { border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,.16); }
+
+/* Make primary CTAs feel primary */
+.btn.primary.lg { padding: 12px 18px; font-size: 15px; border-radius: 12px; }
+
+/* Light divider to separate top grid from content without being heavy */
+.hr-ghost { height: 1px; background: #eef2f7; border: 0; grid-column: 1 / -1; margin: 8px 0 12px; }
+
+/* Attachments grid looks like a gallery */
+.attach-grid { display:flex; gap:12px; flex-wrap:wrap; }
+.attach-card { width: 140px; border:1px solid #e2e8f0; border-radius: 12px; padding: 8px; background:#fff; }
+.attach-thumb {
+  width: 100%; height: 90px; border-radius: 10px; background:#f1f5f9;
+  display:flex; align-items:center; justify-content:center; overflow:hidden;
+}
+
+
+/* ===== KPI Cards upgrade ===== */
+.kpi-card { display:flex; flex-direction:column; gap:10px; }
+.kpi-head { display:flex; align-items:center; justify-content:space-between; }
+.kpi-head h3 { font-size:14px; font-weight:800; color:#0f172a; }
+.kpi-main { font-size:28px; font-weight:800; line-height:1; color:#0b1220; }
+
+.subtle { font-size:12px; color:#94a3b8; }
+
+/* Risk pill */
+.risk-pill {
+  font-size:11px; font-weight:700; padding:6px 10px; border-radius:999px;
+  border:1px solid transparent; text-transform:uppercase; letter-spacing:.04em;
+}
+.risk--ok     { background:#ecfdf5; color:#065f46; border-color:#a7f3d0; }
+.risk--high   { background:#fffbeb; color:#92400e; border-color:#fde68a; }
+.risk--over   { background:#fef2f2; color:#991b1b; border-color:#fecaca; }
+.risk--nobudget { background:#eef2ff; color:#3730a3; border-color:#c7d2fe; }
+
+/* Meter */
+.meter {
+  position:relative; height:10px; background:#f1f5f9; border-radius:999px; overflow:hidden;
+  box-shadow: inset 0 1px 2px rgba(2,6,23,.06);
+}
+.meter__bar { height:100%; background:#0ea5e9; width:0; transition:width .3s ease; }
+.meter--high .meter__bar { background:#f59e0b; }
+.meter--over .meter__bar { background:#ef4444; }
+
+/* Three small stats under each card */
+.stat-row { display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; }
+.stat { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:8px 10px; }
+.stat__label { font-size:11px; color:#64748b; margin-bottom:2px; }
+.stat__value { font-size:16px; font-weight:800; color:#0f172a; }
+
+.text-ok { color:#047857; }
+.text-danger { color:#b91c1c; }
+
+/* Projection delta */
+.delta { display:flex; align-items:center; gap:10px; }
+.delta-pill {
+  font-size:12px; font-weight:700; padding:6px 10px; border-radius:999px;
+}
+.delta-pill.good { background:#ecfdf5; color:#065f46; }
+.delta-pill.bad  { background:#fef2f2; color:#991b1b; }
+.delta-hint { font-size:12px; color:#64748b; }
+.mini-note { font-size:11px; color:#94a3b8; }

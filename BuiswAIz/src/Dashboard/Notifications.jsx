@@ -17,6 +17,9 @@ const Notifications = () => {
     try {
       setLoading(true);
       const allNotifications = [];
+         const nowPH = new Date(
+          new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" })
+        );
 
       // 1. INVENTORY: Low stock (currentstock < reorderpoint)
       try {
@@ -129,7 +132,7 @@ const Notifications = () => {
               timestamp:
                 order.confirmed_at
                   ? new Date(order.confirmed_at)           // Confirmed → use confirmed_at
-                  : (order.created_at ? new Date(order.created_at) : null), // Pending → use created_at; NEVER “now”
+                  : (order.created_at ? new Date(order.created_at) : nowPH), // Pending → use created_at; NEVER “now”
               navigationPath: '/supplier'
             });
           });
@@ -313,6 +316,79 @@ const Notifications = () => {
         });
       }
 
+
+      // 5. PLANNED PAYMENTS: due/advance reminders (respects `notify`)
+      try {
+        // Map enum values to day offsets relative to due_date
+        // Map your enum -> day offsets relative to due_date
+        const OFFSETS = {
+          none: null,
+          due_date: 0,
+          one_day_before: -1,
+          three_days_before: -3,
+          week_before: -7,
+        };
+
+
+          const DAYMS = 24 * 60 * 60 * 1000;
+          const todayPH = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
+          const todayDatePH = new Date(`${todayPH}T00:00:00+08:00`);
+
+          const { data: plans, error: ppErr } = await supabase
+            .from("planned_payments")
+            .select("id, name, amount, due_date, notify, frequency, completed_at, expense_id, category_id, contact_id")
+            .neq("notify", "none")
+            .not("due_date", "is", null);
+
+          if (ppErr) throw ppErr;
+
+          (plans || [])
+            .filter(pp => !pp.completed_at && !pp.expense_id)
+            .forEach((pp, index) => {
+              const offset = OFFSETS[String(pp.notify)] ?? null;
+              const dueISO = String(pp.due_date || "");
+              if (offset === null || !/^\d{4}-\d{2}-\d{2}$/.test(dueISO)) return;
+
+              const [yy, mm, dd] = dueISO.split("-").map(n => parseInt(n, 10));
+              const duePH = new Date(`${yy}-${String(mm).padStart(2,"0")}-${String(dd).padStart(2,"0")}T00:00:00+08:00`);
+              const windowStartPH = new Date(duePH.getTime() + offset * DAYMS);
+
+              // 🔁 Show reminder on ANY day between alert start and the due date (inclusive)
+              if (todayDatePH >= windowStartPH && todayDatePH <= duePH) {
+                const daysLeft = Math.max(0, Math.ceil((duePH - todayDatePH) / DAYMS));
+                const isToday = daysLeft === 0;
+
+                allNotifications.push({
+                  id: `pp-window-${pp.id}-${pp.notify}-${index}-${todayPH}`,
+                  type: "planned-payment",
+                  title: isToday ? "Payment Due Today" : "Upcoming Payment",
+                  message: pp.name || "Planned payment",
+                  details: `Amount: ₱${Number(pp.amount || 0).toFixed(2)} • Due: ${dueISO}` + (isToday ? "" : ` • In ${daysLeft} day(s)`),
+                  priority: isToday ? "high" : "medium",
+                  timestamp: nowPH,
+                  navigationPath: "/PlannedPaymentsPage",
+                });
+              }
+
+              // ⏰ Overdue (only after due date, still open)
+              if (todayDatePH > duePH) {
+                allNotifications.push({
+                  id: `pp-overdue-${pp.id}-${index}-${todayPH}`,
+                  type: "planned-payment-overdue",
+                  title: "Overdue Payment",
+                  message: pp.name || "Planned payment",
+                  details: `Amount: ₱${Number(pp.amount || 0).toFixed(2)} • Due: ${dueISO}`,
+                  priority: "high",
+                  timestamp: duePH,
+                  navigationPath: "/PlannedPaymentsPage",
+                });
+              }
+            });
+      } catch (e) {
+        console.error("Planned payments fetch error:", e);
+      }
+
+
       // Sort notifications
       allNotifications.sort((a, b) => {
         const timeDiff = new Date(b.timestamp) - new Date(a.timestamp);
@@ -341,20 +417,26 @@ const Notifications = () => {
 
   const getPriorityClass = (priority) => `notification-item priority-${priority}`;
 
-  const formatTimestamp = (timestamp) => {
-    if (!timestamp) return '';              // ⬅️ if null/undefined, show nothing
-    const now = new Date();
-    let diff = now - new Date(timestamp);
-    if (Number.isNaN(diff)) return '';      // ⬅️ guard invalid dates
-    if (diff < 0) diff = 0;
-    const minutes = Math.floor(diff / (1000 * 60));
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    if (minutes < 1) return 'just now';
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    return `${days}d ago`;
-  };
+  function formatTimestamp(timestamp) {
+    if (!timestamp) return "";
+    const nowPH = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" }));
+    const ts = new Date(timestamp);
+
+    const isSameDay =
+      nowPH.getFullYear() === ts.getFullYear() &&
+      nowPH.getMonth() === ts.getMonth() &&
+      nowPH.getDate() === ts.getDate();
+
+    if (isSameDay) return "Today";
+
+    const diffMs = nowPH - ts;
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 1) return "Today";
+    if (diffDays === 1) return "Yesterday";
+    return `${diffDays} days ago`;
+  }
+
 
 
   if (loading) {
