@@ -102,12 +102,13 @@ const Bestseller = ({ bestsellers, orderData }) => {
               <th></th>
               <th>Product Name</th>
               <th>Total Sold</th>
+              <th>Orders</th>
             </tr>
           </thead>
           <tbody>
             {filteredBestsellers.length === 0 ? (
               <tr>
-                <td colSpan="3" style={{ textAlign: 'center', color: '#999' }}>
+                <td colSpan="4" style={{ textAlign: 'center', color: '#999' }}>
                   No sales data for this period
                 </td>
               </tr>
@@ -133,6 +134,7 @@ const Bestseller = ({ bestsellers, orderData }) => {
                   </td>
                   <td>{item.productname}</td>
                   <td>{item.totalQuantity}</td>
+                  <td>{item.timesBought}</td>
                 </tr>
               ))
             )}
