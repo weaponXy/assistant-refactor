@@ -9,11 +9,12 @@ const SalesSummaryDashboard = () => {
     percentageChange: 0,
     monthlyTotalSales: 0,
     monthlyNetIncome: 0,
-    dailyTransactions: 0
+    dailyTransactions: 0,
+    todaysGrossProfit: 0,
+    averageTransactionValue: 0
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
     fetchSalesData();
@@ -45,18 +46,57 @@ const SalesSummaryDashboard = () => {
       const lastDayOfMonth = new Date(currentYear, currentMonth, 0);
       const endOfMonthString = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(lastDayOfMonth.getDate()).padStart(2, '0')}`;
 
+      const todayStart = `${todayString} 00:00:00`;
+      const todayEnd = `${todayString} 23:59:59`;
+
       let todaysSale = 0;
+      let todaysGrossProfit = 0;
       let yesterdaysSale = 0;
       let dailyTransactions = 0;
+      let averageTransactionValue = 0;
 
-      const { data: todaysOrders } = await supabase
+      // Fetch today's orders
+      const { data: todaysOrders, error: todaysError } = await supabase
         .from('orders')
-        .select('totalamount, orderdate, orderid')
-        .gte('orderdate', `${todayString} 00:00:00`)
-        .lte('orderdate', `${todayString} 23:59:59`);
-      if (todaysOrders) {
-        todaysSale = todaysOrders.reduce((sum, order) => sum + (parseFloat(order.totalamount) || 0), 0);
+        .select('orderid, totalamount, orderdate')
+        .gte('orderdate', todayStart)
+        .lte('orderdate', todayEnd);
+
+      if (todaysError) {
+        console.warn('Failed to fetch today\'s orders:', todaysError);
+      } else if (todaysOrders && todaysOrders.length > 0) {
+        todaysSale = todaysOrders.reduce((sum, order) => {
+          const amount = parseFloat(order.totalamount);
+          return sum + (isNaN(amount) ? 0 : amount);
+        }, 0);
+        
         dailyTransactions = todaysOrders.length;
+
+        const { data: productCosts, error: costError } = await supabase
+          .from('productcategory')
+          .select('productid, cost');
+
+        if (!costError && productCosts && todaysOrders.length > 0) {
+          const { data: todaysOrderItems, error: orderItemsError } = await supabase
+            .from('orderitems')
+            .select('productid, quantity, orderid')
+            .in('orderid', todaysOrders.map(o => o.orderid));
+
+          if (!orderItemsError && todaysOrderItems) {
+            let todaysTotalCost = 0;
+            todaysOrderItems.forEach(item => {
+              const product = productCosts.find(p => p.productid === item.productid);
+              if (product) {
+                todaysTotalCost += parseFloat(product.cost || 0) * (parseFloat(item.quantity) || 0);
+              }
+            });
+            todaysGrossProfit = todaysSale - todaysTotalCost;
+          } else {
+            todaysGrossProfit = todaysSale;
+          }
+        } else {
+          todaysGrossProfit = todaysSale;
+        }
       }
 
       const { data: yesterdaysOrders } = await supabase
@@ -88,6 +128,10 @@ const SalesSummaryDashboard = () => {
 
       const monthlyNetIncome = monthlyTotalSales - monthlyExpensesTotal;
 
+      if (dailyTransactions > 0) {
+        averageTransactionValue = todaysGrossProfit / dailyTransactions;
+      }
+
       let percentageChange = 0;
       if (yesterdaysSale > 0) {
         percentageChange = ((todaysSale - yesterdaysSale) / yesterdaysSale) * 100;
@@ -101,7 +145,9 @@ const SalesSummaryDashboard = () => {
         percentageChange,
         monthlyTotalSales,
         monthlyNetIncome,
-        dailyTransactions
+        dailyTransactions,
+        todaysGrossProfit,
+        averageTransactionValue
       });
       setError(null);
     } catch (error) {
@@ -110,6 +156,39 @@ const SalesSummaryDashboard = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const downloadCSV = () => {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-PH');
+    const timeStr = now.toLocaleTimeString('en-PH');
+
+    const csvContent = [
+      ['Sales Summary Report'],
+      [`Generated on: ${dateStr} ${timeStr}`],
+      [''],
+      ['Metric', 'Value'],
+      ['Today\'s Sale', `P${salesData.todaysSale.toFixed(2)}`],
+      ['Yesterday\'s Sale', `P${salesData.yesterdaysSale.toFixed(2)}`],
+      ['Percentage Change', `${formatPercentageChange(salesData.percentageChange)}`],
+      ['Monthly Total Sales', `P${salesData.monthlyTotalSales.toFixed(2)}`],
+      ['Monthly Net Income', `P${salesData.monthlyNetIncome.toFixed(2)}`],
+      ['Daily Transactions', salesData.dailyTransactions],
+      ['Today\'s Gross Profit', `P${salesData.todaysGrossProfit.toFixed(2)}`],
+      ['Today\'s Average Transaction Value', `P${salesData.averageTransactionValue.toFixed(2)}`]
+    ].map(row => row.join(',')).join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Sales_Summary_${dateStr.replace(/\//g, '-')}.csv`);
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const formatPercentageChange = (change) => {
@@ -155,6 +234,12 @@ const SalesSummaryDashboard = () => {
 
   return (
     <div className="sales-summary-container">
+      <div className="sales-summary-header">
+        <button className="download-csv-btn" onClick={downloadCSV} title="Download as CSV">
+           Download Summary
+        </button>
+      </div>
+
       <div className="sales-summary-grid">
         <div className="sales-card">
           <div className="sales-icon trend-up"><span>📈</span></div>
@@ -206,29 +291,27 @@ const SalesSummaryDashboard = () => {
             <div className="sales-label">Daily Transactions</div>
           </div>
         </div>
-      </div>
 
-      {/* View More Button */}
-      <div className="view-more" onClick={() => setShowModal(true)}>
-        <button>Click here to view more...</button>
-      </div>
-
-      {/* Modal */}
-      {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3>Sales Summary Details</h3>
-            <ul>
-              <li><strong>Today's Sale:</strong> ₱{salesData.todaysSale.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</li>
-              <li><strong>Yesterday's Sale:</strong> ₱{salesData.yesterdaysSale.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</li>
-              <li><strong>Monthly Total Sales:</strong> ₱{salesData.monthlyTotalSales.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</li>
-              <li><strong>Monthly Net Income:</strong> ₱{salesData.monthlyNetIncome.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</li>
-              <li><strong>Daily Transactions:</strong> {salesData.dailyTransactions}</li>
-            </ul>
-            <button className="close-modal" onClick={() => setShowModal(false)}>Close</button>
+        <div className="sales-card">
+          <div className="sales-icon dollar"><span>💵</span></div>
+          <div className="sales-info">
+            <div className="sales-amount">
+              ₱{salesData.todaysGrossProfit.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+            </div>
+            <div className="sales-label">Today's Gross Profit</div>
           </div>
         </div>
-      )}
+
+        <div className="sales-card">
+          <div className="sales-icon trend-up"><span>📊</span></div>
+          <div className="sales-info">
+            <div className="sales-amount">
+              ₱{salesData.averageTransactionValue.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+            </div>
+            <div className="sales-label">Today's Avg Transaction</div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

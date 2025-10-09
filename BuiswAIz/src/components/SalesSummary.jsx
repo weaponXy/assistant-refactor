@@ -10,6 +10,7 @@ const SalesSummary = ({ orderData, statsFilter }) => {
   const [percentageChange, setPercentageChange] = useState(0);
   const [isIncreasing, setIsIncreasing] = useState(null);
   const [isTransactionsExpanded, setIsTransactionsExpanded] = useState(false);
+  const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
   
 
   // Fetch expenses data
@@ -398,25 +399,38 @@ const SalesSummary = ({ orderData, statsFilter }) => {
     setIsTransactionsExpanded(!isTransactionsExpanded);
   };
 
+  const toggleSummary = () => {
+    setIsSummaryExpanded(!isSummaryExpanded);
+  };
+
   return (
-    <div className="net-income-container">
+    <div className={`net-income-container ${isSummaryExpanded ? 'expanded' : ''}`}>
       <div className="net-income-header">
         <h3>Sales Summary</h3>
-        <select 
-          className="filter-dropdown" 
-          value={localFilter} 
-          onChange={handleFilterChange}
-        >
-          <option value="all">All Time</option>
-          <option value="today">Today</option>
-          <option value="week1">1st Week</option>
-          <option value="week2">2nd Week</option>
-          <option value="week3">3rd Week</option>
-          <option value="month">This Month</option>
-          {availableYears.map(yearObj => (
-            <option key={yearObj.value} value={yearObj.value}>{yearObj.label}</option>
-          ))}
-        </select>
+        <div className="header-controls">
+          <button 
+            className="summary-expand-btn" 
+            onClick={toggleSummary}
+            title={isSummaryExpanded ? "Collapse Summary" : "Expand Summary"}
+          >
+            {isSummaryExpanded ? '🗙' : '☰'}
+          </button>
+          <select 
+            className="filter-dropdown" 
+            value={localFilter} 
+            onChange={handleFilterChange}
+          >
+            <option value="all">All Time</option>
+            <option value="today">Today</option>
+            <option value="week1">1st Week</option>
+            <option value="week2">2nd Week</option>
+            <option value="week3">3rd Week</option>
+            <option value="month">This Month</option>
+            {availableYears.map(yearObj => (
+              <option key={yearObj.value} value={yearObj.value}>{yearObj.label}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="metrics-grid">
@@ -468,7 +482,7 @@ const SalesSummary = ({ orderData, statsFilter }) => {
                 className="metric-icon"
               />
               <p className="metric-label">Total Transactions</p>
-              <span className="expand-icon" onClick={toggleTransactions}>{isTransactionsExpanded ? '🗙' : '三'}</span>
+              <span className="expand-icon" onClick={toggleTransactions}>{isTransactionsExpanded ? '🗙' : '☰'}</span>
             </div>
             <p className="metric-value customers-value">{financialMetrics.totalCustomers.toLocaleString()}</p>
             <p className="metric-description">Number of Total Customers</p>
@@ -540,58 +554,62 @@ const SalesSummary = ({ orderData, statsFilter }) => {
           </div>
         </div>
 
-        <div className="metric-card net-profit-card featured">
-          <div className="metric-content">
-            <p className="metric-label">Net Profit</p>
-            <p className={`metric-value large ${financialMetrics.netProfit >= 0 ? 'positive' : 'negative'}`}>
-              {formatCurrency(financialMetrics.netProfit)}
-            </p>
-            <p className="metric-description">Gross profit minus expenses</p>
-            <div className="profit-breakdown">
-              <div className="breakdown-item">
-                <span className="breakdown-label">Gross:</span>
-                <span className="breakdown-value">{formatCurrency(financialMetrics.grossProfit)}</span>
-              </div>
-              <div className="breakdown-divider">−</div>
-              <div className="breakdown-item">
-                <span className="breakdown-label">Expenses:</span>
-                <span className="breakdown-value">{formatCurrency(financialMetrics.totalExpenses)}</span>
+        {isSummaryExpanded && (
+          <>
+            <div className="metric-card net-profit-card featured">
+              <div className="metric-content">
+                <p className="metric-label">Net Profit</p>
+                <p className={`metric-value large ${financialMetrics.netProfit >= 0 ? 'positive' : 'negative'}`}>
+                  {formatCurrency(financialMetrics.netProfit)}
+                </p>
+                <p className="metric-description">Gross profit minus expenses</p>
+                <div className="profit-breakdown">
+                  <div className="breakdown-item">
+                    <span className="breakdown-label">Gross:</span>
+                    <span className="breakdown-value">{formatCurrency(financialMetrics.grossProfit)}</span>
+                  </div>
+                  <div className="breakdown-divider">−</div>
+                  <div className="breakdown-item">
+                    <span className="breakdown-label">Expenses:</span>
+                    <span className="breakdown-value">{formatCurrency(financialMetrics.totalExpenses)}</span>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        <div className="metric-card summary-card1">
-          <div className="summary-header">
-            <h4>Quick Summary</h4>
-          </div>
-          <div className="summary-content">
-            <div className="summary-row">
-              <span className="summary-label">Profit Margin:</span>
-              <span className={`summary-value ${financialMetrics.netProfit >= 0 ? 'positive' : 'negative'}`}>
-                {financialMetrics.netSales > 0 
-                  ? `${((financialMetrics.netProfit / financialMetrics.netSales) * 100).toFixed(2)}%`
-                  : '0%'}
-              </span>
+            <div className="metric-card summary-card1">
+              <div className="summary-header">
+                <h4>Quick Summary</h4>
+              </div>
+              <div className="summary-content">
+                <div className="summary-row">
+                  <span className="summary-label">Profit Margin:</span>
+                  <span className={`summary-value ${financialMetrics.netProfit >= 0 ? 'positive' : 'negative'}`}>
+                    {financialMetrics.netSales > 0 
+                      ? `${((financialMetrics.netProfit / financialMetrics.netSales) * 100).toFixed(2)}%`
+                      : '0%'}
+                  </span>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-label">Expense Ratio:</span>
+                  <span className="summary-value">
+                    {financialMetrics.netSales > 0 
+                      ? `${((financialMetrics.totalExpenses / financialMetrics.netSales) * 100).toFixed(2)}%`
+                      : '0%'}
+                  </span>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-label">Cost of Goods Sold Ratio:</span>
+                  <span className="summary-value">
+                    {financialMetrics.netSales > 0 
+                      ? `${((financialMetrics.cogs / financialMetrics.netSales) * 100).toFixed(2)}%`
+                      : '0%'}
+                  </span>
+                </div>
+              </div>
             </div>
-            <div className="summary-row">
-              <span className="summary-label">Expense Ratio:</span>
-              <span className="summary-value">
-                {financialMetrics.netSales > 0 
-                  ? `${((financialMetrics.totalExpenses / financialMetrics.netSales) * 100).toFixed(2)}%`
-                  : '0%'}
-              </span>
-            </div>
-            <div className="summary-row">
-              <span className="summary-label">Cost of Goods Sold Ratio:</span>
-              <span className="summary-value">
-                {financialMetrics.netSales > 0 
-                  ? `${((financialMetrics.cogs / financialMetrics.netSales) * 100).toFixed(2)}%`
-                  : '0%'}
-              </span>
-            </div>
-          </div>
-        </div>
+          </>
+        )}
       </div>
     </div>
   );

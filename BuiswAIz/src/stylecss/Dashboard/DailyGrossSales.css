@@ -1,7 +1,7 @@
 .daily-sales-container {
   width: 110%;
   height: 100%;
-  padding: 16px;
+  padding: 7px;
   display: flex;
   flex-direction: column;
   background-color: #ffffff;
@@ -12,12 +12,10 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
-  gap: 12px;
+  gap: 5px;
 }
 
 .daily-sales-header h4 {
-  margin: 0;
   font-size: 14px;
   font-weight: 600;
   color: #374151;
@@ -85,7 +83,8 @@
   display: flex;
   align-items: stretch;
   gap: 8px;
-  min-height: 200px;
+  max-height: 280px;  
+  height: 100%;
   min-width: 500px;
   width: 100%;
   position: relative;
@@ -507,120 +506,4 @@
   border-color: #0290c4;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(4, 180, 252, 0.4);
-}
-
-@media (max-width: 1024px) {
-  .chart-bars-container {
-    gap: 2px;
-  }
-  
-  .bar-group {
-    min-width: 35px;
-  }
-  
-  .bar-value {
-    font-size: 8px;
-  }
-  
-  .day-name {
-    font-size: 9px;
-  }
-  
-  .change-text {
-    font-size: 7px;
-  }
-}
-
-@media (max-width: 768px) {
-  .daily-sales-container {
-    padding: 12px;
-  }
-  
-  .summary-stats {
-    flex-direction: column;
-    gap: 8px;
-  }
-  
-  .stat-item {
-    flex-direction: row;
-    justify-content: space-between;
-  }
-  
-  .change-indicator {
-    display: none;
-  }
-  
-  .daily-sales-header {
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-  
-  .upload-sheet-button {
-    padding: 6px 12px;
-    font-size: 12px;
-  }
-
-  .sales-details-modal {
-    min-width: 95vw;
-    width: 95vw;
-  }
-  
-  .sales-summary-info {
-    flex-direction: column;
-    gap: 12px;
-  }
-  
-  .sales-items-table th,
-  .sales-items-table td {
-    padding: 8px 10px;
-    font-size: 12px;
-  }
-  
-  .product-thumbnail,
-  .product-thumbnail-placeholder {
-    width: 32px;
-    height: 32px;
-  }
-
-  .product-category {
-    font-size: 10px;
-    padding: 3px 8px;
-  }
-}
-
-@media (max-width: 480px) {
-  .bar-group {
-    min-width: 25px;
-  }
-  
-  .bar-value {
-    display: none;
-  }
-  
-  .daily-sales-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-  
-  .daily-sales-header-left {
-    flex-direction: column;
-    align-items: flex-start;
-    width: 100%;
-  }
-  
-  .upload-sheet-button {
-    width: 100%;
-    text-align: center;
-  }
-
-  .sales-details-modal {
-    min-width: 100vw;
-  }
-
-  .sales-items-table th,
-  .sales-items-table td {
-    padding: 6px 8px;
-    font-size: 11px;
-  }
 }

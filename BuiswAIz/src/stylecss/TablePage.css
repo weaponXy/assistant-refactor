@@ -42,7 +42,7 @@ body {
   overflow: auto;
 }
 
-/* Sales Panel - Updated Grid Layout */
+/* Sales Panel - Updated Grid Layout with Dynamic Rows */
 .sales-panel {
   grid-column: 1;
   grid-row: 1;
@@ -52,9 +52,10 @@ body {
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
   display: grid;
   grid-template-columns: 1fr;
-  grid-template-rows: 3fr 1fr;
+  grid-template-rows: auto 1fr;
   gap: 20px;
   overflow: visible;
+  min-height: min-content;
 }
 
 /* Container styles */
@@ -77,7 +78,7 @@ h3 {
   font-family: 'Montserrat', sans-serif;
 }
 
-/* Flex layout for tables - Updated for new layout with Net Income on top */
+/* Flex layout for tables - Updated with auto height for Net Income */
 .table-flex-wrapper {
   grid-column: 1;
   grid-row: 1;
@@ -119,7 +120,7 @@ h3 {
   height: 100%;
 }
 
-/* Net Income - Row 1, Full Width */
+/* Net Income - Row 1, Full Width with Dynamic Height */
 .net-income {
   grid-column: 1 / -1;
   grid-row: 1;
@@ -128,8 +129,9 @@ h3 {
   padding: 0;
   border: none;
   overflow: visible;
-  min-height: 520px;
-  height: 100%;
+  min-height: auto;
+  height: auto;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Bestseller takes the first row in right column */
@@ -272,4 +274,9 @@ table tbody td {
 
 .table-flex-wrapper {
   overflow: auto;
+}
+
+/* Ensure smooth transitions for all child components */
+.sales-panel > * {
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
