@@ -17,11 +17,11 @@ public sealed class PlannerService
     private readonly string _plannerSystem;
     private readonly GroqJsonClient _groq;
 
-    public Task<System.Text.Json.JsonDocument> JsonPlanAsync(string system, string userPrompt) =>
-        _groq.CompleteJsonAsync(system, userPrompt);
+    public Task<System.Text.Json.JsonDocument> JsonPlanAsync(string system, string userPrompt, CancellationToken ct = default) =>
+        _groq.CompleteJsonAsyncChat(system, userPrompt, null, 0.0, ct);
 
-    public Task<System.Text.Json.JsonDocument> JsonRenderAsync(string system, string userPrompt, object rows) =>
-        _groq.CompleteJsonAsync(system, userPrompt, rows);
+    public Task<System.Text.Json.JsonDocument> JsonRenderAsync(string system, string userPrompt, object rows, CancellationToken ct = default) =>
+        _groq.CompleteJsonAsyncReport(system, userPrompt, rows, 0.0, ct);
 
     public PlannerService(IHttpClientFactory factory, IConfiguration cfg, PromptLoader prompts, BConfig appCfg, GroqJsonClient groq)
     {
@@ -484,11 +484,6 @@ public sealed class PlannerService
     }
 
 
-    public Task<JsonDocument> JsonPlanAsync(string system, string user, CancellationToken ct)
-        => _groq.CompleteJsonAsync(system, user, data: null, ct);
-
-    // New overload: system+user+data+ct
-    public Task<JsonDocument> JsonPlanAsync(string system, string user, object? data, CancellationToken ct)
-        => _groq.CompleteJsonAsync(system, user, data, ct);
+    // Removed duplicate methods - using the ones at the top of the class instead
 
 }

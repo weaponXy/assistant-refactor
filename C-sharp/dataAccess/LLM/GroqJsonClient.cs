@@ -9,7 +9,8 @@ public sealed class GroqJsonClient
 {
     private readonly HttpClient _http;
     private readonly string _apiKey;
-    private readonly string _model;
+    private readonly string _chatModel;
+    private readonly string _reportModel;
 
     private static readonly JsonSerializerOptions _jsonOpts = new()
     {
@@ -32,14 +33,8 @@ public sealed class GroqJsonClient
             ?? throw new InvalidOperationException("APP__GROQ__API_KEY (or GROQ_API_KEY) is not set.");
 
         // Allow override via config/env; default to a JSON-capable, fast model
-        _model =
-            cfg["APP:GROQ:MODEL"]
-            ?? cfg["APP__GROQ__MODEL"]
-            ?? cfg["GROQ:MODEL"]
-            ?? cfg["GROQ_MODEL"]
-            ?? Environment.GetEnvironmentVariable("APP__GROQ__MODEL")
-            ?? Environment.GetEnvironmentVariable("GROQ_MODEL")
-            ?? "gemma2-9b-it";
+        _chatModel = cfg["APP__GROQ__MODEL_CHAT"] ?? Environment.GetEnvironmentVariable("APP__GROQ__MODEL_CHAT") ?? "llama-3.1-8b-instant";
+        _reportModel = cfg["APP__GROQ__MODEL_REPORT"] ?? Environment.GetEnvironmentVariable("APP__GROQ__MODEL_REPORT") ?? "llama-3.3-70b-versatile";
 
         // BaseAddress is usually set in Program.cs AddHttpClient<GroqJsonClient>(...), but keep it safe here:
         if (_http.BaseAddress is null)
@@ -55,23 +50,58 @@ public sealed class GroqJsonClient
     // PUBLIC API
     // ----------------------------------------------------------------
 
-    /// <summary>
-    /// Strict JSON-mode completion (original signature). Deterministic (temperature=0.0).
-    /// </summary>
-    public async Task<JsonDocument> CompleteJsonAsync(
+    // Legacy adapter compatibility overloads (used by ModelSelectingGroqAdapter)
+    // (system, user, data, ct)
+    public Task<JsonDocument> CompleteJsonAsync(
+        string system,
+        string user,
+        object? data,
+        CancellationToken ct = default)
+        => CompleteJsonAsyncReport(system, user, data, 0.0, ct);
+
+    // (system, data, ct) — adapter may pass a single payload; we provide a default "render" user
+    public Task<JsonDocument> CompleteJsonAsync(
+        string system,
+        object input,
+        CancellationToken ct = default)
+        => CompleteJsonAsyncReport(system, "render", input, 0.0, ct);
+
+    // Use this for chat: client.CompleteJsonAsyncChat(...)
+    public Task<JsonDocument> CompleteJsonAsyncChat(
         string system,
         string user,
         object? data = null,
+        double temperature = 0.0,
         CancellationToken ct = default)
-        => await CompleteJsonAsync(system, user, data, temperature: 0.0, ct);
+        => CompleteJsonAsync(system, user, data, _chatModel, temperature, ct);
+
+    // Use this for reports: client.CompleteJsonAsyncReport(...)
+    public Task<JsonDocument> CompleteJsonAsyncReport(
+        string system,
+        string user,
+        object? data = null,
+        double temperature = 0.0,
+        CancellationToken ct = default)
+        => CompleteJsonAsync(system, user, data, _reportModel, temperature, ct);
+
+    // General: specify model explicitly
+    public Task<JsonDocument> CompleteJsonAsync(
+        string system,
+        string user,
+        object? data,
+        string model,
+        double temperature = 0.0,
+        CancellationToken ct = default)
+        => CompleteJsonAsyncInternal(system, user, data, model, temperature, ct);
 
     /// <summary>
     /// Strict JSON-mode completion with explicit temperature.
     /// </summary>
-    public async Task<JsonDocument> CompleteJsonAsync(
+    private async Task<JsonDocument> CompleteJsonAsyncInternal(
         string system,
         string user,
         object? data,
+        string model,
         double temperature,
         CancellationToken ct = default)
     {
@@ -82,7 +112,7 @@ public sealed class GroqJsonClient
 
         var req = new
         {
-            model = _model,
+            model = model,
             temperature = temperature,
             response_format = new { type = "json_object" },
             messages = BuildMessages(strictSystem, user, data)
@@ -115,6 +145,7 @@ public sealed class GroqJsonClient
         string system,
         JsonObject factsJson,
         IEnumerable<string> schemaKeys,
+        string model,
         double temperature,
         CancellationToken ct = default)
     {
@@ -124,7 +155,7 @@ public sealed class GroqJsonClient
             $"return strict JSON with exactly these keys: {keys}. " +
             "Do NOT invent numbers, dates, or percentages. Keep each field to 2–3 sentences.";
 
-        using var doc = await CompleteJsonAsync(system, user, data: factsJson, temperature: temperature, ct: ct);
+        using var doc = await CompleteJsonAsync(system, user, data: factsJson, model: model, temperature: temperature, ct: ct);
         return ToJsonObject(doc);
     }
 
@@ -134,11 +165,12 @@ public sealed class GroqJsonClient
     public Task<JsonObject> CompleteNarrativesAsync(
         string system,
         JsonObject factsJson,
+        string model,
         double temperature,
         CancellationToken ct = default)
     {
         var keys = new[] { "performance", "trends", "best_sellers_tips" };
-        return CompleteJsonAsync(system, factsJson, keys, temperature, ct);
+        return CompleteJsonAsync(system, factsJson, keys, model, temperature, ct);
     }
 
     // ----------------------------------------------------------------

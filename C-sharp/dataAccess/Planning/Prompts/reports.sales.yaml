@@ -2,7 +2,7 @@
 version: "0.4.0"
 
 model:
-  name: groq/gemma2-9b-it
+  name: groq/llama-3.3-70b-versatile
   temperature: 0.2
   max_output_tokens: 1600
 
@@ -162,9 +162,9 @@ phase2:
     # 4) Narratives (top-level "narratives" object)
     - Write THREE concise fields using ONLY the available numbers:
       {
-        "performance": "3–4 sentences describing revenue and movement vs prior (if any).",
-        "trends": "2–3 sentences describing peaks/seasonality from the day-series; if unclear, say it's steady.",
-        "best_sellers_tips": "2–3 sentences with light, actionable tips tied to the actual top list."
+        "performance": "3 - 4 sentences describing revenue and movement vs prior (if any).",
+        "trends": "2 - 3 sentences describing peaks/seasonality from the day-series; if unclear, say it's steady.",
+        "best_sellers_tips": "2 - 3 sentences with light, actionable tips tied to the actual top list."
       }
     - Prohibited:
       - Any numbers not present or derivable (simple arithmetic) from inputs.
@@ -176,9 +176,9 @@ phase2:
       If one is missing, use "narratives.best_sellers_tips" as fallback.
       If still fewer than two, add a generic sentence like: "This summary covers <period.label>."
     - Also populate "sections" as mirrors of the narratives:
-      * sales_performance.narrative → 3-4 sentences (reuse "narratives.performance")
-      * sales_trends.narrative     → 2–3 sentences (reuse "narratives.trends")
-      * best_selling.narrative     → 2–3 sentences (reuse "narratives.best_sellers_tips")
+      * sales_performance.narrative → 3 - 4 sentences (reuse "narratives.performance")
+      * sales_trends.narrative     → 2 - 3 sentences (reuse "narratives.trends")
+      * best_selling.narrative     → 2 - 3 sentences (reuse "narratives.best_sellers_tips")
 
     ## OUTPUT JSON SHAPE
     {

@@ -23,6 +23,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // -------------------------------
 // Config & Services
+builder.Services.AddSingleton<Shared.Allowlists.ISqlAllowlist, Shared.Allowlists.SqlAllowlistV2>();
 // -------------------------------
 var candidates = new[] {
     Path.Combine(AppContext.BaseDirectory, ".env"),                 // bin/Debug/netX/ with .env copied (optional)
@@ -41,13 +42,12 @@ var vec = Environment.GetEnvironmentVariable("APP__VEC__CONNECTIONSTRING")
           ?? throw new Exception("APP__VEC__CONNECTIONSTRING missing");
 
 builder.Services.AddSingleton<VecConnResolver>();
-builder.Services.AddScoped<ReportRunStore>();
 
+// Helper to resolve VEC connection string (with fallback)
 string Mask(string s) => Regex.Replace(s ?? "", @"Password=[^;]*", "Password=***");
 Console.WriteLine("[Boot] REL = " + Mask(rel));
 try { Console.WriteLine("[Boot] VEC = " + Mask(ResolveVecConn(builder.Configuration))); }
 catch { Console.WriteLine("[Boot] VEC = <missing>"); }
-
 
 builder.Services.AddScoped<SimpleForecastService>();
 builder.Services.AddScoped<ISqlCatalog, SqlCatalog>();
@@ -96,6 +96,7 @@ builder.Services.AddScoped<Func<string, CancellationToken, Task<string>>>(sp => 
     return spec.Phase2System; // property from your ReportSpecLoader result
 });
 builder.Services.AddScoped<YamlReportRunner>();
+builder.Services.AddScoped<dataAccess.Reports.YamlIntentRunner>();
 builder.Services.AddSingleton<IReportRunStore, ReportRunStore>();
 builder.Services.AddSingleton<TimeResolver>();
 builder.Services.AddSingleton<CapabilityGuard>();
@@ -197,8 +198,88 @@ app.MapGet("/api/debug/groq-ping", async (GroqJsonClient groq, CancellationToken
 {
     // Instruct the model to return valid JSON immediately
     var system = """Return exactly {"pong":true}.""";
-    var doc = await groq.CompleteJsonAsync(system, "ping", null, ct);
+    var doc = await groq.CompleteJsonAsyncChat(system, "ping", null, 0.0, ct);
     return Results.Json(doc.RootElement);
+});
+
+app.MapGet("/api/debug/expense-queries", async (ISqlCatalog catalog, CancellationToken ct) =>
+{
+    try
+    {
+        var startStr = "2025-10-01";
+        var endStr = "2025-10-31";
+        
+        var summary = await catalog.RunAsync("EXPENSE_SUMMARY", new Dictionary<string, object?> { ["start"] = startStr, ["end"] = endStr }, ct);
+        var categories = await catalog.RunAsync("TOP_EXPENSE_CATEGORIES", new Dictionary<string, object?> { ["start"] = startStr, ["end"] = endStr, ["k"] = 5 }, ct);
+        var daily = await catalog.RunAsync("EXPENSE_BY_DAY", new Dictionary<string, object?> { ["start"] = startStr, ["end"] = endStr }, ct);
+        var recent = await catalog.RunAsync("EXPENSE_RECENT_TRANSACTIONS", new Dictionary<string, object?> { ["start"] = startStr, ["end"] = endStr, ["limit"] = 10 }, ct);
+
+        return Results.Ok(new
+        {
+            summary,
+            categories,
+            daily,
+            recent,
+            debug_info = new { startStr, endStr, message = "Raw query results for October 2025" }
+        });
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message, stack = ex.StackTrace });
+    }
+});
+
+// Debug endpoint to check raw expense data
+app.MapGet("/api/debug/expense-data", async (AppDbContext db, CancellationToken ct) =>
+{
+    try
+    {
+        var start = DateOnly.Parse("2025-10-01");
+        var end = DateOnly.Parse("2025-10-31");
+        
+        // Get all expenses in the period with category info
+        var expenses = await db.Expenses
+            .Where(e => e.OccurredOn >= start && e.OccurredOn <= end)
+            .Join(db.Categories, e => e.CategoryId!, c => c.Id, (e, c) => new {
+                ExpenseId = e.Id,
+                Amount = e.Amount,
+                OccurredOn = e.OccurredOn,
+                CategoryId = e.CategoryId,
+                CategoryName = c.Name,
+                Notes = e.Notes
+            })
+            .OrderByDescending(x => x.OccurredOn)
+            .ToListAsync(ct);
+
+        // Calculate totals by category
+        var categoryTotals = expenses
+            .GroupBy(x => x.CategoryName)
+            .Select(g => new {
+                category = g.Key,
+                total_amount = g.Sum(x => x.Amount),
+                transaction_count = g.Count(),
+                transactions = g.Select(x => new {
+                    id = x.ExpenseId,
+                    amount = x.Amount,
+                    date = x.OccurredOn,
+                    notes = x.Notes
+                }).ToList()
+            })
+            .OrderByDescending(x => x.total_amount)
+            .ToList();
+
+        return Results.Ok(new {
+            period = new { start = start.ToString("yyyy-MM-dd"), end = end.ToString("yyyy-MM-dd") },
+            total_expenses = expenses.Count,
+            total_amount = expenses.Sum(x => x.Amount),
+            category_breakdown = categoryTotals,
+            all_transactions = expenses
+        });
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message, stack = ex.StackTrace });
+    }
 });
 
 app.MapGet("/api/debug/expense-spec-deep", async () =>
@@ -316,202 +397,6 @@ app.MapPost("/api/hybrid/route", async (HybridQueryService svc, RouteReq req, Ca
 app.MapPost("/api/vector/route", async (VectorSearchService svc, RouteReq req, CancellationToken ct) =>
     Results.Ok(await svc.DispatchAsync(req.Input ?? "", ct)));
 
-app.MapPost("/api/reports/expense/plan-inline", async (
-    HttpContext ctx,
-    PlannerService planner,
-    dataAccess.Planning.Validation.PlanValidator validator,
-    CancellationToken ct) =>
-{
-    // read request once
-    using var jdoc = await JsonDocument.ParseAsync(ctx.Request.Body, cancellationToken: ct);
-    var text = jdoc.RootElement.TryGetProperty("text", out var tEl) && tEl.ValueKind == JsonValueKind.String
-        ? tEl.GetString() ?? ""
-        : "";
-
-    // 100% INLINE. No YAML loader here at all.
-    var system = """
-    You MUST return ONLY strict JSON (no prose, no markdown, no code fences).
-    Target JSON schema (use exactly these keys and snake_case):
-    {
-      "intent": "expense_report",
-      "slots": {
-        "period_start": "YYYY-MM-DD",
-        "period_end": "YYYY-MM-DD",
-        "compare_to_prior": true
-      },
-      "sql_requests": [
-        { "query_id": "EXPENSE_SUMMARY",           "args": { "start": "YYYY-MM-DD", "end": "YYYY-MM-DD" } },
-        { "query_id": "TOP_EXPENSE_CATEGORIES",    "args": { "start": "YYYY-MM-DD", "end": "YYYY-MM-DD", "k": 5 } },
-        { "query_id": "EXPENSE_BY_CATEGORY_WEEKLY","args": { "start": "YYYY-MM-DD", "end": "YYYY-MM-DD" } }
-      ]
-    }
-    Rules:
-    - Map phrases like "this month", "last month", "Q1 2025" to concrete dates.
-    - Set compare_to_prior when the user asks for trends or comparison.
-    - Do NOT add extra fields; keys must match exactly.
-    """;
-
-    try
-    {
-        // call the model
-        using var planDoc = await planner.JsonPlanAsync(system, text, ct);
-
-        // validate while document is alive
-        validator.ValidatePhase1(planDoc);
-
-        // IMPORTANT: capture raw JSON before disposing planDoc
-        var rawJson = planDoc.RootElement.GetRawText();
-
-        // return strict JSON (no extra wrapper), correct content-type
-        return Results.Text(rawJson, "application/json");
-    }
-    catch (HttpRequestException ex)
-    {
-        // upstream call failed
-        return Results.Problem(
-            title: "Upstream model call failed",
-            detail: $"{ex.GetType().Name}: {ex.Message}",
-            statusCode: 502);
-    }
-    catch (System.ComponentModel.DataAnnotations.ValidationException vex)
-    {
-        // if validation fails, include the model's raw JSON for debugging
-        // NOTE: we don't have planDoc in this catch, so we can't echo raw here unless we captured it earlier.
-        // If you want raw on validation errors too, capture it before ValidatePhase1 and reuse it here.
-        return Results.BadRequest(new
-        {
-            error = "Phase1ValidationFailed",
-            message = vex.Message
-        });
-    }
-    catch (Exception ex)
-    {
-        return Results.BadRequest(new
-        {
-            error = ex.GetType().Name,
-            message = ex.Message
-        });
-    }
-});
-
-// -------------------------------
-// Expense Report: Phase-1 (plan) — YAML-driven, strict JSON
-// -------------------------------
-app.MapPost("/api/reports/expense/plan", async (
-    HttpContext ctx,
-    PromptComposer prompts,
-    PlannerService planner,
-    dataAccess.Planning.Validation.PlanValidator validator,
-    CancellationToken ct) =>
-{
-    try
-    {
-        ctx.Request.EnableBuffering();
-        string raw;
-        using (var reader = new StreamReader(ctx.Request.Body, Encoding.UTF8, true, 4096, leaveOpen: true))
-            raw = await reader.ReadToEndAsync();
-        ctx.Request.Body.Position = 0;
-
-        using var jdocIn = JsonDocument.Parse(string.IsNullOrWhiteSpace(raw) ? "{}" : raw);
-        var rootIn = jdocIn.RootElement;
-
-        var text = rootIn.TryGetProperty("text", out var t) && t.ValueKind == JsonValueKind.String
-            ? t.GetString() ?? ""
-            : "";
-
-        var (system, _fix) = prompts.ComposePhase1("reports.expense.yaml"); // YAML → system
-        using var planDoc = await planner.JsonPlanAsync(system, text, ct);   // model → strict JSON
-
-        // validate while the document is still alive
-        validator.ValidatePhase1(planDoc); // intent, slots, sql_requests[*] present
-
-        // IMPORTANT: capture the raw JSON before the JsonDocument is disposed
-        var rawPlanJson = planDoc.RootElement.GetRawText();
-
-        // Return the raw JSON with the correct content type
-        return Results.Text(rawPlanJson, "application/json");
-    }
-    catch (Exception ex)
-    {
-        return Results.BadRequest(new { error = ex.GetType().Name, message = ex.Message });
-    }
-});
-
-// -------------------------------
-// Expense Report: Phase-2 (render) — single read, tolerant casing
-// -------------------------------
-app.MapPost("/api/reports/expense/render", async (
-    HttpContext ctx,
-    ISqlCatalog catalog,
-    GroqJsonClient groq,
-    dataAccess.Planning.Validation.PlanValidator validator,
-    CancellationToken ct) =>
-{
-    try
-    {
-        // Read the body ONCE
-        ctx.Request.EnableBuffering();
-        string rawJson;
-        using (var reader = new StreamReader(ctx.Request.Body, Encoding.UTF8, true, 4096, leaveOpen: true))
-            rawJson = await reader.ReadToEndAsync();
-        ctx.Request.Body.Position = 0;
-
-        using var jdoc = JsonDocument.Parse(rawJson);
-        var root = jdoc.RootElement;
-
-        // Pull "text"
-        var text = root.TryGetProperty("text", out var t) && t.ValueKind == JsonValueKind.String
-            ? t.GetString() ?? ""
-            : "";
-
-        // Pull sqlRequests[] and accept queryId OR query_id
-        var fixedReqs = new List<(string QueryId, IDictionary<string, object?> Args)>();
-        if (root.TryGetProperty("sqlRequests", out var arr) && arr.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var el in arr.EnumerateArray())
-            {
-                string? qid = null;
-                if (el.TryGetProperty("queryId", out var q1) && q1.ValueKind == JsonValueKind.String)
-                    qid = q1.GetString();
-                else if (el.TryGetProperty("query_id", out var q2) && q2.ValueKind == JsonValueKind.String)
-                    qid = q2.GetString();
-
-                if (string.IsNullOrWhiteSpace(qid)) continue;
-
-                var args = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-                if (el.TryGetProperty("args", out var a) && a.ValueKind == JsonValueKind.Object)
-                    foreach (var p in a.EnumerateObject())
-                        args[p.Name] = p.Value.Deserialize<object?>();
-
-                fixedReqs.Add((qid!, args));
-            }
-        }
-
-        if (fixedReqs.Count == 0)
-            return Results.BadRequest(new { error = "No valid sqlRequests (queryId or query_id) found." });
-
-        // Execute allow-listed queries
-        var rows = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (qid, args) in fixedReqs)
-            rows[qid] = await catalog.RunAsync(qid, args, ct);
-
-        // Load prompt + render via Groq
-        var spec = await dataAccess.Api.Services.ReportSpecLoader
-        .LoadAsync("reports.expense.yaml", ct);
-        var ui = await groq.CompleteJsonAsync(spec.Phase2System, text, new { rows }, ct);
-
-        // Validate & return
-        validator.ValidateUiSpec(ui, rows);
-        return Results.Json(ui.RootElement, contentType: "application/json");
-    }
-    catch (Exception ex)
-    {
-        var status = ex is HttpRequestException ? 502 : 500;
-        var title = ex is HttpRequestException ? "Upstream model call failed" : "Render failed";
-        return Results.Problem(detail: $"{ex.GetType().Name}: {ex.Message}", statusCode: status, title: title);
-    }
-});
-
 app.MapPost("/api/reports/inventory/plan", async (
     HttpContext ctx,
     PromptComposer prompts,
@@ -625,7 +510,7 @@ app.MapPost("/api/reports/inventory/render", async (
 
         // prefer a deterministic user message; `text` can be empty
         const string phase2User = "Render the Inventory report UI spec using only the provided rows.";
-        using var uiDocRaw = await groq.CompleteJsonAsync(spec.Phase2System, phase2User, new { rows, input_text = text }, ct);
+    using var uiDocRaw = await groq.CompleteJsonAsyncReport(spec.Phase2System, phase2User, new { rows, input_text = text }, 0.0, ct);
 
         // -------- 5) Normalize UI: ensure required fields + narrative hygiene --------
         static JsonDocument EnsureUiMinimum(JsonDocument ui, string titleFallback, string periodLabelFallback)
@@ -674,6 +559,245 @@ app.MapPost("/api/reports/inventory/render", async (
         var json = uiDoc.RootElement.GetRawText(); // already strict JSON
         return Results.Text(json, "application/json");
     }
+});
+
+app.MapPost("/api/reports/expense/generate", async (
+    HttpContext ctx,
+    PromptComposer prompts,
+    PlannerService planner,
+    PlanValidator validator,
+    ISqlCatalog catalog,
+    GroqJsonClient groq,
+    IReportRunStore runs,
+    CancellationToken ct) =>
+{
+    // 1) Read request body
+    ctx.Request.EnableBuffering();
+    string raw;
+    using (var reader = new StreamReader(ctx.Request.Body, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, bufferSize: 4096, leaveOpen: true))
+        raw = await reader.ReadToEndAsync();
+    ctx.Request.Body.Position = 0;
+
+    using var jIn = JsonDocument.Parse(string.IsNullOrWhiteSpace(raw) ? "{}" : raw);
+    var root = jIn.RootElement;
+    string userText = root.TryGetProperty("text", out var t) && t.ValueKind == JsonValueKind.String ? (t.GetString() ?? "") : "";
+
+    // 2) Phase-1 plan (YAML → strict JSON)
+    var (phase1System, _) = prompts.ComposePhase1("reports.expense.yaml");
+    using var planDoc = await planner.JsonPlanAsync(phase1System, userText, ct);
+    validator.ValidatePhase1(planDoc); // requires: intent, slots, sql_requests
+
+    var planRoot = planDoc.RootElement;
+    if (!planRoot.TryGetProperty("slots", out var slotsEl) || slotsEl.ValueKind != JsonValueKind.Object)
+        return Results.BadRequest(new { error = "NoSlots", message = "Planner returned no slots." });
+
+    if (!slotsEl.TryGetProperty("period_start", out var psEl) || psEl.ValueKind != JsonValueKind.String)
+        return Results.BadRequest(new { error = "NoStart", message = "Missing period_start." });
+    if (!slotsEl.TryGetProperty("period_end", out var peEl) || peEl.ValueKind != JsonValueKind.String)
+        return Results.BadRequest(new { error = "NoEnd", message = "Missing period_end." });
+
+    var startStr = psEl.GetString()!;
+    var endStr   = peEl.GetString()!;
+    bool compare = slotsEl.TryGetProperty("compare_to_prior", out var cmpEl) && cmpEl.ValueKind == JsonValueKind.True;
+
+    // Period label
+    var start = DateTime.Parse(startStr);
+    var end   = DateTime.Parse(endStr);
+    string periodLabel = $"{start:MMM d}–{end:MMM d}, {end:yyyy}";
+
+    // 3) Collect sql_requests (accept snake/camel; query_id/queryId). Fallback to allow-listed defaults.
+    var sqlReqs = new List<(string qid, Dictionary<string, object?> args)>();
+    if ((planRoot.TryGetProperty("sql_requests", out var reqArr) && reqArr.ValueKind == JsonValueKind.Array)
+     || (planRoot.TryGetProperty("sqlRequests", out reqArr) && reqArr.ValueKind == JsonValueKind.Array))
+    {
+        foreach (var el in reqArr.EnumerateArray())
+        {
+            string? qid = null;
+            if (el.TryGetProperty("query_id", out var q1) && q1.ValueKind == JsonValueKind.String) qid = q1.GetString();
+            else if (el.TryGetProperty("queryId", out var q2) && q2.ValueKind == JsonValueKind.String) qid = q2.GetString();
+            if (string.IsNullOrWhiteSpace(qid)) continue;
+
+            var args = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+            if (el.TryGetProperty("args", out var a) && a.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var prp in a.EnumerateObject())
+                    args[prp.Name] = prp.Value.Deserialize<object?>();
+            }
+            sqlReqs.Add((qid!, args));
+        }
+    }
+    if (sqlReqs.Count == 0)
+    {
+        // Defaults aligned to your allow-list
+        sqlReqs.Add(("EXPENSE_SUMMARY",            new Dictionary<string, object?> { ["start"] = startStr, ["end"] = endStr }));
+        sqlReqs.Add(("TOP_EXPENSE_CATEGORIES",     new Dictionary<string, object?> { ["start"] = startStr, ["end"] = endStr, ["k"] = 5 }));
+        sqlReqs.Add(("EXPENSE_BY_DAY",             new Dictionary<string, object?> { ["start"] = startStr, ["end"] = endStr }));
+        sqlReqs.Add(("EXPENSE_RECENT_TRANSACTIONS", new Dictionary<string, object?> { ["start"] = startStr, ["end"] = endStr, ["limit"] = 10 }));
+    }
+
+    // 4) Execute allow-listed queries
+    var rows = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+    foreach (var (qid, args) in sqlReqs)
+        rows[qid] = await catalog.RunAsync(qid, args, ct);
+
+    // 5) Phase-2 render (YAML)
+    var spec = await dataAccess.Api.Services.ReportSpecLoader.LoadAsync("reports.expense.yaml", ct);
+    var phase2Input = new
+    {
+        period = new { start = startStr, end = endStr, label = periodLabel },
+        compare_to_prior = compare,
+        rows,
+        fmt = new { currency = "PHP", symbol = "₱", locale = "en-PH", money_decimals = 2, pct_decimals = 2, use_thousands = true }
+    };
+
+    const string phase2User = "Render the Expense report UI spec using only the provided rows.";
+    using var uiDocRaw = await groq.CompleteJsonAsyncReport(spec.Phase2System, phase2User, phase2Input, 0.0, ct);
+
+    // 6) Patch minimum UI structure + REQUIRED fields for validator
+    var rootNode = JsonNode.Parse(uiDocRaw.RootElement.GetRawText())?.AsObject() ?? new JsonObject();
+
+    // 6.1 Base required keys
+    if (!rootNode.ContainsKey("report_title")) rootNode["report_title"] = "Expense Report";
+    if (rootNode["period"] is not JsonObject perObj)
+        rootNode["period"] = new JsonObject { ["label"] = periodLabel, ["start"] = startStr, ["end"] = endStr };
+    if (rootNode["kpis"]  is not JsonArray) rootNode["kpis"]  = new JsonArray();
+    if (rootNode["cards"] is not JsonArray) rootNode["cards"] = new JsonArray();
+    if (rootNode["charts"] is not JsonArray) rootNode["charts"] = new JsonArray();
+
+    // 6.2 Ensure "narrative" (≥2 non-empty sentences)
+    var narrativeArr = rootNode["narrative"] as JsonArray ?? new JsonArray();
+    rootNode["narrative"] = narrativeArr;
+    static IEnumerable<string> SplitSentences(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) yield break;
+        var parts = System.Text.RegularExpressions.Regex.Split(text.Trim(), @"(?<=[\.!\?])\s+");
+        foreach (var p in parts) { var s = p.Trim(); if (!string.IsNullOrWhiteSpace(s)) yield return s; }
+    }
+    int nonEmpty = 0;
+    foreach (var item in narrativeArr.ToList())
+    {
+        var s = (item as JsonValue)?.GetValue<string>() ?? "";
+        if (!string.IsNullOrWhiteSpace(s)) nonEmpty++;
+    }
+    if (nonEmpty < 2)
+    {
+        narrativeArr.Clear();
+        var fallback1 = $"Spending overview for {periodLabel}.";
+        var fallback2 = "See category breakdown and weekly trend.";
+        foreach (var s in SplitSentences(fallback1)) narrativeArr.Add(s);
+        foreach (var s in SplitSentences(fallback2)) narrativeArr.Add(s);
+    }
+
+    // 6.3 Ensure "actions" exists (at least 1–2 default actions)
+    var actionsArr = rootNode["actions"] as JsonArray ?? new JsonArray();
+    if (actionsArr.Count == 0)
+    {
+        actionsArr.Add(new JsonObject { ["id"] = "download_pdf", ["label"] = "Download PDF" });
+        actionsArr.Add(new JsonObject { ["id"] = "regenerate",   ["label"] = "Regenerate"  });
+    }
+    rootNode["actions"] = actionsArr;
+
+    // 6.4 Ensure KPI[0].value == EXPENSE_SUMMARY.total
+    var kpisArr = rootNode["kpis"] as JsonArray ?? new JsonArray();
+    rootNode["kpis"] = kpisArr;
+
+    bool totalFound = false;
+    decimal totalVal = 0m;
+    try
+    {
+        if (rows.TryGetValue("EXPENSE_SUMMARY", out var summaryObj) && summaryObj is not null)
+        {
+            var jsonSummary = JsonSerializer.Serialize(summaryObj);
+            using var jd = JsonDocument.Parse(jsonSummary);
+            var r = jd.RootElement;
+            if (r.ValueKind == JsonValueKind.Array && r.GetArrayLength() > 0)
+            {
+                var first = r[0];
+                if (first.TryGetProperty("total", out var tot) && tot.ValueKind == JsonValueKind.Number)
+                {
+                    totalVal = tot.GetDecimal();
+                    totalFound = true;
+                }
+            }
+            else if (r.ValueKind == JsonValueKind.Object)
+            {
+                if (r.TryGetProperty("total", out var tot) && tot.ValueKind == JsonValueKind.Number)
+                {
+                    totalVal = tot.GetDecimal();
+                    totalFound = true;
+                }
+            }
+        }
+    }
+    catch { /* best effort */ }
+
+    if (totalFound)
+    {
+        if (kpisArr.Count == 0 || kpisArr[0] is not JsonObject)
+        {
+            kpisArr.Clear();
+            kpisArr.Add(new JsonObject { ["label"] = "Total Expense", ["value"] = totalVal });
+        }
+        else
+        {
+            var k0 = (JsonObject)kpisArr[0]!;
+            k0["value"] = totalVal; // force-match the validator expectation
+            if (!k0.ContainsKey("label")) k0["label"] = "Total Expense";
+        }
+    }
+
+    // Freeze + Validate
+    using var uiPatchedDoc = JsonDocument.Parse(rootNode.ToJsonString());
+    validator.ValidateUiSpec(uiPatchedDoc, rows);
+
+    // 7) Save to reports table (domain='expenses')
+    var record = new dataAccess.Reports.ReportRecord(
+        Domain: "expenses",
+        Scope: null,
+        ReportType: "summary",
+        ProductId: null,
+        PeriodStart: startStr,
+        PeriodEnd: endStr,
+        PeriodLabel: periodLabel,
+        CompareToPrior: compare,
+        TopK: 5,
+        YamlName: "reports.expense.yaml",
+        YamlVersion: null,
+        ModelName: "groq-json",
+        UiSpec: JsonDocument.Parse(uiPatchedDoc.RootElement.GetRawText()),
+        Meta: JsonDocument.Parse("""{"source":"generate"}""")
+    );
+
+    var id = await runs.SaveAsync(record, ct);
+    return Results.Json(new { id, title = "Expense Report", periodLabel });
+});
+
+
+app.MapGet("/api/reports/expense/by-id/{id:guid}", async (
+    Guid id,
+    HttpContext ctx,
+    CancellationToken ct) =>
+{
+    var cfg = ctx.RequestServices.GetRequiredService<IConfiguration>();
+    var connStr = ResolveVecConn(cfg);
+
+    await using var conn = new NpgsqlConnection(connStr);
+    await conn.OpenAsync(ct);
+
+    const string sql = @"
+        select ui_spec
+        from public.reports
+        where id = @id
+        limit 1;";
+
+    await using var cmd = new NpgsqlCommand(sql, conn);
+    cmd.Parameters.AddWithValue("id", id);
+
+    var uiSpecJson = (string?)await cmd.ExecuteScalarAsync(ct);
+    if (uiSpecJson is null)
+        return Results.NotFound(new { error = "NotFound", id });
+
+    return Results.Json(new { ui_spec = JsonDocument.Parse(uiSpecJson).RootElement, id });
 });
 
 app.MapPost("/api/reports/sales/generate", async (
@@ -793,7 +917,7 @@ app.MapPost("/api/reports/sales/generate", async (
     };
 
     const string phase2User = "Render the Sales report UI spec per rules using only the provided rows.";
-    using var uiDoc = await groq.CompleteJsonAsync(spec.Phase2System, phase2User, phase2Input, ct);
+    using var uiDoc = await groq.CompleteJsonAsyncReport(spec.Phase2System, phase2User, phase2Input, 0.0, ct);
 
     // 8) Patch minimal keys + KPI type coercion + GUARANTEED narrative (>=2 sentences)
     var rootNode = JsonNode.Parse(uiDoc.RootElement.GetRawText())?.AsObject() ?? new JsonObject();
@@ -981,23 +1105,37 @@ app.MapGet("/api/reports/recent", async (
     var cfg = ctx.RequestServices.GetRequiredService<IConfiguration>();
     var connStr = ResolveVecConn(cfg);
 
-    var domain = (ctx.Request.Query["domain"].ToString() ?? "sales").Trim().ToLowerInvariant();
-    if (string.IsNullOrWhiteSpace(domain)) domain = "sales";
+    // ✅ Read optional domain & limit
+    var domain = ctx.Request.Query["domain"].ToString()?.Trim().ToLowerInvariant();
     var limitQ = ctx.Request.Query["limit"].ToString();
     var limit = int.TryParse(limitQ, out var n) && n > 0 && n <= 10 ? n : 5;
 
     await using var conn = new NpgsqlConnection(connStr);
     await conn.OpenAsync(ct);
 
-    const string sql = @"
-        select id, domain, period_label, created_at, ui_spec
-        from public.reports
-        where domain = @domain
-        order by created_at desc
-        limit @limit;";
+    // ✅ If no domain or "all" → include every report
+    string sql;
+    if (string.IsNullOrWhiteSpace(domain) || domain == "all")
+    {
+        sql = @"
+            select id, domain, period_label, created_at, ui_spec
+            from public.reports
+            order by created_at desc
+            limit @limit;";
+    }
+    else
+    {
+        sql = @"
+            select id, domain, period_label, created_at, ui_spec
+            from public.reports
+            where domain = @domain
+            order by created_at desc
+            limit @limit;";
+    }
 
     await using var cmd = new NpgsqlCommand(sql, conn);
-    cmd.Parameters.AddWithValue("domain", domain);
+    if (!string.IsNullOrWhiteSpace(domain) && domain != "all")
+        cmd.Parameters.AddWithValue("domain", domain);
     cmd.Parameters.AddWithValue("limit", limit);
 
     var list = new List<object>();
@@ -1010,7 +1148,6 @@ app.MapGet("/api/reports/recent", async (
         var createdAt = (DateTimeOffset)rdr.GetFieldValue<DateTime>(3);
         var uiSpecJson = rdr.GetString(4);
 
-        // return minimal shape your UI expects
         list.Add(new
         {
             id,
@@ -1090,9 +1227,9 @@ static string NormalizeReportDomain(string? domain)
     var d = domain.Trim().ToLowerInvariant();
     return d switch
     {
-        "expenses" => "expense",     // accept both
-        "inventories" => "inventory",   // just in case
-        "sale" => "sales",       // typo guard
+        "expense" or "expenses" => "expenses",
+        "inventories" => "inventory",
+        "sale" => "sales",
         _ => d
     };
 }
@@ -1247,7 +1384,7 @@ static async Task<string[]> GenerateAnalystNarrativeAsync(
     try
     {
         // Use your existing overload (no GroqJsonRequest type)
-        using var doc = await groq.CompleteJsonAsync(system: system, user: user, ct: ct);
+    using var doc = await groq.CompleteJsonAsyncReport(system: system, user: user, data: null, temperature: 0.0, ct: ct);
 
         if (doc.RootElement.TryGetProperty("narrative", out var n) && n.ValueKind == JsonValueKind.String)
         {
@@ -1395,6 +1532,7 @@ app.MapGet("/api/debug/config/vec-all", (IConfiguration cfg) =>
 
 app.MapPost("/api/assistant", async (
     HttpContext ctx,
+    dataAccess.Reports.YamlIntentRunner intentRunner,
     dataAccess.Reports.YamlReportRunner yamlRunner,
     SimpleForecastService forecastSvc,
     GroqJsonClient groq,
@@ -1415,16 +1553,7 @@ app.MapPost("/api/assistant", async (
     {
         try
         {
-            var clfPath = Path.Combine(AppContext.BaseDirectory, "Planning", "Prompts", "router.intent.yaml");
-
-            var rawObj = await yamlRunner.RunPromptFileAsync(
-                clfPath,
-                new { userText = userText },
-                ct
-            );
-
-            var json = JsonSerializer.Serialize(rawObj);
-            using var doc = JsonDocument.Parse(json);
+            using var doc = await intentRunner.RunIntentAsync(userText, ct);
             var root = doc.RootElement;
 
             intent = root.TryGetProperty("intent", out var iEl) && iEl.ValueKind == JsonValueKind.String
@@ -1554,49 +1683,60 @@ app.MapPost("/api/assistant", async (
     }
 
     // 4) NLQ → proxy to your existing NLQ endpoint and return markdown-as-chitchat
-if (intent.Equals("nlq", StringComparison.OrdinalIgnoreCase))
-{
-    // Build base URL (same host/port as current request)
-    var http = new HttpClient
+    if (intent.Equals("nlq", StringComparison.OrdinalIgnoreCase))
     {
-        BaseAddress = new Uri($"{ctx.Request.Scheme}://{ctx.Request.Host}")
-    };
-
-    // Forward to your existing NLQ endpoint (expects { text })
-    var resp = await http.PostAsJsonAsync("/api/nlq", new { text = userText }, ct);
-
-    // If your /api/nlq returns plain markdown text:
-    var markdown = await resp.Content.ReadAsStringAsync(ct);
-
-    // If it returns JSON with { render:{kind,content} }, you can instead:
-    // var obj = await resp.Content.ReadFromJsonAsync<object>(cancellationToken: ct);
-    // and set uiSpec = obj directly.
-
-    return Results.Json(new
-    {
-        mode = "chitchat", // UI renders markdown when mode=chitchat + uiSpec.render
-        uiSpec = new
+        // Build base URL (same host/port as current request)
+        var http = new HttpClient
         {
-            render = new { kind = "markdown", content = markdown },
-            suggestedActions = new[] { new { id = "regenerate", label = "Regenerate" } }
-        },
-        router = new { intent, domain, confidence = conf }
-    });
-}
+            BaseAddress = new Uri($"{ctx.Request.Scheme}://{ctx.Request.Host}")
+        };
+
+        // Forward to your existing NLQ endpoint (expects { text })
+        var resp = await http.PostAsJsonAsync("/api/nlq", new { text = userText }, ct);
+
+        // If your /api/nlq returns plain markdown text:
+        var markdown = await resp.Content.ReadAsStringAsync(ct);
+
+        // If it returns JSON with { render:{kind,content} }, you can instead:
+        // var obj = await resp.Content.ReadFromJsonAsync<object>(cancellationToken: ct);
+        // and set uiSpec = obj directly.
+
+        return Results.Json(new
+        {
+            mode = "chitchat", // UI renders markdown when mode=chitchat + uiSpec.render
+            uiSpec = new
+            {
+                render = new { kind = "markdown", content = markdown },
+                suggestedActions = new[] { new { id = "regenerate", label = "Regenerate" } }
+            },
+            router = new { intent, domain, confidence = conf }
+        });
+    }
 
 
     // 5) CHITCHAT (prompt file)
     if (intent.Equals("chitchat", StringComparison.OrdinalIgnoreCase))
+
     {
         object? ui = null;
         var full = Path.Combine(AppContext.BaseDirectory, "Planning", "Prompts", "chitchat.yaml");
-
         try
         {
-            ui = await yamlRunner.RunPromptFileAsync(
-                full,
-                new { userText = req.Text, tz = "Asia/Manila" },
-                ct);
+            var yaml = File.ReadAllText(full);
+            var des = new DeserializerBuilder().Build();
+            var yamlObj = des.Deserialize<dynamic>(yaml);
+            string systemPrompt = yamlObj["system"] ?? "You are a helpful assistant.";
+            double temperature = 0.3;
+            try
+            {
+                var tempObj = yamlObj["defaults"]?["model"]?["temperature"];
+                if (tempObj != null)
+                    temperature = Convert.ToDouble(tempObj);
+            }
+            catch { }
+
+            using var doc = await groq.CompleteJsonAsyncChat(systemPrompt, req.Text, null, temperature, ct);
+            ui = JsonSerializer.Deserialize<object>(doc.RootElement.GetRawText());
         }
         catch (Exception ex)
         {

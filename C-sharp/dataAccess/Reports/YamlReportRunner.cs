@@ -99,7 +99,7 @@ namespace dataAccess.Reports
                 _ => throw new InvalidOperationException($"Unknown domain: {domain}")
             };
             var system = await _loadPhase2(specFile, ct);
-            var doc = await _groq.CompleteJsonAsync(system, new { input = phase2Input }, ct);
+            var doc = await _groq.CompleteJsonAsyncReport(system, "render", new { input = phase2Input }, 0.0, ct);
 
             // 6) Save run
             var metaNode = new JsonObject
@@ -123,7 +123,7 @@ namespace dataAccess.Reports
                 TopK: (short?)(h.TopK ?? 10),
                 YamlName: specFile,
                 YamlVersion: null,
-                ModelName: "groq/gemma2-9b-it",                 // keep in sync with YAML
+                ModelName: "groq/llama-3.1-8b-instant",                 // keep in sync with YAML
                 UiSpec: doc,
                 Meta: metaDoc
             );
@@ -154,7 +154,7 @@ namespace dataAccess.Reports
                 {
                     var system = await _loadPhase2(cand, ct);
                     var payload = new { input = args ?? new { } };
-                    var doc = await _groq.CompleteJsonAsync(system, payload, ct);
+                    var doc = await _groq.CompleteJsonAsyncReport(system, "render", payload, 0.0, ct);
                     return JsonSerializer.Deserialize<object>(doc.RootElement.GetRawText())!;
                 }
                 catch
@@ -173,7 +173,7 @@ namespace dataAccess.Reports
 
             var yaml = await File.ReadAllTextAsync(fullPath, ct);
             var payload = new { input = args ?? new { } };
-            var doc = await _groq.CompleteJsonAsync(yaml, payload, ct);
+            var doc = await _groq.CompleteJsonAsyncReport(yaml, "render", payload, 0.0, ct);
             return JsonSerializer.Deserialize<object>(doc.RootElement.GetRawText())!;
         }
 
@@ -214,7 +214,7 @@ namespace dataAccess.Reports
                         string? ym = null;
                         list.AddRange(Expense.OverviewQueries(h.Start!, h.End!, h.CompareToPrior, h.PrevStart, h.PrevEnd, ym));
                         list.AddRange(Expense.TopCategoryQueries(h.Start!, h.End!, 10));
-                        list.AddRange(Expense.AnomalyQueries(h.Start!, h.End!));
+                        list.AddRange(Expense.ByDayQueries(h.Start!, h.End!));
                         break;
                     }
 
@@ -254,7 +254,8 @@ namespace dataAccess.Reports
                 },
                 "expenses" => new HashSet<string>(StringComparer.OrdinalIgnoreCase)
                 {
-                    "EXPENSE_SUMMARY","TOP_EXPENSE_CATEGORIES","EXPENSE_BY_CATEGORY_WEEKLY"
+                    "EXPENSE_SUMMARY","TOP_EXPENSE_CATEGORIES","EXPENSE_BY_DAY",
+                    "TOP_EXPENSE_SUPPLIERS","EXPENSE_RECENT_TRANSACTIONS","EXPENSE_BUDGET_VS_ACTUAL"
                 },
                 "inventory" => new HashSet<string>(StringComparer.OrdinalIgnoreCase)
                 {

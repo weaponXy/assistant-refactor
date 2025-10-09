@@ -319,41 +319,42 @@ namespace dataAccess.Services
 
         private async Task<object?> ExpenseRecentTransactions(IDictionary<string, object?> a, CancellationToken ct)
         {
-            var n = GetIntArg(a, "n", 20);
+            var n = GetIntArg(a, "limit", 20);
             var userId = GetGuidArg(a, "user_id");
+            var start = a.ContainsKey("start") ? GetDateArg(a, "start") : (DateOnly?)null;
+            var end = a.ContainsKey("end") ? GetDateArg(a, "end") : (DateOnly?)null;
 
-            var rows = await _db.Expenses
-                .Where(e => !userId.HasValue || e.UserId == userId)
+            // 1. Fetch expenses for the period
+            var q = _db.Expenses.AsQueryable();
+            if (userId.HasValue)
+                q = q.Where(e => e.UserId == userId);
+            if (start.HasValue)
+                q = q.Where(e => e.OccurredOn >= start.Value);
+            if (end.HasValue)
+                q = q.Where(e => e.OccurredOn <= end.Value);
+
+            var expenses = await q
                 .OrderByDescending(e => e.OccurredOn)
                 .ThenByDescending(e => e.Id)
                 .Take(n)
-                .GroupJoin(_db.Categories, e => e.CategoryId, c => (Guid?)c.Id,
-                    (e, cg) => new
-                    {
-                        e.OccurredOn,
-                        e.Amount,
-                        Category = cg.Select(x => x.Name).FirstOrDefault(),
-                        e.ContactId,
-                        e.Notes
-                    })
-                .GroupJoin(_db.Contacts, x => x.ContactId, co => (Guid?)co.Id,
-                    (x, cog) => new
-                    {
-                        occurred_on = x.OccurredOn,
-                        amount = x.Amount,
-                        category = x.Category ?? "Uncategorized",
-                        supplier = cog.Select(s => s.Name).FirstOrDefault() ?? "Unknown",
-                        notes = x.Notes
-                    })
                 .ToListAsync(ct);
 
-            return rows.Select(r => new {
-                r.occurred_on,
-                amount = Math.Round((decimal)r.amount, 2),
-                r.category,
-                r.supplier,
-                r.notes
+            // 2. Get all needed category and contact IDs
+            var categoryIds = expenses.Select(e => e.CategoryId).Where(id => id.HasValue).Select(id => id.Value).Distinct().ToList();
+            var contactIds = expenses.Select(e => e.ContactId).Where(id => id.HasValue).Select(id => id.Value).Distinct().ToList();
+
+            var categories = await _db.Categories.Where(c => categoryIds.Contains(c.Id)).ToDictionaryAsync(c => c.Id, c => c.Name, ct);
+            var contacts = await _db.Contacts.Where(c => contactIds.Contains(c.Id)).ToDictionaryAsync(c => c.Id, c => c.Name, ct);
+
+            // 3. Project to result
+            var rows = expenses.Select(e => new {
+                occurred_on = e.OccurredOn,
+                amount = Math.Round((decimal)e.Amount, 2),
+                category = (e.CategoryId.HasValue && categories.ContainsKey(e.CategoryId.Value)) ? categories[e.CategoryId.Value] : "Uncategorized",
+                notes = string.IsNullOrWhiteSpace(e.Notes) ? "—" : e.Notes.Trim()
             }).ToList();
+
+            return rows;
         }
 
         private async Task<object?> ExpenseLabelBreakdown(IDictionary<string, object?> a, CancellationToken ct)

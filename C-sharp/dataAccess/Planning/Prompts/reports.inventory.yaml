@@ -2,7 +2,7 @@
 version: "0.2.0"
 
 model:
-  name: groq/gemma2-9b-it
+  name: groq/llama-3.3-70b-versatile
   temperature: 0.2
   max_output_tokens: 900
 

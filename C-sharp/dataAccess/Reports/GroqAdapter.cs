@@ -8,10 +8,12 @@ using System.Threading.Tasks;
 
 namespace dataAccess.Reports
 {
-    // Common interface used by YamlReportRunner
+    // Common interface used by YamlReportRunner and chat endpoints
     public interface IGroqJsonClient
     {
         Task<JsonDocument> CompleteJsonAsync(string systemPrompt, object input, CancellationToken ct);
+        Task<JsonDocument> CompleteJsonAsyncChat(string system, string user, object? data = null, double temperature = 0.0, CancellationToken ct = default);
+        Task<JsonDocument> CompleteJsonAsyncReport(string system, string user, object? data = null, double temperature = 0.0, CancellationToken ct = default);
     }
 
     public sealed class ModelSelectingGroqAdapter : IGroqJsonClient
@@ -111,6 +113,52 @@ namespace dataAccess.Reports
             }
 
             throw new InvalidOperationException("Unexpected return type from GroqJsonClient.CompleteJsonAsync.");
+        }
+
+        public async Task<JsonDocument> CompleteJsonAsyncChat(string system, string user, object? data = null, double temperature = 0.0, CancellationToken ct = default)
+        {
+            // Use reflection to call CompleteJsonAsyncChat on the inner GroqJsonClient
+            var t = _inner.GetType();
+            var method = t.GetMethod("CompleteJsonAsyncChat", new[] { typeof(string), typeof(string), typeof(object), typeof(double), typeof(CancellationToken) });
+            
+            if (method is not null)
+            {
+                var taskObj = method.Invoke(_inner, new object?[] { system, user, data, temperature, ct });
+                if (taskObj is Task<JsonDocument> tJD)
+                    return await tJD.ConfigureAwait(false);
+                
+                if (taskObj is Task t2)
+                {
+                    await t2.ConfigureAwait(false);
+                    var resultProp = t2.GetType().GetProperty("Result");
+                    if (resultProp?.GetValue(t2) is JsonDocument jd) return jd;
+                }
+            }
+            
+            throw new InvalidOperationException("CompleteJsonAsyncChat method not found or unexpected return type.");
+        }
+
+        public async Task<JsonDocument> CompleteJsonAsyncReport(string system, string user, object? data = null, double temperature = 0.0, CancellationToken ct = default)
+        {
+            // Use reflection to call CompleteJsonAsyncReport on the inner GroqJsonClient
+            var t = _inner.GetType();
+            var method = t.GetMethod("CompleteJsonAsyncReport", new[] { typeof(string), typeof(string), typeof(object), typeof(double), typeof(CancellationToken) });
+            
+            if (method is not null)
+            {
+                var taskObj = method.Invoke(_inner, new object?[] { system, user, data, temperature, ct });
+                if (taskObj is Task<JsonDocument> tJD)
+                    return await tJD.ConfigureAwait(false);
+                
+                if (taskObj is Task t2)
+                {
+                    await t2.ConfigureAwait(false);
+                    var resultProp = t2.GetType().GetProperty("Result");
+                    if (resultProp?.GetValue(t2) is JsonDocument jd) return jd;
+                }
+            }
+            
+            throw new InvalidOperationException("CompleteJsonAsyncReport method not found or unexpected return type.");
         }
     }
 }

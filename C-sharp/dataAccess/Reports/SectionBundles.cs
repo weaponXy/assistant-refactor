@@ -59,15 +59,21 @@ public static class SectionBundles
             if (includePrior && prevStart != null && prevEnd != null)
                 list.Add(new("EXPENSE_SUMMARY", new() { ["start"] = prevStart, ["end"] = prevEnd, ["_role"] = "previous" }));
             if (ym is not null)
-                list.Add(new("BUDGET_UTILIZATION", new() { ["month_year"] = ym }));
+                list.Add(new("EXPENSE_BUDGET_VS_ACTUAL", new() { ["month_year"] = ym }));
             return list;
         }
 
         public static IReadOnlyList<QuerySpec> TopCategoryQueries(string start, string end, int k = 10)
             => new List<QuerySpec> { new("TOP_EXPENSE_CATEGORIES", new() { ["start"] = start, ["end"] = end, ["k"] = k }) };
 
-        public static IReadOnlyList<QuerySpec> AnomalyQueries(string start, string end)
+        public static IReadOnlyList<QuerySpec> ByDayQueries(string start, string end)
             => new List<QuerySpec> { new("EXPENSE_BY_DAY", new() { ["start"] = start, ["end"] = end }) };
+
+        public static IReadOnlyList<QuerySpec> TopSupplierQueries(string start, string end, int k = 5)
+            => new List<QuerySpec> { new("TOP_EXPENSE_SUPPLIERS", new() { ["start"] = start, ["end"] = end, ["k"] = k }) };
+
+        public static IReadOnlyList<QuerySpec> RecentTransactionsQueries(string start, string end, int n = 20)
+            => new List<QuerySpec> { new("EXPENSE_RECENT_TRANSACTIONS", new() { ["start"] = start, ["end"] = end, ["n"] = n }) };
     }
 
     public static class Inventory
@@ -94,5 +100,5 @@ public static class SectionBundles
             };
     }
 
-    public sealed record QuerySpec(string QueryId, Dictionary<string, object> Args);
+    public sealed record QuerySpec(string QueryId, Dictionary<string, object?> Args);
 }
