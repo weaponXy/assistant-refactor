@@ -127,8 +127,8 @@ const Assistant = () => {
     (async () => {
       try {
         const [r, f] = await Promise.all([
-          fetchRecentReports(5, "sales"),
-          fetchRecentForecasts(5, "sales")
+          fetchRecentReports(2, "sales"),
+          fetchRecentForecasts(2, "sales")
         ]);
         if (!alive) return;
         setReports(r);
@@ -436,17 +436,7 @@ const Assistant = () => {
                   {user ? user.username || user.email : "Loading."}
                 </div>
               </div>
-               <button
-                  className="logout-button"
-                  onClick={async () => {
-                    await supabase.auth.signOut();
-                    localStorage.removeItem("userProfile"); 
-                    localStorage.removeItem('lastActive');
-                    navigate = "/login"; 
-                  }}
-                >
-                  ⏻
-                </button>
+               
             </div>
             <AssistantChat
               messages={messages}

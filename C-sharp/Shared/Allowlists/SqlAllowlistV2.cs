@@ -79,9 +79,11 @@ namespace Shared.Allowlists
                 // sales (view)
                 ["sales"] = new(StringComparer.OrdinalIgnoreCase)
                 {
-                    // Typical columns for a sales reporting view (adjust as needed)
-                    "orderid", "orderdate", "totalamount", "orderstatus", "amount_paid", "change",
-                    "productid", "productname", "quantity", "unitprice", "subtotal",
+                    // Sales view columns (based on Sales entity and AppDbContext view definition)
+                    "orderid", "orderdate", "productid", "productname", 
+                    "quantity", "unitprice", "subtotal", "revenue", "profit",
+                    // Additional columns that may be useful in the view
+                    "totalamount", "orderstatus", "amount_paid", "change",
                     "supplierid", "suppliername", "categoryid", "productcategoryid"
                 },
             };

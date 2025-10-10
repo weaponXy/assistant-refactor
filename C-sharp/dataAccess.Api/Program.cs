@@ -8,6 +8,7 @@ using dataAccess.Planning.Validation;
 using dataAccess.Reports;
 using dataAccess.Services;
 using dataAccess.Forecasts;
+using dataAccess.LLM;
 using DotNetEnv;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -166,6 +167,18 @@ builder.Services.AddHttpClient<GroqJsonClient>((sp, http) =>
 builder.Services.AddScoped<SqlQueryService>();
 builder.Services.AddScoped<HybridQueryService>();
 builder.Services.AddScoped<VectorSearchService>();
+
+// LLM SQL Generation services
+builder.Services.AddSingleton<LlmSqlPromptLoader>();
+builder.Services.AddScoped<LlmSqlGenerator>();
+builder.Services.AddScoped<SqlValidator>();
+builder.Services.AddScoped<SafeSqlExecutor>();
+builder.Services.AddSingleton<VirtualTableRewriter>();
+
+// Query Pipeline services (new architecture)
+builder.Services.AddScoped<LlmSummarizer>();
+builder.Services.AddSingleton<ResponseFormatter>();
+builder.Services.AddScoped<QueryPipeline>();
 
 // CORS
 builder.Services.AddCors(o => {
@@ -396,6 +409,62 @@ app.MapPost("/api/hybrid/route", async (HybridQueryService svc, RouteReq req, Ca
 
 app.MapPost("/api/vector/route", async (VectorSearchService svc, RouteReq req, CancellationToken ct) =>
     Results.Ok(await svc.DispatchAsync(req.Input ?? "", ct)));
+
+// Debug endpoint to test LLM SQL generation
+app.MapPost("/api/debug/llm-sql", async (
+    HttpContext ctx,
+    LlmSqlGenerator sqlGen,
+    SqlValidator validator,
+    SafeSqlExecutor executor,
+    VirtualTableRewriter rewriter,
+    CancellationToken ct) =>
+{
+    var body = await ctx.Request.ReadFromJsonAsync<Dictionary<string, string>>(cancellationToken: ct);
+    var question = body?.GetValueOrDefault("question") ?? "";
+    
+    if (string.IsNullOrWhiteSpace(question))
+        return Results.BadRequest(new { error = "Question is required" });
+
+    try
+    {
+        // Generate SQL
+        var sql = await sqlGen.GenerateSqlAsync(question, ct);
+        
+        if (string.IsNullOrWhiteSpace(sql))
+            return Results.Ok(new { success = false, message = "Could not generate SQL" });
+
+        // Rewrite virtual tables (if any)
+        sql = rewriter.RewriteIfNeeded(sql);
+
+        // Validate SQL
+        var (isValid, errorMsg) = validator.ValidateSql(sql);
+        
+        if (!isValid)
+            return Results.Ok(new { success = false, sql, error = errorMsg, validated = false });
+
+        // Ensure LIMIT
+        sql = validator.EnsureLimit(sql, 50);
+
+        // Execute SQL
+        var results = await executor.ExecuteQueryAsync(sql, ct);
+        var markdown = executor.FormatAsMarkdown(results);
+
+        return Results.Ok(new
+        {
+            success = true,
+            question,
+            sql,
+            validated = true,
+            rowCount = results.Count,
+            results,
+            markdown
+        });
+    }
+    catch (Exception ex)
+    {
+        return Results.Ok(new { success = false, error = ex.Message, stack = ex.StackTrace });
+    }
+});
 
 app.MapPost("/api/reports/inventory/plan", async (
     HttpContext ctx,
@@ -1219,6 +1288,7 @@ app.MapGet("/api/debug/db-ping", async (IConfiguration cfg, CancellationToken ct
 
 
 app.MapNlqEndpoint();
+app.MapQueryPipelineEndpoint();  // New query pipeline endpoint
 // Assuming you have: public sealed record AssistantRequest(string Text, string? Domain);
 // ---------- tiny helpers (can be placed above the map) ----------
 static string NormalizeReportDomain(string? domain)
@@ -1589,7 +1659,7 @@ app.MapPost("/api/assistant", async (
     }
     else
     {
-        // Explicit domain in request → treat as report
+        // Explicit domain in request → chitchat DAPAT
         intent = "report";
         domain = req.Domain!.ToLowerInvariant();
         conf = 1.0;
@@ -1682,34 +1752,177 @@ app.MapPost("/api/assistant", async (
         });
     }
 
-    // 4) NLQ → proxy to your existing NLQ endpoint and return markdown-as-chitchat
+    // 4) NLQ → Try LLM SQL (primary), fallback to classic NLQ if needed
     if (intent.Equals("nlq", StringComparison.OrdinalIgnoreCase))
     {
-        // Build base URL (same host/port as current request)
-        var http = new HttpClient
+        string markdown = "";
+        string summary = "";
+        bool llmSqlSuccess = false;
+        string? usedMethod = null;
+        try
         {
-            BaseAddress = new Uri($"{ctx.Request.Scheme}://{ctx.Request.Host}")
-        };
+            var sqlGen = ctx.RequestServices.GetRequiredService<LlmSqlGenerator>();
+            var validator = ctx.RequestServices.GetRequiredService<SqlValidator>();
+            var executor = ctx.RequestServices.GetRequiredService<SafeSqlExecutor>();
+            var summarizer = ctx.RequestServices.GetRequiredService<LlmSummarizer>();
 
-        // Forward to your existing NLQ endpoint (expects { text })
-        var resp = await http.PostAsJsonAsync("/api/nlq", new { text = userText }, ct);
+            // Generate SQL using LLM
+            var generatedSql = await sqlGen.GenerateSqlAsync(userText, ct);
 
-        // If your /api/nlq returns plain markdown text:
-        var markdown = await resp.Content.ReadAsStringAsync(ct);
+            if (!string.IsNullOrWhiteSpace(generatedSql))
+            {
+                // Validate the SQL
+                var (isValid, errorMsg) = validator.ValidateSql(generatedSql);
 
-        // If it returns JSON with { render:{kind,content} }, you can instead:
-        // var obj = await resp.Content.ReadFromJsonAsync<object>(cancellationToken: ct);
-        // and set uiSpec = obj directly.
+                if (isValid)
+                {
+                    // Ensure reasonable LIMIT
+                    generatedSql = validator.EnsureLimit(generatedSql, 100);
+
+                    // Execute the query
+                    var results = await executor.ExecuteQueryAsync(generatedSql, ct);
+
+                    // Remove columns with all null/empty values
+                    if (results is IEnumerable<IDictionary<string, object?>> rowsList)
+                    {
+                        var rowsArr = rowsList.Select(r => new Dictionary<string, object?>(r)).ToList();
+                        if (rowsArr.Count > 0)
+                        {
+                            var allKeys = rowsArr.SelectMany(r => r.Keys).Distinct().ToList();
+                            var keysToKeep = allKeys.Where(k => rowsArr.Any(r => r.TryGetValue(k, out var v) && v != null && !(v is string s && string.IsNullOrWhiteSpace(s)))).ToList();
+                            foreach (var row in rowsArr)
+                            {
+                                var keysToRemove = row.Keys.Except(keysToKeep).ToList();
+                                foreach (var k in keysToRemove)
+                                    row.Remove(k);
+                            }
+                            // Use filtered rows for markdown
+                            results = rowsArr;
+                        }
+                    }
+
+                    // Always serialize results to JSON then parse as JsonElement
+                    var resultsJson = JsonSerializer.Serialize(results);
+                    using var doc = JsonDocument.Parse(resultsJson);
+                    var resultsElement = doc.RootElement;
+                    int rowCount = (resultsElement.ValueKind == JsonValueKind.Array) ? resultsElement.GetArrayLength() : 0;
+                    summary = await summarizer.SummarizeAsync(userText, generatedSql, resultsElement, rowCount, ct);
+
+                    // Format as markdown
+                    markdown = executor.FormatAsMarkdown(results, null);
+                    llmSqlSuccess = true;
+                    usedMethod = "llm_sql";
+                }
+                else
+                {
+                    Console.WriteLine($"[LLM SQL] Validation failed: {errorMsg}");
+                }
+            }
+            else
+            {
+                Console.WriteLine("[LLM SQL] No SQL generated");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[LLM SQL] Failed: {ex.Message}");
+        }
+
+        // FALLBACK: If LLM SQL failed, try classic NLQ endpoint
+        if (!llmSqlSuccess)
+        {
+            try
+            {
+                var http = new HttpClient
+                {
+                    BaseAddress = new Uri($"{ctx.Request.Scheme}://{ctx.Request.Host}")
+                };
+
+                var resp = await http.PostAsJsonAsync("/api/nlq", new { text = userText }, ct);
+                
+                if (resp.IsSuccessStatusCode)
+                {
+                    markdown = await resp.Content.ReadAsStringAsync(ct);
+                    
+                    // Check if NLQ returned a meaningful result
+                    if (!string.IsNullOrWhiteSpace(markdown) && 
+                        !markdown.Contains("I don't understand") && 
+                        !markdown.Contains("I cannot") &&
+                        markdown.Length > 20)
+                    {
+                        usedMethod = "classic_nlq";
+                    }
+                    else
+                    {
+                        markdown = "I'm not sure how to answer that question. Could you rephrase it or ask about specific business data?";
+                        usedMethod = "none";
+                    }
+                }
+                else
+                {
+                    markdown = "I encountered an error trying to answer your question. Please try rephrasing it.";
+                    usedMethod = "none";
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[NLQ Fallback] Failed: {ex.Message}");
+                markdown = "I encountered an error trying to answer your question. Please try rephrasing it.";
+                usedMethod = "none";
+            }
+        }
+
+        // Compose the response: summary (if any) + markdown table
+        string combinedContent = string.IsNullOrWhiteSpace(summary)
+            ? markdown
+            : string.IsNullOrWhiteSpace(markdown)
+                ? summary
+                : $"{summary}\n\n{markdown}";
+
+        // Remove markdown tables (lines starting with | or containing --- for table headers)
+        string RemoveMarkdownTables(string input)
+        {
+            if (string.IsNullOrWhiteSpace(input)) return input;
+            var lines = input.Split('\n');
+            var filtered = new List<string>();
+            bool inTable = false;
+            foreach (var line in lines)
+            {
+                var trimmed = line.Trim();
+                // Start of table: line starts with | and next line contains ---
+                if (trimmed.StartsWith("|") && trimmed.Contains("|"))
+                {
+                    inTable = true;
+                    continue;
+                }
+                if (inTable && (trimmed.Contains("---") || trimmed.StartsWith("|")))
+                {
+                    continue;
+                }
+                // End table if line is not a table line
+                if (inTable && !trimmed.StartsWith("|"))
+                {
+                    inTable = false;
+                }
+                if (!inTable && !trimmed.StartsWith("|"))
+                {
+                    filtered.Add(line);
+                }
+            }
+            return string.Join("\n", filtered).Trim();
+        }
+
+        var filteredContent = RemoveMarkdownTables(combinedContent);
 
         return Results.Json(new
         {
-            mode = "chitchat", // UI renders markdown when mode=chitchat + uiSpec.render
+            mode = "chitchat",
             uiSpec = new
             {
-                render = new { kind = "markdown", content = markdown },
+                render = new { kind = "markdown", content = filteredContent },
                 suggestedActions = new[] { new { id = "regenerate", label = "Regenerate" } }
             },
-            router = new { intent, domain, confidence = conf }
+            router = new { intent, domain, confidence = conf, method = usedMethod }
         });
     }
 

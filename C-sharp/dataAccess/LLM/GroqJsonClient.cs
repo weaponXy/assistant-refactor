@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
+namespace dataAccess.LLM;
 public sealed class GroqJsonClient
 {
     private readonly HttpClient _http;

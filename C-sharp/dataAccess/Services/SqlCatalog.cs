@@ -68,7 +68,7 @@ namespace dataAccess.Services
             if (v is int i) return i;
             if (v is long l) return checked((int)l);
             if (v is string s && int.TryParse(s, out var si)) return si;
-            throw new InvalidCastException($"Arg '{key}' must be int. Got {v.GetType().Name}.");
+            throw new InvalidCastException($"Arg '{key}' must be int. Got {(v == null ? "null" : v.GetType().Name)}.");
         }
 
         // DateOnly → DateTime (unspecified kind) for timestamptz comparisons
@@ -340,8 +340,17 @@ namespace dataAccess.Services
                 .ToListAsync(ct);
 
             // 2. Get all needed category and contact IDs
-            var categoryIds = expenses.Select(e => e.CategoryId).Where(id => id.HasValue).Select(id => id.Value).Distinct().ToList();
-            var contactIds = expenses.Select(e => e.ContactId).Where(id => id.HasValue).Select(id => id.Value).Distinct().ToList();
+            var categoryIds = expenses.Select(e => e.CategoryId)
+                                     .Where(id => id.HasValue)
+                                     .Select(id => id.GetValueOrDefault())
+                                     .Distinct()
+                                     .ToList();
+            var contactIds = expenses
+                .Select(e => e.ContactId)
+                .Where(id => id.HasValue)
+                .Select(id => id.GetValueOrDefault())
+                .Distinct()
+                .ToList();
 
             var categories = await _db.Categories.Where(c => categoryIds.Contains(c.Id)).ToDictionaryAsync(c => c.Id, c => c.Name, ct);
             var contacts = await _db.Contacts.Where(c => contactIds.Contains(c.Id)).ToDictionaryAsync(c => c.Id, c => c.Name, ct);
