@@ -1031,7 +1031,7 @@ function getInlineAttachmentsFromRow(row) {
           </section>
 
           {/* Table */}
-          <div className="table-scroll-box">
+          <div className="Ex-table-scroll-box">
             <table>
               <thead>
                 <tr>
