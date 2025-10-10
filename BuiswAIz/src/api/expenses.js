@@ -106,6 +106,8 @@ export async function createExpense(input) {
     notes: input.notes ?? null,
     status: input.status ?? 'uncleared',
     contact_id: input.contact_id ?? null,
+    tax_json: input.tax_json ?? null,
+
   };
 
   const ins = await supabase.from('expenses').insert(payload).select('*').single();
@@ -140,6 +142,7 @@ export async function updateExpense(expenseId, input) {
     notes: input.notes ?? null,
     status: input.status ?? 'uncleared',
     contact_id: input.contact_id ?? null,
+    tax_json: input.tax_json ?? null,
   };
 
   const upd = await supabase

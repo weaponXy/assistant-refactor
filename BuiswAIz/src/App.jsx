@@ -19,6 +19,8 @@ import ExpenseDashboard from "./expenses/expenses";
 import UploadSheets from "./components/UploadSheets";
 import BudgetHistory from "./budget/BudgetHistory";
 import PointOfSales from "./PointOfSales";
+import PlannedPaymentsPage from "./pages/PlannedPaymentsPage";
+
 
 function App() {
   return (
@@ -44,7 +46,7 @@ function App() {
             <Route path="/assistant" element={<ProtectedRoute><Assistant /></ProtectedRoute>} />
             <Route path="/expenses" element={<ProtectedRoute><ExpenseDashboard /></ProtectedRoute>} />
             <Route path="/upload" element={<ProtectedRoute><UploadSheets /></ProtectedRoute>} />
-            <Route path="/budget" element={<ProtectedRoute><BudgetHistory /></ProtectedRoute>} />
+            <Route path="/PlannedPaymentsPage" element={<ProtectedRoute><PlannedPaymentsPage /></ProtectedRoute>} />
             <Route path="/budget-history" element={<ProtectedRoute><BudgetHistory /></ProtectedRoute>} />
 
             <Route path="*" element={<Navigate to="/login" replace />} />

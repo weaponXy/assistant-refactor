@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+// ========================= Imports ===========================================
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -7,74 +8,153 @@ import {
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import { supabase } from '../supabase';
-import "../expenses/ExpenseDashboard.css";
+import "./ExpenseDashboard.css";
 import { fetchMainCategories, fetchSubcategories, getCategoryById } from '../api/categories';
-import { listLabels, createLabel } from '../api/labels';
 import { listContacts, createContact } from '../api/contacts';
 import { listExpensesByMonth, createExpense, updateExpense, listExpensesByYear, listExpensesBetween, deleteExpense } from '../api/expenses';
 import { AttachmentsPanel } from '../components/AttachmentsPanel';
 import { uploadAttachments } from '../api/attachments';
 import BudgetCenter from "../budget/BudgetCenter";
 import ContactsCenter from "../contacts/ContactsCenter";
+import { listLabels, createLabel, deleteLabel } from '../api/labels';
+import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
+import TaxCenter from "../tax/TaxCenter";
+import { calcTax } from "../libs/tax";
+
+
+
+// ========================= Constants & Small Utils ===========================
+
+  const DEFAULT_ATTACHMENTS_BUCKET = import.meta.env.VITE_ATTACHMENTS_BUCKET || "attachments";
+
+// formatYYYYMM, monthBounds, startOfTodayISO, addDaysISO, isoRangeForPreset
+
+  function formatYYYYMM(d) {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}`;
+  }
+  function monthBounds(yyyyMM) {
+    const [y, m] = yyyyMM.split('-').map(Number);
+    const start = new Date(y, m - 1, 1);
+    const end = new Date(y, m, 0);
+    return { start, end };
+  }
+  function startOfTodayISO() {
+    const d = new Date();
+    d.setHours(0,0,0,0);
+    return d.toISOString().slice(0,10);
+  }
+  function addDaysISO(iso, days) {
+    const [y,m,dd] = iso.split('-').map(Number);
+    const d = new Date(Date.UTC(y, m-1, dd));
+    d.setUTCDate(d.getUTCDate() + days);
+    return d.toISOString().slice(0,10);
+  }
+  function isoRangeForPreset(preset) {
+    const today = startOfTodayISO();
+    switch (preset) {
+      case 'last7':   return { start: addDaysISO(today, -7),  end: addDaysISO(today, 1) };
+      case 'last30':  return { start: addDaysISO(today, -30), end: addDaysISO(today, 1) };
+      case 'last12w': return { start: addDaysISO(today, -84), end: addDaysISO(today, 1) };
+      case 'last6m':  return { start: addDaysISO(today, -183), end: addDaysISO(today, 1) };
+      case 'last1y':  return { start: addDaysISO(today, -365), end: addDaysISO(today, 1) };
+      case 'thisWeek': {
+        const d = new Date();
+        const day = (d.getDay() + 6) % 7; // 0..6 Monday..Sunday
+        const start = addDaysISO(startOfTodayISO(), -day);
+        const end   = addDaysISO(startOfTodayISO(), 1);
+        return { start, end };
+      }
+      case 'thisMonth': {
+        const now = new Date();
+        const start = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1)).toISOString().slice(0,10);
+        const end   = new Date(Date.UTC(now.getFullYear(), now.getMonth()+1, 1)).toISOString().slice(0,10);
+        return { start, end };
+      }
+      case 'thisYear': {
+        const now = new Date();
+        const start = new Date(Date.UTC(now.getFullYear(), 0, 1)).toISOString().slice(0,10);
+        const end   = new Date(Date.UTC(now.getFullYear()+1, 0, 1)).toISOString().slice(0,10);
+        return { start, end };
+      }
+      default: return null;
+    }
+  }
+
+
+// ========================= Storage Helpers ===================================
+// splitStorageKey, deleteExpenseDeep
+
+
+// ========================= Notify (no external deps) =========================
+// const notify = { success, error };
+
+
+// ========================= ExpenseDashboard ==================================
+
+
+  // ---------- State ----------------------------------------------------------
+  // (all useState declarations)
+
+  // ---------- Effects: auth guard, pickers, data loads -----------------------
+  // (auth guard useEffect)
+  // (picker loads useEffects)
+  // (table refresh useEffect)
+  // (yearRows useEffect)
+  // (budget load useEffect)
+
+  // ---------- Data loaders ---------------------------------------------------
+  // async function refresh() { ... }
+  // async function fetchBudget(yyyyMM) { ... }
+
+  // ---------- Derived selectors ----------------------------------------------
+  // categories, filteredByCategory, visibleExpenses, totals, chartData
+
+  // ---------- Handlers --------------------------------------------------------
+  // handleOpenExpenseFromContacts
+  // openEdit
+  // handleSaveExpense
+  // handleUpdateExpense
+  // handleDeleteExpense
+  // handleDeleteLabel
+  // onCalendarStartDateChange
+  // getInlineAttachmentsFromRow (if you still need it)
+
+  // ---------- Render ----------------------------------------------------------
+  // return (...)  (everything in JSX, table, modals, panels)
+
+
+
+// ========================= Inline Micro-Components ============================
+// QuickContactInline
+// QuickLabelInline
+
+
+// ========================= Export ============================================
+
+
+
+
+
+
+
+
+// lightweight notifier so we don't crash if a toast lib isn't present
+const notify = {
+  success: (msg) => { try { console.log(msg); alert(msg); } catch {} },
+  error:   (msg) => { try { console.error(msg); alert(msg); } catch {} },
+};
+
 
 /** Utils */
-function formatYYYYMM(d) {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  return `${year}-${month}`;
-}
-function monthBounds(yyyyMM) {
-  const [y, m] = yyyyMM.split('-').map(Number);
-  const start = new Date(y, m - 1, 1);
-  const end = new Date(y, m, 0);
-  return { start, end };
-}
-function startOfTodayISO() {
-  const d = new Date();
-  d.setHours(0,0,0,0);
-  return d.toISOString().slice(0,10);
-}
-function addDaysISO(iso, days) {
-  const [y,m,dd] = iso.split('-').map(Number);
-  const d = new Date(Date.UTC(y, m-1, dd));
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0,10);
-}
-function isoRangeForPreset(preset) {
-  const today = startOfTodayISO();
-  switch (preset) {
-    case 'last7':   return { start: addDaysISO(today, -7),  end: addDaysISO(today, 1) };
-    case 'last30':  return { start: addDaysISO(today, -30), end: addDaysISO(today, 1) };
-    case 'last12w': return { start: addDaysISO(today, -84), end: addDaysISO(today, 1) };
-    case 'last6m':  return { start: addDaysISO(today, -183), end: addDaysISO(today, 1) };
-    case 'last1y':  return { start: addDaysISO(today, -365), end: addDaysISO(today, 1) };
-    case 'thisWeek': {
-      const d = new Date();
-      const day = (d.getDay() + 6) % 7; // 0..6 Monday..Sunday
-      const start = addDaysISO(startOfTodayISO(), -day);
-      const end   = addDaysISO(startOfTodayISO(), 1);
-      return { start, end };
-    }
-    case 'thisMonth': {
-      const now = new Date();
-      const start = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1)).toISOString().slice(0,10);
-      const end   = new Date(Date.UTC(now.getFullYear(), now.getMonth()+1, 1)).toISOString().slice(0,10);
-      return { start, end };
-    }
-    case 'thisYear': {
-      const now = new Date();
-      const start = new Date(Date.UTC(now.getFullYear(), 0, 1)).toISOString().slice(0,10);
-      const end   = new Date(Date.UTC(now.getFullYear()+1, 0, 1)).toISOString().slice(0,10);
-      return { start, end };
-    }
-    default: return null;
-  }
-}
+
 
 const ExpenseDashboard = () => {
   const navigate = useNavigate();
 
   // ======== State ========
+
   const [budget, setBudget] = useState(0);
 
   const [editId, setEditId] = useState(null);
@@ -87,7 +167,6 @@ const ExpenseDashboard = () => {
     [selectedMonth]
   );
   const [yearRows, setYearRows] = useState([]);
-
   // range filtering
   const [rangeMode, setRangeMode] = useState('month'); // 'month' | 'preset' | 'custom'
   const [rangePreset, setRangePreset] = useState('thisMonth');
@@ -110,6 +189,18 @@ const ExpenseDashboard = () => {
   const [notes, setNotes] = useState('');
   const [labelIds, setLabelIds] = useState([]);
   const [newFiles, setNewFiles] = useState([]);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const confirmRef = useRef({});
+
+
+  const [taxType, setTaxType] = useState('NONE'); // 'VAT' | 'PERCENTAGE_TAX' | 'NONE'
+  const [taxRate, setTaxRate] = useState(0.03);
+  const [taxInclusive, setTaxInclusive] = useState(false);
+  const [withholdingRate, setWithholdingRate] = useState(0);
+
+  const [editOriginalAmount, setEditOriginalAmount] = useState(0);
+
+
 
   // pickers
   const [mains, setMains] = useState([]);
@@ -122,24 +213,25 @@ const ExpenseDashboard = () => {
   const [sortMode, setSortMode] = useState('date_desc');
 
   const handleOpenExpenseFromContacts = useCallback(async (expRowOrId) => {
-  // If ContactsCenter passed a full row, use it.
-  if (expRowOrId && typeof expRowOrId === "object") {
-    openEdit(expRowOrId);
-    return;
-  }
+    // If a full row was passed, use it.
+    if (expRowOrId && typeof expRowOrId === "object") {
+      openEdit(expRowOrId);
+      return;
+    }
 
-  // Otherwise it’s an ID — try to find it in the currently loaded rows first
-  const local = rows.find(r => r.id === expRowOrId);
-  if (local) {
-    openEdit(local);
-    return;
-  }
+    // Try local cache, but ONLY if it already has tax_json
+    const local = rows.find(r => r.id === expRowOrId);
+    if (local && local.tax_json != null) {
+      openEdit(local);
+      return;
+    }
 
-  // Fallback: fetch by id (could be outside current month filter)
+    // Fallback: fetch full record (includes tax_json)
     try {
       const { data, error } = await supabase
         .from("expenses")
-        .select("id, occurred_on, amount, notes, status, contact_id, category_id, attachments_count")
+        .select("id, occurred_on, amount, notes, status, contact_id, category_id, tax_json")
+
         .eq("id", expRowOrId)
         .maybeSingle();
 
@@ -154,6 +246,65 @@ const ExpenseDashboard = () => {
       alert(e.message || "Failed to open expense.");
     }
   }, [rows, openEdit]);
+
+
+
+
+
+function splitStorageKey(key = "") {
+  if (!key) return { bucket: DEFAULT_ATTACHMENTS_BUCKET, path: "" };
+  const i = key.indexOf("/");
+  return i > 0
+    ? { bucket: key.slice(0, i), path: key.slice(i + 1) }
+    : { bucket: DEFAULT_ATTACHMENTS_BUCKET, path: key };
+}
+
+async function deleteExpenseDeep(expenseId) {
+  const { data: atts, error: qErr } = await supabase
+    .from("attachments")
+    .select("id, storage_key")
+    .eq("expense_id", expenseId);
+  if (qErr) throw qErr;
+
+  const byBucket = new Map();
+  for (const a of atts || []) {
+    const { bucket, path } = splitStorageKey(a.storage_key || "");
+    if (!path) continue;
+    if (!byBucket.has(bucket)) byBucket.set(bucket, []);
+    byBucket.get(bucket).push(path);
+  }
+  for (const [bucket, paths] of byBucket) {
+    const { error: rmErr } = await supabase.storage.from(bucket).remove(paths);
+    if (rmErr) console.warn("Storage remove warning:", bucket, rmErr.message);
+  }
+
+  const { error: delAttErr } = await supabase
+    .from("attachments")
+    .delete()
+    .eq("expense_id", expenseId);
+  if (delAttErr) throw delAttErr;
+
+  const { error: delExpErr } = await supabase
+    .from("expenses")
+    .delete()
+    .eq("id", expenseId);
+  if (delExpErr) throw delExpErr;
+}
+
+  // Ensure a label with given name exists; return its id.
+  // Also keeps local `labels` state fresh.
+  async function ensureLabelByName(name, color = "#ef4444") {
+    const existing = labels.find(l => (l.name || "").toLowerCase() === name.toLowerCase());
+    if (existing) return existing.id;
+
+    const created = await createLabel({ name, color });  // already imported
+    const next = await listLabels();
+    setLabels(next);
+    const again = next.find(l => (l.name || "").toLowerCase() === name.toLowerCase());
+    return again?.id || created?.id;
+  }
+
+
 
   // ======== Auth guard ========
   useEffect(() => {
@@ -294,6 +445,49 @@ const ExpenseDashboard = () => {
     return { month: monthName, total };
   });
 
+
+
+
+  // ======== Budget math for summary cards ========
+  const daysInMonth = (() => {
+    const d0 = new Date(selectedMonth + "-01");
+    return new Date(d0.getFullYear(), d0.getMonth() + 1, 0).getDate();
+  })();
+
+  const today = new Date();
+  const isCurrentMonth =
+    today.getFullYear() === Number(selectedMonth.slice(0, 4)) &&
+    today.getMonth() + 1 === Number(selectedMonth.slice(5, 7));
+
+  const daysElapsed = isCurrentMonth ? Math.max(1, today.getDate()) : daysInMonth;
+
+  // Main budget progress
+  const spent = monthlyTotal;
+  const remaining = Math.max((budget || 0) - spent, 0);
+  const overspend = Math.max(spent - (budget || 0), 0);
+  const spendPct = budget > 0 ? Math.min(spent / budget, 1) : 0; // clamp 0..1
+  const risk =
+    budget <= 0 ? "nobudget" :
+    spent >= budget ? "over" :
+    spent >= budget * 0.8 ? "high" : "ok";
+
+  // Daily pacing vs daily budget
+  const dailyBudget = budget > 0 ? budget / daysInMonth : 0;
+  const dailyPct = dailyBudget > 0 ? Math.min(dailyTotal / dailyBudget, 1) : 0;
+
+  // Top category (month-to-date)
+  const topCat = (() => {
+    const sums = new Map(); // main category -> sum
+    for (const e of rows) {
+      const main = String(e.category_path || "").split("/")[0].trim() || "Uncategorized";
+      sums.set(main, (sums.get(main) || 0) + Number(e.amount || 0));
+    }
+    let name = "—", amt = 0;
+    for (const [k, v] of sums) { if (v > amt) { name = k; amt = v; } }
+    return { name, amt };
+  })();
+
+
   // ======== Create / Update / Delete expense ========
   const category_id = subCatId || mainCatId || null;
 
@@ -310,14 +504,55 @@ const ExpenseDashboard = () => {
         return;
       }
 
+      const taxSnapshot = taxType === 'NONE'
+        ? null
+        : {
+            type: taxType,          // 'VAT' | 'PERCENTAGE_TAX'
+            rate: Number(taxRate || 0),
+            is_inclusive: !!taxInclusive,
+            withholding_rate: Number(withholdingRate || 0),
+                 // Optional: store precomputed values for reporting
+                  ...(() => {
+                    const { net, tax, gross, withholding } = calcTax({
+                      amount: Number(amount || 0),
+                      type: taxType,
+                      rate: Number(taxRate || 0),
+                      isInclusive: !!taxInclusive,      // camelCase for helper
+                      withholdingRate: Number(withholdingRate || 0)
+                    });
+                    return {
+                      net: Number((net ?? 0).toFixed(2)),
+                      tax: Number((tax ?? 0).toFixed(2)),
+                      gross: Number((gross ?? 0).toFixed(2)),
+                      withholding: Number((withholding ?? 0).toFixed(2)),
+                    };
+                  })(),
+          };
+      
+            // --- Budget guardrail + auto-label ---
+      let finalLabelIds = expanded ? [...labelIds] : [];
+      if (Number(budget || 0) > 0) {
+        const projected = Number(spent || 0) + amountNum;
+        if (projected > Number(budget)) {
+          const overBy = projected - Number(budget);
+          const ok = confirm(`⚠️ This will put you over budget by ₱${overBy.toFixed(2)}.\nProceed?`);
+          if (!ok) return; // cancel create
+          // Ensure "Over budget" label is present
+          const overId = await ensureLabelByName("Over budget", "#ef4444");
+          if (overId && !finalLabelIds.includes(overId)) finalLabelIds.push(overId);
+        }
+      }
+    
+
       const exp = await createExpense({
+        tax_json: taxSnapshot,
         occurred_on: occurredOn,
         amount: amountNum,
         category_id: chosenCategoryId,
         notes: expanded ? (notes || null) : null,
         status: expanded ? status : 'uncleared',
         contact_id: expanded && contactId ? contactId : null,
-        label_ids: expanded ? labelIds : [],
+        label_ids: finalLabelIds,
       });
 
       if (newFiles.length) {
@@ -325,6 +560,10 @@ const ExpenseDashboard = () => {
       }
 
       setShowAddModal(false);
+      setTaxType('NONE');
+      setTaxRate(0.03);
+      setTaxInclusive(false);
+      setWithholdingRate(0);
       setAmount('');
       setMainCatId('');
       setSubCatId('');
@@ -355,14 +594,53 @@ const ExpenseDashboard = () => {
         return;
       }
 
+      const taxSnapshot = taxType === 'NONE'
+        ? null
+        : {
+            type: taxType,          // 'VAT' | 'PERCENTAGE_TAX'
+            rate: Number(taxRate || 0),
+            is_inclusive: !!taxInclusive,
+            withholding_rate: Number(withholdingRate || 0),
+                 // Optional: store precomputed values for reporting
+                  ...(() => {
+                    const { net, tax, gross, withholding } = calcTax({
+                      amount: Number(amount || 0),
+                      type: taxType,
+                      rate: Number(taxRate || 0),
+                      isInclusive: !!taxInclusive,      // camelCase for helper
+                      withholdingRate: Number(withholdingRate || 0)
+                    });
+                    return {
+                      net: Number((net ?? 0).toFixed(2)),
+                      tax: Number((tax ?? 0).toFixed(2)),
+                      gross: Number((gross ?? 0).toFixed(2)),
+                      withholding: Number((withholding ?? 0).toFixed(2)),
+                    };
+                  })(),
+          };
+ 
+          // --- Budget guardrail + auto-label for EDIT ---
+    let finalEditLabelIds = [...labelIds];
+    if (Number(budget || 0) > 0) {
+      const projected = Number(spent || 0) - Number(editOriginalAmount || 0) + amountNum;
+      if (projected > Number(budget)) {
+        const overBy = projected - Number(budget);
+        const ok = confirm(`⚠️ This change will put you over budget by ₱${overBy.toFixed(2)}.\nProceed?`);
+        if (!ok) return; // cancel update
+        const overId = await ensureLabelByName("Over budget", "#ef4444");
+        if (overId && !finalEditLabelIds.includes(overId)) finalEditLabelIds.push(overId);
+      }
+    }   
+
       await updateExpense(editId, {
+        tax_json: taxSnapshot,
         occurred_on: occurredOn,
         amount: amountNum,
         category_id: chosenCategoryId,
         notes: notes || null,
         status,
         contact_id: contactId || null,
-        label_ids: labelIds,
+        label_ids: finalEditLabelIds,
       });
 
       if (editFiles.length) {
@@ -373,6 +651,10 @@ const ExpenseDashboard = () => {
       setEditId(null);
 
       setAmount('');
+      setTaxType('NONE');
+      setTaxRate(0.03);
+      setTaxInclusive(false);
+      setWithholdingRate(0);
       setMainCatId('');
       setSubCatId('');
       setNotes('');
@@ -389,27 +671,74 @@ const ExpenseDashboard = () => {
   }
 
   async function handleDeleteExpense(id) {
-    if (!window.confirm('Delete this expense permanently?')) return;
-    try {
-      await deleteExpense(id);
-      await refresh();
-      const y = Number(selectedMonth.slice(0,4));
-      setYearRows(await listExpensesByYear(y));
-    } catch (e) {
-      alert(`Failed to delete: ${e?.message || 'Unknown error'}`);
-    }
+    const row = rows.find(r => r.id === id);
+    setConfirmOpen(true);
+    confirmRef.current = {
+      title: "Delete expense",
+      message: "This will delete the expense and its attachments.",
+      onConfirm: async () => {
+        setConfirmOpen(false);
+        try {
+          await deleteExpenseDeep(id);             
+          setRows(prev => prev.filter(r => r.id !== id));
+        } catch (e) {
+          notify.error(e?.message || "Failed to delete expense");
+        }
+      }
+    };
+
   }
+
+
+
+  async function handleDeleteLabel(id) {
+  if (!confirm('Delete this label permanently? This cannot be undone.')) return;
+  try {
+    await deleteLabel(id);                   // hard delete in DB
+    const next = await listLabels();         // refresh list
+    setLabels(next);
+    // remove from current selection if it was selected
+    setLabelIds(prev => prev.filter(x => next.some(l => l.id === x)));
+  } catch (e) {
+    alert(`Failed to delete label: ${e?.message || 'Unknown error'}`);
+  }
+}
+
+
 
   async function openEdit(row) {
     try {
       setEditId(row.id);
       setOccurredOn(String(row.occurred_on).slice(0,10));
       setAmount(String(row.amount));
+      setEditOriginalAmount(Number(row.amount || 0));
       setStatus(row.status || 'uncleared');
       setContactId(row.contact_id || '');
       setNotes(row.notes || '');
-      setEditAttachmentCount(row.attachments_count ?? 0);
-      setShowEditModal(true);
+
+      if (row.attachments_count != null) setEditAttachmentCount(row.attachments_count);
+
+      
+      const t = row.tax_json || null;
+        const nextType = t?.type || 'NONE';
+
+        // Parse numbers whether they came back as "0.12" (string) or 0.12 (number)
+        const parsedRate = Number(t?.rate);
+        const parsedWh   = Number(t?.withholding_rate);
+
+        setTaxType(nextType);
+        setTaxRate(
+          Number.isFinite(parsedRate)
+            ? parsedRate
+            : nextType === 'VAT'
+              ? 0.12
+              : nextType === 'PERCENTAGE_TAX'
+                ? 0.03
+                : 0
+        );
+        setTaxInclusive(Boolean(t?.is_inclusive));
+        setWithholdingRate(Number.isFinite(parsedWh) ? parsedWh : 0);
+
 
       const ids = (row.label_badges || []).map(b => b.id);
       setLabelIds(ids);
@@ -450,6 +779,63 @@ const ExpenseDashboard = () => {
     }
   }
 
+// 1) Try inline JSON/array fields on the row itself
+function getInlineAttachmentsFromRow(row) {
+  return (
+    row?.attachments ||
+    row?.files ||
+    row?.images ||
+    row?.docs ||
+    row?.attachments_json ||
+    []
+  );
+}
+
+  function handleTaxTypeChange(nextType) {
+    setTaxType(nextType);
+
+    // Auto-suggest a sensible default but keep it editable
+    if (nextType === 'VAT') {
+      setTaxRate(0.12);
+    } else if (nextType === 'PERCENTAGE_TAX') {
+      setTaxRate(0.03);
+    } else if (nextType === 'NONE') {
+      // Optional: keep current rate or clear suggestion baseline
+      // setTaxRate(0.03);
+    }
+  }
+
+
+  function resetAddExpenseForm() {
+    setOccurredOn(new Date().toISOString().slice(0,10));
+    setAmount('');
+    setMainCatId('');
+    setSubCatId('');
+    setNotes('');
+    setLabelIds([]);
+    setContactId('');
+    setStatus('uncleared');
+    setNewFiles([]);
+    setExpanded(false);
+
+    // tax defaults
+    setTaxType('NONE');
+    setTaxRate(0.03);
+    setTaxInclusive(false);
+    setWithholdingRate(0);
+  }
+
+  function closeEditModalAndReset() {
+    setShowEditModal(false);
+    setEditId(null);
+    setEditFiles([]);
+    setEditAttachmentCount(0);
+
+    // Critical: clear the shared form state so Add opens clean
+    resetAddExpenseForm();
+  }
+
+
   const amountNum = Number.parseFloat(String(amount).trim());
   const canSave =
     Number.isFinite(amountNum) &&
@@ -474,6 +860,7 @@ const ExpenseDashboard = () => {
               <li onClick={() => navigate("/pos")}>Point of Sales</li>
               <li onClick={() => navigate("/TablePage")}>Sales</li>
               <li className="active">Expenses</li>
+              <li onClick={() => navigate("/PlannedPaymentsPage")}>Planned Payment</li>
               <li onClick={() => navigate("/assistant")}>AI Assistant</li>
             </ul>
             <p className="nav-header">SUPPORT</p>
@@ -485,29 +872,91 @@ const ExpenseDashboard = () => {
         </aside>
 
         <main className="main">
-          {/* Summary cards */}
           <div className="top-summary">
-            <div className="summary-card">
-              <h3>Daily Expenses</h3>
-              <p>₱{dailyTotal.toFixed(2)}</p>
+
+            {/* 1) Month-to-date vs Budget (with overspend meter) */}
+            <div className="summary-card kpi-card">
+              <div className="kpi-head">
+                <h3>Month-to-date</h3>
+                <span className={`risk-pill risk--${risk}`}>
+                  {risk === "over" ? "Over Budget" :
+                  risk === "high" ? "At Risk" :
+                  risk === "ok" ? "On Track" : "No Budget"}
+                </span>
+              </div>
+
+              <div className="kpi-main">₱{spent.toFixed(2)}</div>
+              <div className={`meter meter--${risk}`}>
+                <div className="meter__bar" style={{ width: `${spendPct * 100}%` }} />
+              </div>
+
+              <div className="stat-row">
+                <div className="stat">
+                  <div className="stat__label">Budget</div>
+                  <div className="stat__value">₱{Number(budget || 0).toFixed(2)}</div>
+                </div>
+                <div className="stat">
+                  <div className="stat__label">{overspend > 0 ? "Over by" : "Remaining"}</div>
+                  <div className={`stat__value ${overspend > 0 ? "text-danger" : "text-ok"}`}>
+                    {overspend > 0 ? `₱${overspend.toFixed(2)}` : `₱${remaining.toFixed(2)}`}
+                  </div>
+                </div>
+                <div className="stat">
+                  <div className="stat__label">% of Budget</div>
+                  <div className="stat__value">
+                    {budget > 0 ? ((spent / budget) * 100).toFixed(0) + "%" : "—"}
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="summary-card">
-              <h3>Monthly Expenses</h3>
-              <p>₱{monthlyTotal.toFixed(2)}</p>
+
+            {/* 3) Today vs. Daily Budget */}
+            <div className="summary-card kpi-card">
+              <div className="kpi-head">
+                <h3>Today</h3>
+                <span className="subtle">vs daily allowance</span>
+              </div>
+              <div className="kpi-main">₱{dailyTotal.toFixed(2)}</div>
+              <div className="meter meter--ok">
+                <div className="meter__bar" style={{ width: `${dailyPct * 100}%` }} />
+              </div>
+              <div className="stat-row">
+                <div className="stat">
+                  <div className="stat__label">Daily Budget</div>
+                  <div className="stat__value">₱{dailyBudget.toFixed(2)}</div>
+                </div>
+                <div className="stat">
+                  <div className="stat__label">{dailyTotal > dailyBudget ? "Over today" : "Left today"}</div>
+                  <div className={`stat__value ${dailyTotal > dailyBudget ? "text-danger" : "text-ok"}`}>
+                    ₱{Math.abs(dailyBudget - dailyTotal).toFixed(2)}
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="summary-card">
-              <h3>Remaining Budget</h3>
-              <p style={{ color: monthlyTotal > budget ? 'red' : 'green' }}>
-                {monthlyTotal > budget
-                  ? `Over by ₱${(monthlyTotal - budget).toFixed(2)}`
-                  : `₱${(budget - monthlyTotal).toFixed(2)} left`}
-              </p>
+
+            {/* 4) Top Category This Month */}
+            <div className="summary-card kpi-card">
+              <div className="kpi-head">
+                <h3>Top Category</h3>
+                <span className="subtle">{selectedMonth}</span>
+              </div>
+              <div className="kpi-main">{topCat.name}</div>
+              <div className="stat-row">
+                <div className="stat">
+                  <div className="stat__label">Spent</div>
+                  <div className="stat__value">₱{topCat.amt.toFixed(2)}</div>
+                </div>
+                <div className="stat">
+                  <div className="stat__label">% of Month</div>
+                  <div className="stat__value">
+                    {spent > 0 ? ((topCat.amt / spent) * 100).toFixed(0) + "%" : "—"}
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="summary-card">
-              <h3>Monthly Budget</h3>
-              <p>₱{budget.toFixed(2)}</p>
-            </div>
+
           </div>
+
 
           {monthlyTotal > budget && (
             <div className="warning-banner">
@@ -518,7 +967,7 @@ const ExpenseDashboard = () => {
           {/* Toolbar */}
           <section className="toolbar">
             <div className="toolbar-left">
-              <button className="btn primary" onClick={() => setShowAddModal(true)}>
+              <button className="btn primary" onClick={() =>{resetAddExpenseForm(); setShowAddModal(true);}}>
                 + Add Expense
               </button>
             </div>
@@ -529,6 +978,7 @@ const ExpenseDashboard = () => {
                   triggerLabel="Contacts"
                   onOpenExpense={handleOpenExpenseFromContacts}
                 />
+                <TaxCenter triggerClass="btn primary" triggerLabel="Tax" />
               </div>
 
             
@@ -587,10 +1037,9 @@ const ExpenseDashboard = () => {
                 <tr>
                   <th>Date</th>
                   <th>Category</th>
-                  <th>Notes</th>
+                  <th>Description</th>
                   <th>Labels</th>
                   <th>Amount</th>
-                  <th>Status</th>
                   <th>Attach</th>
                   <th className="col-actions">Actions</th>
                 </tr>
@@ -600,9 +1049,9 @@ const ExpenseDashboard = () => {
                   <tr
                     key={r.id}
                     className="clickable-row"
-                    onClick={() => openEdit(r)}
+                    onClick={() => handleOpenExpenseFromContacts(r.id)}
                     tabIndex={0}
-                    onKeyDown={(e) => { if (e.key === 'Enter') openEdit(r); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleOpenExpenseFromContacts(r.id); }}
                     role="button"
                     aria-label="Edit expense"
                   >
@@ -620,30 +1069,43 @@ const ExpenseDashboard = () => {
                       </div>
                     </td>
                     <td>₱{Number(r.amount).toFixed(2)}</td>
-                    <td className="capitalize">{r.status}</td>
                     <td>📎 {r.attachments_count ?? 0}</td>
                     <td className="col-actions">
-                      <div className="table-actions">
-                        <button
-                          className="btn xs outline"
-                          onClick={(e) => { e.stopPropagation(); setSelectedId(r.id); }}
-                        >
-                          Attachments
-                        </button>
+                      <div
+                        className="table-actions"
+                        onClick={(e) => e.stopPropagation()}   // prevent row onClick
+                      >
+                      <button
+                        type="button"
+                        className="btn xs"
+                         onClick={(e) => {
+                         e.preventDefault();
+                         e.stopPropagation();
+                         setSelectedId(r.id); // open the original AttachmentsPanel
+                       }}
+                      >
+                        View attachments
+                      </button>
+
+
                         <button
                           className="btn xs danger"
-                          onClick={(e) => { e.stopPropagation(); handleDeleteExpense(r.id); }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteExpense(r.id);                   // use r
+                          }}
                           title="Delete expense"
                         >
                           Delete
                         </button>
                       </div>
                     </td>
+
                   </tr>
                 ))}
                 {visibleExpenses.length === 0 && (
                   <tr>
-                    <td colSpan={8} style={{ padding: '20px', color: '#64748b' }}>
+                    <td colSpan={7} style={{ padding: '20px', color: '#64748b' }}>
                       No expenses in the selected range.
                     </td>
                   </tr>
@@ -651,6 +1113,7 @@ const ExpenseDashboard = () => {
               </tbody>
             </table>
           </div>
+
 
           {/* Chart + Calendar */}
           <div className="chart-and-calendar">
@@ -688,6 +1151,17 @@ const ExpenseDashboard = () => {
         </main>
       </div>
 
+        
+      <ConfirmDeleteModal
+      isOpen={confirmOpen}
+      message={confirmRef.current.message}
+      onCancel={() => setConfirmOpen(false)}
+      onConfirm={confirmRef.current.onConfirm}
+      />
+
+
+
+
       {/* Add Expense modal */}
       {showAddModal && (
         <div
@@ -706,7 +1180,9 @@ const ExpenseDashboard = () => {
             </div>
 
             <div className="modal-body">
+              <div className="accent-bar" />
               <div className="fields-grid">
+                <hr className="hr-ghost" />
                 <div className="field">
                   <label>Date</label>
                   <input type="date" value={occurredOn} onChange={(e) => setOccurredOn(e.target.value)} required />
@@ -725,11 +1201,24 @@ const ExpenseDashboard = () => {
                     {subs.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
                 </div>
-                <div className="field">
+                {/* Amount (emphasized) */}
+                <div className="field amount-field field--full">
                   <label>Amount</label>
-                  <input type="number" step="0.01" min="0" value={amount}
-                    onChange={(e) => setAmount(e.target.value)} required />
+                  <div className="money-group">
+                    <div className="money-prefix">₱</div>
+                    <input
+                      className="money-input"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      required
+                    />
+                  </div>
                 </div>
+
               </div>
 
               <div style={{ display:'flex', justifyContent:'flex-end' }}>
@@ -740,102 +1229,198 @@ const ExpenseDashboard = () => {
 
               {expanded && (
                 <div className="fields-grid" style={{ marginTop: 8 }}>
+                  {/* 1) Description */}
+                  <div className="section-title" style={{ gridColumn: '1 / -1' }}>Description</div>
+                  <div className="field" style={{ gridColumn: '1 / -1' }}>
+                    <input
+                      placeholder="Add a description…"
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                    />
+                  </div>
+
+                  <hr className="section-divider" style={{ gridColumn: '1 / -1' }} />
+
+                  {/* 2) Tax */}
+                  <div className="fieldset-card">
+                    <div className="section-head">
+                      <div className="title">Tax</div>
+                      <p className="hint">Configure how amount is treated</p>
+                    </div>
+
+                    {/* KPI row */}
+                    {(() => {
+                      const { net, tax, gross } = calcTax({
+                        amount: Number(amount || 0),
+                        type: taxType, rate: taxRate, isInclusive: taxInclusive, withholdingRate,
+                      });
+                      return (
+                        <div className="kpi-row" style={{ marginTop: 2 }}>
+                          <div className="kpi kpi--net"><span className="kpi__label">Net</span><span className="kpi__value">₱{(net ?? 0).toFixed(2)}</span></div>
+                          <div className="kpi kpi--tax"><span className="kpi__label">Tax</span><span className="kpi__value">₱{(tax ?? 0).toFixed(2)}</span></div>
+                          <div className="kpi kpi--gross"><span className="kpi__label">Gross</span><span className="kpi__value">₱{(gross ?? 0).toFixed(2)}</span></div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Tax controls (your existing 4 fields) */}
+                    <div className="fields-grid" style={{ marginTop: 8 }}>
+                      {/* Type / Rate / Inclusive / Withholding — unchanged */}
+                      {/* ... paste your existing 4 fields here ... */}
+                    </div>
+                  </div>
+
+
+                  {/* Tax controls */}
                   <div className="field">
-                    <label>Status</label>
-                    <select value={status} onChange={(e) => setStatus(e.target.value)}>
-                      <option value="uncleared">Uncleared</option>
-                      <option value="cleared">Cleared</option>
-                      <option value="reconciled">Reconciled</option>
+                    <label>Type</label>
+                    <select value={taxType} onChange={(e) => handleTaxTypeChange(e.target.value)}>
+                      <option value="NONE">None</option>
+                      <option value="PERCENTAGE_TAX">Percentage Tax</option>
+                      <option value="VAT">VAT</option>
                     </select>
                   </div>
+
+                  <div className="field">
+                    <label>Rate</label>
+                    <input
+                      type="number"
+                      step="0.0001"
+                      placeholder={taxType === 'VAT' ? '0.12' : '0.03'}
+                      disabled={taxType === 'NONE'}
+                      value={taxType === 'NONE' ? '' : taxRate}
+                      onChange={(e) => setTaxRate(Number(e.target.value || 0))}
+                    />
+                  </div>
+
+                  <div className="field">
+                    <label>
+                      <input
+                        type="checkbox"
+                        disabled={taxType === 'NONE'}
+                        checked={taxType === 'NONE' ? false : taxInclusive}
+                        onChange={(e) => setTaxInclusive(e.target.checked)}
+                      />
+                      &nbsp;Inclusive
+                    </label>
+                    <div className="hint">If checked, the Amount includes the tax.</div>
+                  </div>
+
+                  <div className="field">
+                    <label>Withholding Rate</label>
+                    <input
+                      type="number"
+                      step="0.0001"
+                      placeholder="0.01"
+                      disabled={taxType === 'NONE'}
+                      value={taxType === 'NONE' ? '' : withholdingRate}
+                      onChange={(e) => setWithholdingRate(Number(e.target.value || 0))}
+                    />
+                    <div className="hint">Optional. e.g. 0.01 means 1% withholding.</div>
+                  </div>
+
+                  <hr className="section-divider" style={{ gridColumn: '1 / -1' }} />
+
+                  {/* 3) Contacts & Labels */}
+                  <div className="section-title" style={{ gridColumn: '1 / -1' }}>Contacts &amp; Labels</div>
+
                   <div className="field">
                     <label>Contact</label>
                     <select value={contactId} onChange={(e) => setContactId(e.target.value)}>
                       <option value="">—</option>
-                      {contacts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      {contacts.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
                     </select>
                     <div style={{ marginTop: 6 }}>
-                      <QuickContactInline onCreated={(c) => { setContacts(prev => [...prev, c]); setContactId(c.id); }} />
+                      <QuickContactInline
+                        onCreated={(c) => {
+                          setContacts((prev) => [...prev, c]);
+                          setContactId(c.id);
+                        }}
+                      />
                     </div>
                   </div>
-                  <div className="field" style={{ gridColumn: '1 / -1' }}>
-                    <label>Notes</label>
-                    <input placeholder="Add a note…" value={notes} onChange={(e) => setNotes(e.target.value)} />
-                  </div>
-                  <div className="field" style={{ gridColumn:'1 / -1' }}>
-                    <label>Labels</label>
 
-                    {/* Multi-select with checkboxes */}
-                    <div style={{ display:'flex', flexDirection:'column', gap:6, maxHeight:180, overflow:'auto', padding:6, border:'1px solid #e5e7eb', borderRadius:8 }}>
-                      {labels.map(l => {
+                  <div className="field" style={{ gridColumn: '1 / -1' }}>
+                    <label>Labels</label>
+                    <div className="label-cloud">
+                      {labels.map((l) => {
                         const checked = labelIds.includes(l.id);
                         return (
-                          <label key={l.id} style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer' }}>
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setLabelIds(prev => prev.includes(l.id) ? prev : [...prev, l.id]);
-                                } else {
-                                  setLabelIds(prev => prev.filter(id => id !== l.id));
-                                }
-                              }}
-                            />
-                            <span style={{ display:'inline-block', width:12, height:12, borderRadius:999, background:l.color }} />
-                            <span>{l.name}</span>
-                          </label>
+                          <div className={`chip ${checked ? 'chip--selected' : ''}`} key={l.id} title={l.name}>
+                            <button
+                              type="button"
+                              className="chip__main"
+                              onClick={() =>
+                                setLabelIds((prev) => (checked ? prev.filter((id) => id !== l.id) : [...prev, l.id]))
+                              }
+                            >
+                              <span className="chip__dot" style={{ background: l.color || '#64748b' }} />
+                              <span className="chip__text">{l.name}</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="chip__delete"
+                              aria-label={`Delete ${l.name}`}
+                              title="Delete label"
+                              onClick={(e) => { e.stopPropagation(); handleDeleteLabel(l.id); }}
+                            >
+                              ×
+                            </button>
+                          </div>
                         );
                       })}
                     </div>
 
-                    <div style={{ marginTop:8 }}>
+                    <div style={{ marginTop: 8 }}>
                       <QuickLabelInline
                         onCreated={(lbl) => {
-                          setLabels(prev => [...prev, lbl]);
+                          setLabels((prev) => [...prev, lbl]);
                         }}
                       />
                     </div>
+                  </div>
+
+                  <hr className="section-divider" style={{ gridColumn: '1 / -1' }} />
+
+         
+                  {/* 4) Attachments */}
+                  <div className="fieldset-card">
+                    <div className="section-head">
+                      <div className="title">Attachments</div>
+                      <p className="hint">Upload JPEG/PNG receipts</p>
+                    </div>
 
                     <div className="field" style={{ gridColumn:'1 / -1' }}>
-                      <label>Attachments (JPEG/PNG)</label>
-                      <input
-                        type="file"
-                        accept="image/jpeg,image/png"
-                        multiple
-                        onChange={(e) => setNewFiles(Array.from(e.target.files || []))}
-                      />
-                      {!!newFiles.length && (
-                        <div style={{ display:'flex', gap:12, flexWrap:'wrap', marginTop:8 }}>
-                          {newFiles.map((f, i) => (
-                            <div key={i} className="border rounded-xl p-2" style={{ width: 140 }}>
-                              <div
-                                style={{
-                                  width: '100%', height: 90, overflow: 'hidden',
-                                  borderRadius: 12, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center'
-                                }}
-                              >
-                                <img
-                                  src={URL.createObjectURL(f)}
-                                  alt={f.name}
-                                  style={{ maxWidth:'100%', maxHeight:'100%', objectFit:'cover' }}
-                                  onLoad={(e) => URL.revokeObjectURL(e.currentTarget.src)}
-                                />
-                              </div>
-                              <div style={{ fontSize: 12, marginTop: 6, color: '#475569' }}>
-                                {f.name.length > 20 ? f.name.slice(0, 17) + '…' : f.name}
-                              </div>
-                              <div style={{ fontSize: 11, color: '#64748b' }}>
-                                {(f.size/1024).toFixed(1)} KB
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      <input type="file" accept="image/jpeg,image/png" multiple
+                            onChange={(e) => setNewFiles(Array.from(e.target.files || []))} />
                     </div>
+
+                    {!!newFiles.length && (
+                      <div className="attach-grid" style={{ marginTop: 8 }}>
+                        {newFiles.map((f, i) => (
+                          <div key={i} className="attach-card">
+                            <div className="attach-thumb">
+                              <img src={URL.createObjectURL(f)} alt={f.name}
+                                  style={{ maxWidth:'100%', maxHeight:'100%', objectFit:'cover' }}
+                                  onLoad={(e) => URL.revokeObjectURL(e.currentTarget.src)} />
+                            </div>
+                            <div style={{ fontSize: 12, marginTop: 6, color: '#475569' }}>
+                              {f.name.length > 20 ? f.name.slice(0, 17) + '…' : f.name}
+                            </div>
+                            <div style={{ fontSize: 11, color: '#64748b' }}>
+                              {(f.size/1024).toFixed(1)} KB
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
+
                 </div>
               )}
+              
             </div>
 
             <div className="modal-footer">
@@ -865,12 +1450,13 @@ const ExpenseDashboard = () => {
           <form className="modal sheet animate-in" onSubmit={handleUpdateExpense}>
             <div className="modal-header">
               <h2 className="modal-title">Edit Expense</h2>
-              <span style={{ fontSize: 12, color: '#64748b' }}>📎 {editAttachmentCount}</span>
-              <button type="button" className="icon-btn" aria-label="Close" onClick={() => setShowEditModal(false)}>✕</button>
+              <button type="button" className="icon-btn" aria-label="Close" onClick={closeEditModalAndReset}>✕</button>
             </div>
 
             <div className="modal-body">
+              <div className="accent-bar" />
               <div className="fields-grid">
+                <hr className="hr-ghost" />
                 <div className="field">
                   <label>Date</label>
                   <input type="date" value={occurredOn} onChange={(e) => setOccurredOn(e.target.value)} required />
@@ -899,58 +1485,159 @@ const ExpenseDashboard = () => {
                     {subs.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
                 </div>
-                <div className="field">
+                {/* Amount (emphasized) */}
+                <div className="field amount-field field--full">
                   <label>Amount</label>
-                  <input type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+                  <div className="money-group">
+                    <div className="money-prefix">₱</div>
+                    <input
+                      className="money-input"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      required
+                    />
+                  </div>
                 </div>
+
               </div>
 
               <div className="fields-grid" style={{ marginTop: 8 }}>
+                {/* 1) Description */}
+                <div className="section-title" style={{ gridColumn: '1 / -1' }}>Description</div>
+                <div className="field" style={{ gridColumn: '1 / -1' }}>
+                  <input
+                    placeholder="Add a note…"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                  />
+                </div>
+
+                <hr className="section-divider" style={{ gridColumn: '1 / -1' }} />
+
+                {/* 2) Tax */}
+                <div className="section-title" style={{ gridColumn: '1 / -1' }}>Tax</div>
+
+                {/* KPI row already shown under Amount; you can keep a second KPI row here if you like.
+                    If you want it here too, uncomment the block below.
+                */}
+                {true && (() => {
+                  const { net, tax, gross } = calcTax({
+                    amount: Number(amount || 0),
+                    type: taxType,
+                    rate: taxRate,
+                    isInclusive: taxInclusive,
+                    withholdingRate,
+                  });
+                  return (
+                    <div className="kpi-row" style={{ gridColumn: '1 / -1', marginTop: 2 }}>
+                      <div className="kpi kpi--net">
+                        <span className="kpi__label">Net</span>
+                        <span className="kpi__value">₱{(net ?? 0).toFixed(2)}</span>
+                      </div>
+                      <div className="kpi kpi--tax">
+                        <span className="kpi__label">Tax</span>
+                        <span className="kpi__value">₱{(tax ?? 0).toFixed(2)}</span>
+                      </div>
+                      <div className="kpi kpi--gross">
+                        <span className="kpi__label">Gross</span>
+                        <span className="kpi__value">₱{(gross ?? 0).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Tax controls */}
                 <div className="field">
-                  <label>Status</label>
-                  <select value={status} onChange={(e) => setStatus(e.target.value)}>
-                    <option value="uncleared">Uncleared</option>
-                    <option value="cleared">Cleared</option>
-                    <option value="reconciled">Reconciled</option>
+                  <label>Type</label>
+                  <select value={taxType} onChange={(e) => handleTaxTypeChange(e.target.value)}>
+                    <option value="NONE">None</option>
+                    <option value="PERCENTAGE_TAX">Percentage Tax</option>
+                    <option value="VAT">VAT</option>
                   </select>
                 </div>
+
+                <div className="field">
+                  <label>Rate</label>
+                  <input
+                    type="number"
+                    step="0.0001"
+                    placeholder={taxType === 'VAT' ? '0.12' : '0.03'}
+                    disabled={taxType === 'NONE'}
+                    value={taxType === 'NONE' ? '' : taxRate}
+                    onChange={(e) => setTaxRate(Number(e.target.value || 0))}
+                  />
+                </div>
+
+                <div className="field">
+                  <label>
+                    <input
+                      type="checkbox"
+                      disabled={taxType === 'NONE'}
+                      checked={taxType === 'NONE' ? false : taxInclusive}
+                      onChange={(e) => setTaxInclusive(e.target.checked)}
+                    />
+                    &nbsp;Inclusive
+                  </label>
+                  <div className="hint">If checked, the Amount includes the tax.</div>
+                </div>
+
+                <div className="field">
+                  <label>Withholding Rate</label>
+                  <input
+                    type="number"
+                    step="0.0001"
+                    placeholder="0.01"
+                    disabled={taxType === 'NONE'}
+                    value={taxType === 'NONE' ? '' : withholdingRate}
+                    onChange={(e) => setWithholdingRate(Number(e.target.value || 0))}
+                  />
+                  <div className="hint">Optional. e.g. 0.01 means 1% withholding.</div>
+                </div>
+
+                <hr className="section-divider" style={{ gridColumn: '1 / -1' }} />
+
+                {/* 3) Contacts & Labels */}
+                <div className="section-title" style={{ gridColumn: '1 / -1' }}>Contacts &amp; Labels</div>
 
                 <div className="field">
                   <label>Contact</label>
                   <select value={contactId} onChange={(e) => setContactId(e.target.value)}>
                     <option value="">—</option>
-                    {contacts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    {contacts.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
                   </select>
                 </div>
 
                 <div className="field" style={{ gridColumn:'1 / -1' }}>
-                  <label>Notes</label>
-                  <input placeholder="Add a note…" value={notes} onChange={(e) => setNotes(e.target.value)} />
-                </div>
-
-                <div className="field" style={{ gridColumn:'1 / -1' }}>
                   <label>Labels</label>
-                  <div style={{ display:'flex', flexDirection:'column', gap:6, maxHeight:180, overflow:'auto', padding:6, border:'1px solid #e5e7eb', borderRadius:8 }}>
-                    {labels.map(l => {
+                  <div className="label-cloud">
+                    {labels.map((l) => {
                       const checked = labelIds.includes(l.id);
                       return (
-                        <label key={l.id} style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer' }}>
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={(e) => {
-                              if (e.target.checked) setLabelIds(prev => prev.includes(l.id) ? prev : [...prev, l.id]);
-                              else setLabelIds(prev => prev.filter(id => id !== l.id));
-                            }}
-                          />
-                          <span style={{ display:'inline-block', width:12, height:12, borderRadius:999, background:l.color }} />
-                          <span>{l.name}</span>
-                        </label>
+                        <button
+                          type="button"
+                          key={l.id}
+                          className={`chip ${checked ? 'chip--selected' : ''}`}
+                          onClick={() => setLabelIds(prev => checked ? prev.filter(id => id !== l.id) : [...prev, l.id])}
+                          title={l.name}
+                        >
+                          <span className="chip__dot" style={{ background: l.color || '#64748b' }} />
+                          <span className="chip__text">{l.name}</span>
+                        </button>
                       );
                     })}
                   </div>
                 </div>
 
+                <hr className="section-divider" style={{ gridColumn: '1 / -1' }} />
+
+                {/* 4) Attachments */}
+                <div className="section-title" style={{ gridColumn: '1 / -1' }}>Attachments</div>
                 <div className="field" style={{ gridColumn:'1 / -1' }}>
                   <label>Attachments (JPEG/PNG)</label>
                   <input
@@ -988,12 +1675,12 @@ const ExpenseDashboard = () => {
                     </div>
                   )}
                 </div>
-
               </div>
+
             </div>
 
             <div className="modal-footer">
-              <button type="button" className="btn secondary" onClick={() => setShowEditModal(false)}>Cancel</button>
+              <button type="button" className="btn secondary" onClick={closeEditModalAndReset}>Cancel</button>
               <button type="submit" className="btn primary">Save changes</button>
             </div>
           </form>
@@ -1004,16 +1691,18 @@ const ExpenseDashboard = () => {
       {selectedId && (
         <div className="main" style={{ paddingTop: 0 }}>
           <section className="rounded-2xl border p-4">
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <h2 className="modal-title">Attachments</h2>
-              <button className="btn secondary" onClick={() => setSelectedId(null)}>Close</button>
-            </div>
-            <AttachmentsPanel expenseId={selectedId} />
+              <AttachmentsPanel
+              expenseId={selectedId}
+              onClose={() => setSelectedId(null)}
+            />
+
           </section>
         </div>
       )}
     </div>
   );
+
+
 };
 
 // Inline “quick contact”
@@ -1024,32 +1713,65 @@ function QuickContactInline({ onCreated }) {
   const [phone, setPhone] = useState('');
   const [saving, setSaving] = useState(false);
 
+  const emailValid = !email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const canSave = name.trim() && emailValid && !saving;
+
   async function submit() {
+    if (!canSave) return;
     setSaving(true);
     try {
-      const c = await createContact({ name, email, phone });
+      const c = await createContact({ name: name.trim(), email: email.trim(), phone: phone.trim() });
       onCreated(c);
       setOpen(false);
       setName(''); setEmail(''); setPhone('');
+    } catch (e) {
+      alert(`Failed to create contact: ${e?.message || 'Unknown error'}`);
     } finally {
       setSaving(false);
     }
   }
 
-  if (!open) return <button className="btn xs outline" onClick={() => setOpen(true)}>+ New contact</button>;
-
   return (
-    <div className="fields-grid" style={{ marginTop: 8 }}>
-      <div className="field"><label>Name</label><input value={name} onChange={(e)=>setName(e.target.value)} placeholder="Contact name" /></div>
-      <div className="field"><label>Email</label><input value={email} onChange={(e)=>setEmail(e.target.value)} placeholder="email@example.com" /></div>
-      <div className="field"><label>Phone</label><input value={phone} onChange={(e)=>setPhone(e.target.value)} placeholder="+63…" /></div>
-      <div className="field" style={{ gridColumn:'1 / -1' }}>
-        <button type="button" className="btn primary" disabled={saving} onClick={submit}>Save contact</button>
-        <button type="button" className="btn secondary" style={{ marginLeft: 8 }} onClick={()=>setOpen(false)}>Cancel</button>
-      </div>
+    <div className="inline-add" style={{ marginTop: 6 }}>
+      {!open && (
+        <button type="button" className="btn link" onClick={() => setOpen(true)}>
+          + New contact
+        </button>
+      )}
+      {open && (
+        <div className="inline-card">
+          <div className="fields-grid">
+            <div className="field">
+              <label>Name</label>
+              <input value={name} onChange={(e)=>setName(e.target.value)} placeholder="Contact name" />
+            </div>
+            <div className="field">
+              <label>Email</label>
+              <input value={email} onChange={(e)=>setEmail(e.target.value)} placeholder="email@example.com" type="email" />
+              {!emailValid && <div className="hint error">Please enter a valid email</div>}
+            </div>
+            <div className="field">
+              <label>Phone</label>
+              <input value={phone} onChange={(e)=>setPhone(e.target.value)} placeholder="+63…" />
+              <div className="hint">Optional</div>
+            </div>
+            <div className="field" style={{ gridColumn:'1 / -1' }}>
+              <div className="actions">
+                <button type="button" className="btn primary" disabled={!canSave} onClick={submit}>
+                  Save contact
+                </button>
+                <button type="button" className="btn secondary" onClick={()=>setOpen(false)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
 
 function QuickLabelInline({ onCreated }) {
   const [open, setOpen] = useState(false);
@@ -1106,6 +1828,9 @@ function QuickLabelInline({ onCreated }) {
       </div>
     </div>
   );
+
+
+
 }
 
 export default ExpenseDashboard;

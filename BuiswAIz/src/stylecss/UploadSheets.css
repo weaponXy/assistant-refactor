@@ -1,4 +1,5 @@
 .btn {
+  background-color: #04B4FC;
   padding: 10px 22px;
   border-radius: 8px;
   border: none;
@@ -10,11 +11,10 @@
 }
 
 .btn-primary {
-  background: #dc2626;
-  color: #fff;
+  background-color: #3644c2;
   border: 1px solid red;
-  box-shadow: 2px 3px 8px rgb(255, 2, 2);
-  margin: 20px 0 20px 10px;
+  box-shadow: 2px 5px 12px rgba(220, 38, 38, 0.3);
+  padding: 12px 20px 12px 20px;
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -67,7 +67,7 @@ th, td {
 }
 
 th {
-  background: #f9fafb;
+  background: #f9fafb;    
   color: #374151;
   font-weight: 600;
   text-transform: capitalize;

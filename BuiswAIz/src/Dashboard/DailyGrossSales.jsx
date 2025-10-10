@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
-import UploadSheets from '../components/UploadSheets';
 import '../stylecss/Dashboard/DailyGrossSales.css';
+import UploadSheets, { downloadTemplate } from '../components/UploadSheets'; 
+
 
 const DailyGrossSales = () => {
   const [dailySales, setDailySales] = useState([]);
@@ -304,6 +305,36 @@ const DailyGrossSales = () => {
                 ✕
               </button>
             </div>
+            {/* Toolbar above the uploader */}
+            <div className="template-toolbar">
+              <button
+                type="button"
+                className="download-template-btn"
+                onClick={downloadTemplate}
+                aria-label="Download sales upload template"
+              >
+                {/* Icon */}
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  aria-hidden="true"
+                  className="icon"
+                >
+                  <path d="M12 3v10m0 0l4-4m-4 4l-4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"
+                        stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <span>Download Template</span>
+              </button>
+
+              <div className="template-help">
+                Expected columns:&nbsp;
+                <code>orderid</code>, <code>orderdate</code>, <code>productname</code>,
+                <code> color</code>, <code>agesize</code>, <code>quantity</code>,
+                <code> unitprice</code>, <code>subtotal</code>, <code>amountpaid</code>
+              </div>
+            </div>
 
             <UploadSheets />
 
@@ -313,6 +344,7 @@ const DailyGrossSales = () => {
           </div>
         </div>
       )}
+
 
       {/* Sales Details Modal */}
       {showSalesModal && selectedDaySales && (
