@@ -1,5 +1,4 @@
-﻿// dataAccess.Api/Endpoints/AssistantEndpoint.cs
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using System.Text.Json.Nodes;
 using dataAccess.Reports;
