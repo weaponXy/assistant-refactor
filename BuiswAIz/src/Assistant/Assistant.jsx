@@ -121,6 +121,7 @@ const Assistant = () => {
     };
   }, [navigate]);
 
+
   // Preload Spotlight Adjust ko to pag okay na backend 
   useEffect(() => {
     let alive = true;

@@ -18,6 +18,9 @@ import Dashboard from "./Dashboard";
 import ExpenseDashboard from "./expenses/expenses";
 import UploadSheets from "./components/UploadSheets";
 import BudgetHistory from "./budget/BudgetHistory";
+import PointOfSales from "./PointOfSales";
+import PlannedPaymentsPage from "./pages/PlannedPaymentsPage";
+
 
 function App() {
   return (
@@ -39,10 +42,11 @@ function App() {
             <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
             <Route path="/supplier" element={<ProtectedRoute><Supplier /></ProtectedRoute>} />
             <Route path="/TablePage" element={<ProtectedRoute><Sales /></ProtectedRoute>} />
+            <Route path="/pos" element={<ProtectedRoute><PointOfSales /></ProtectedRoute>} />
             <Route path="/assistant" element={<ProtectedRoute><Assistant /></ProtectedRoute>} />
             <Route path="/expenses" element={<ProtectedRoute><ExpenseDashboard /></ProtectedRoute>} />
             <Route path="/upload" element={<ProtectedRoute><UploadSheets /></ProtectedRoute>} />
-            <Route path="/budget" element={<ProtectedRoute><BudgetHistory /></ProtectedRoute>} />
+            <Route path="/PlannedPaymentsPage" element={<ProtectedRoute><PlannedPaymentsPage /></ProtectedRoute>} />
             <Route path="/budget-history" element={<ProtectedRoute><BudgetHistory /></ProtectedRoute>} />
 
             <Route path="*" element={<Navigate to="/login" replace />} />
