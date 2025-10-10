@@ -21,7 +21,7 @@ const PointOfSales = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [orderData, setOrderData] = useState({});
 
-  // Fetch user authentication
+  // Fetch user authentication 
   useEffect(() => {
     let mounted = true;
 

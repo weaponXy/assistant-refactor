@@ -351,7 +351,7 @@ function downloadTemplate() {
                     {expenseChartData.length === 0 ? (
                       <p style={{ padding: 12 }}>No expense data yet.</p>
                     ) : (
-                      <ResponsiveContainer width="100%" height="100%">
+                      <ResponsiveContainer width="100%" height="105%">
                         <LineChart data={expenseChartData}>
                           <XAxis dataKey="day" />
                           <YAxis domain={[0, (dataMax) => (dataMax && dataMax > 0 ? dataMax : 1)]} />

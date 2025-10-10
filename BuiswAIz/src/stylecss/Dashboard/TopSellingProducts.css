@@ -199,6 +199,7 @@
   width: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .top-selling-scroll-container {
@@ -209,6 +210,7 @@
   margin: 0;
   box-sizing: border-box;
   min-height: 0;
+  max-height: 100%;
 }
 
 .top-selling-scroll-container::-webkit-scrollbar {
@@ -232,15 +234,15 @@
 .top-selling-item {
   display: flex;
   align-items: center;
-  padding: 12px 8px;
-  margin-bottom: 8px;
+  padding: 10px 8px;
+  margin-bottom: 6px;
   background: #ffffff;
   transition: all 0.2s ease;
   border-radius: 8px;
 }
 
 .top-selling-item:last-child {
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .top-selling-item:hover {
@@ -275,16 +277,16 @@
 }
 
 .product-image-small {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   object-fit: cover;
   border-radius: 6px;
   border: 1px solid #e3e3e3;
 }
 
 .image-placeholder-small {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   background: #f8f9fa;
   display: flex;
   align-items: center;
@@ -303,7 +305,7 @@
 
 .product-name-small {
   font-weight: 500;
-  font-size: 13px;
+  font-size: 12px;
   color: #333;
   margin-bottom: 4px;
   white-space: nowrap;
@@ -319,14 +321,14 @@
 }
 
 .sales-quantity {
-  font-size: 12px;
+  font-size: 11px;
   color: #4CAF50;
   font-weight: 600;
   line-height: 1.2;
 }
 
 .times-bought {
-  font-size: 11px;
+  font-size: 10px;
   color: #666;
   line-height: 1.2;
 }

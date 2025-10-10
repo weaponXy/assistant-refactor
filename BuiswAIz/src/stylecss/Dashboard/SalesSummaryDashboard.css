@@ -7,14 +7,17 @@
   position: relative;
   padding: 0;
   overflow: hidden;
-  flex: 1;
+  flex: 0 0 auto;
+  min-height: 120px;
+  max-height: 180px;
 }
 
 .sales-summary-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
 }
 
 .sales-summary-header h3 {
@@ -53,28 +56,30 @@
 
 .sales-summary-grid {
   display: flex;
-  flex-direction: row; /* stack vertically */
-  justify-content: space-evenly; /* evenly distribute vertical space */
-  align-items: stretch; /* make all boxes equal width */
-  gap: 12px;
+  flex-direction: row;
+  justify-content: space-evenly;
+  align-items: stretch;
+  gap: 10px;
   width: 100%;
   max-width: 100%;
   flex: 1;
   overflow: hidden;
+  min-height: 0;
 }
 
 .sales-card {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px;
+  gap: 10px;
+  padding: 10px;
   background-color: #ffffff;
   border-radius: 8px;
   border: 2px solid #e1e8f0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   transition: all 0.2s ease;
-  flex: 1; /* ensures equal vertical height distribution */
-  min-height: 70px;
+  flex: 1;
+  min-height: 65px;
+  max-height: 75px;
 }
 
 .sales-card:nth-child(1) { border-color: #0084ff; }
@@ -93,10 +98,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: 8px;
-  font-size: 16px;
+  font-size: 14px;
   flex-shrink: 0;
 }
 
@@ -113,7 +118,7 @@
 }
 
 .sales-amount {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   color: #1f2937;
 }
@@ -122,10 +127,11 @@
 .sales-amount.negative { color: #dc2626; }
 
 .sales-label {
-  font-size: 10px;
+  font-size: 9px;
   color: #6b7280;
   font-weight: 500;
   text-transform: uppercase;
+  line-height: 1.2;
 }
 
 /* Responsive (optional - can limit height for mobile) */
