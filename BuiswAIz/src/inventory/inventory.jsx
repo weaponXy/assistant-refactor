@@ -133,6 +133,7 @@ const Inventory = () => {
               <li onClick={() => navigate("/Dashboard")}>Dashboard</li>
               <li className="active">Inventory</li>
               <li onClick={() => navigate("/supplier")}>Supplier</li>
+              <li onClick={() => navigate("/pos")}>Point of Sales</li>
               <li onClick={() => navigate("/TablePage")}>Sales</li>
               <li onClick={() => navigate("/expenses")}>Expenses</li>
               <li onClick={() => navigate("/PlannedPaymentsPage")}>Planned Payment</li>

@@ -1,7 +1,7 @@
 .daily-sales-container {
   width: 110%;
   height: 100%;
-  padding: 16px;
+  padding: 7px;
   display: flex;
   flex-direction: column;
   background-color: #ffffff;
@@ -12,12 +12,10 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
-  gap: 12px;
+  gap: 5px;
 }
 
 .daily-sales-header h4 {
-  margin: 0;
   font-size: 14px;
   font-weight: 600;
   color: #374151;
@@ -85,7 +83,8 @@
   display: flex;
   align-items: stretch;
   gap: 8px;
-  min-height: 200px;
+  max-height: 280px;  
+  height: 100%;
   min-width: 500px;
   width: 100%;
   position: relative;
@@ -509,6 +508,7 @@
   box-shadow: 0 4px 12px rgba(4, 180, 252, 0.4);
 }
 
+
 @media (max-width: 1024px) {
   .chart-bars-container {
     gap: 2px;
@@ -692,3 +692,4 @@
   margin-right: 4px;
   display: inline-block;
 }
+

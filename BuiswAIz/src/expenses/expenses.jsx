@@ -857,6 +857,7 @@ function getInlineAttachmentsFromRow(row) {
               <li onClick={() => navigate("/Dashboard")}>Dashboard</li>
               <li onClick={() => navigate("/inventory")}>Inventory</li>
               <li onClick={() => navigate("/supplier")}>Supplier</li>
+              <li onClick={() => navigate("/pos")}>Point of Sales</li>
               <li onClick={() => navigate("/TablePage")}>Sales</li>
               <li className="active">Expenses</li>
               <li onClick={() => navigate("/PlannedPaymentsPage")}>Planned Payment</li>

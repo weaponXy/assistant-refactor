@@ -3,10 +3,10 @@ import React, { useState, useEffect } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "./supabase"; 
 import {
-  LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar, ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer,
 } from 'recharts';
 import TopSellingProducts from "./Dashboard/TopSellingProducts";
-import SalesSummary from "./Dashboard/SalesSummary";
+import SalesSummaryDashboard from "./Dashboard/SalesSummaryDashboard";
 import DailyGrossSales from "./Dashboard/DailyGrossSales";
 import Notifications from "./Dashboard/Notifications";
 import "./stylecss/Dashboard/Dashboard.css";
@@ -20,6 +20,7 @@ const Dashboard = () => {
   const [productsLoading, setProductsLoading] = useState(true);
   const [productsError, setProductsError] = useState(null);
   const [expenseChartData, setExpenseChartData] = useState([]);
+  const [activityLogs, setActivityLogs] = useState([]);
 
 
 function downloadTemplate() {
@@ -94,34 +95,30 @@ function downloadTemplate() {
 
 
   function getExpenseDate(row) {
-    // Prefer your domain date fields
     const raw =
-      row.occured_on ??           // common misspelling in schemas
-      row.occurred_on ??          // correct spelling
+      row.occured_on ??
+      row.occurred_on ??
       row.expensedate ??
       row.expense_date ??
       row.expenseDate ??
       row.date ??
-      row.created_at;             // LAST resort fallback
+      row.created_at;
 
     if (!raw) return null;
 
-    // If it's a DATE like "YYYY-MM-DD", build a local date to avoid timezone shifts
     if (typeof raw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw)) {
       const [y, m, d] = raw.split("-").map(Number);
-      return new Date(y, m - 1, d); // local time
+      return new Date(y, m - 1, d);
     }
 
     const d = new Date(raw);
     return isNaN(d) ? null : d;
   }
 
-
-
   function buildDailySeries(rows, opts = {}) {
     const now = new Date();
     const year = opts.year ?? now.getFullYear();
-    const monthIndex = opts.monthIndex ?? now.getMonth(); // 0..11
+    const monthIndex = opts.monthIndex ?? now.getMonth();
 
     const lastDay = new Date(year, monthIndex + 1, 0);
     const daysInMonth = lastDay.getDate();
@@ -149,16 +146,12 @@ function downloadTemplate() {
     }));
   }
 
-
-
-
   useEffect(() => {
     const loadChartData = async () => {
       const now = new Date();
       const y = now.getFullYear();
-      const m = now.getMonth(); // 0..11
+      const m = now.getMonth();
 
-      // first day of current month, and first day of next month (exclusive upper bound)
       const startStr = `${y}-${String(m + 1).padStart(2, "0")}-01`;
       const nextMonth = m === 11 ? 0 : m + 1;
       const nextYear  = m === 11 ? y + 1 : y;
@@ -166,9 +159,9 @@ function downloadTemplate() {
 
       const { data, error } = await supabase
         .from("expenses")
-        .select("id, occurred_on, amount") // only what you need
-        .gte("occurred_on", startStr)      // inclusive
-        .lt("occurred_on", nextStr);       // exclusive
+        .select("id, occurred_on, amount")
+        .gte("occurred_on", startStr)
+        .lt("occurred_on", nextStr);
 
       if (error) {
         console.error("Failed to fetch expenses for chart:", error);
@@ -181,6 +174,42 @@ function downloadTemplate() {
     };
 
     loadChartData();
+  }, []);
+
+  const loadActivityLogs = async () => {
+    const { data, error } = await supabase
+      .from("activitylog")
+      .select("*, systemuser(username)")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Failed to fetch activity logs:", error);
+      return;
+    }
+
+    setActivityLogs(data.slice(0, 50)); 
+
+    if (data.length > 50) {
+      const logsToDelete = data.slice(50); 
+      const idsToDelete = logsToDelete.map(log => log.activity_id); 
+
+      const { error: deleteError } = await supabase
+        .from("activitylog")
+        .delete()
+        .in("activity_id", idsToDelete);
+
+      if (deleteError) {
+        console.error("Failed to delete old logs:", deleteError);
+      } else {
+        console.log(`Deleted ${idsToDelete.length} old logs.`);
+      }
+    }
+  };
+
+  useEffect(() => {
+    loadActivityLogs();
+    const id = setInterval(loadActivityLogs, 5000);
+    return () => clearInterval(id);
   }, []);
 
   useEffect(() => {
@@ -278,7 +307,6 @@ function downloadTemplate() {
       </header>
 
       <div className="main-section">
-        {/* Sidebar */}
         <aside className="sidebar">
           <div className="nav-section">
             <p className="nav-header">GENERAL</p>
@@ -286,6 +314,7 @@ function downloadTemplate() {
               <li className="active">Dashboard</li>
               <li onClick={() => navigate("/inventory")}>Inventory</li>
               <li onClick={() => navigate("/supplier")}>Supplier</li>
+              <li onClick={() => navigate("/pos")}>Point of Sales</li>
               <li onClick={() => navigate("/TablePage")}>Sales</li>
               <li onClick={() => navigate("/expenses")}>Expenses</li>
               <li onClick={() => navigate("/PlannedPaymentsPage")}>Planned Payment</li>
@@ -302,75 +331,70 @@ function downloadTemplate() {
         <div className="main-content">
           <div className="dashboard-content">
             <div className="dashboard-panel sales-summary">
-              <h3>Sales Summary</h3>
-              <div className="panel-content">
-                <SalesSummary />
+              <div className="panel-header-with-action">
+                <h3>Sales Summary</h3>
+                <SalesSummaryDashboard />
               </div>
             </div>
 
             <div className="charts-section">
               <div className="dashboard-panel daily-sales">
                 <h3>Daily Gross Sales</h3>
-
                 <div className="panel-content">
                   <DailyGrossSales/>
                 </div>
-
               </div>
-            </div>
 
-            <div className="bottom-section">
-              <div className="dashboard-panel monthly-expense">
-                <h3>Monthly Expense</h3>
-
-                <div className="panel-content" style={{ minWidth: 0 }}>
-                  {expenseChartData.length === 0 ? (
-                  <p style={{ padding: 12 }}>No expense data yet.</p>
+              <div className="bottom-section">
+                <div className="dashboard-panel monthly-expense">
+                  <h3>Monthly Expense</h3>
+                  <div className="panel-content" style={{ minWidth: 0 }}>
+                    {expenseChartData.length === 0 ? (
+                      <p style={{ padding: 12 }}>No expense data yet.</p>
                     ) : (
-                    <ResponsiveContainer width="100%" height={180}>
-                      <LineChart data={expenseChartData}>
-                        <XAxis dataKey="day" />
-                        <YAxis domain={[0, (dataMax) => (dataMax && dataMax > 0 ? dataMax : 1)]} />
-                        <Tooltip />
-                        <CartesianGrid strokeDasharray="5 5" />
-                        <Line
-                          type="monotone"
-                          dataKey="total"
-                          stroke="#3b82f6"
-                          strokeWidth={2}
-                          dot={false}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-
-                  )}
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={expenseChartData}>
+                          <XAxis dataKey="day" />
+                          <YAxis domain={[0, (dataMax) => (dataMax && dataMax > 0 ? dataMax : 1)]} />
+                          <Tooltip />
+                          <CartesianGrid strokeDasharray="5 5" />
+                          <Line
+                            type="monotone"
+                            dataKey="total"
+                            stroke="#3b82f6"
+                            strokeWidth={2}
+                            dot={false}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              <div className="dashboard-panel top-selling">
-                <h3>Top Selling Products</h3>
-                <div className="panel-content">
-                  {productsLoading ? (
-                    <div className="loading-state">
-                      <p>Loading products...</p>
-                    </div>
-                  ) : productsError ? (
-                    <div className="error-state">
-                      <p>{productsError}</p>
-                    </div>
-                  ) : topSellingProducts.length === 0 ? (
-                    <div className="no-data-state">
-                      <p>No top selling products available.</p>
-                    </div>
-                  ) : (
-                    <TopSellingProducts topSellingProducts={topSellingProducts} />
-                  )}
-                </div>
+                <div className="dashboard-panel top-selling">
+                  <h3>Top Selling Products</h3>
+                  <div className="panel-content">
+                    {productsLoading ? (
+                      <div className="loading-state">
+                        <p>Loading products...</p>
+                      </div>
+                    ) : productsError ? (
+                      <div className="error-state">
+                        <p>{productsError}</p>
+                      </div>
+                    ) : topSellingProducts.length === 0 ? (
+                      <div className="no-data-state">
+                        <p>No top selling products available.</p>
+                      </div>
+                    ) : (
+                      <TopSellingProducts topSellingProducts={topSellingProducts} />
+                    )}
+                  </div>
+                </div> 
               </div>
             </div>
           </div>
 
-          {/* Right Panel */}
           <div className="right-panel">
             <div className="user-info-card">
               <div className="user-left">
@@ -395,6 +419,33 @@ function downloadTemplate() {
               <h3>Notifications</h3>
               <div className="activity-container">
                 <Notifications />
+              </div>
+            </div>
+
+            <div className="activity-panel">
+              <h3>Recent Activity</h3>
+              <div className="activity-container">
+                <ul className="activity-list">
+                  {activityLogs.length === 0 ? (
+                    <li className="activity-item no-activity">No recent activity</li>
+                  ) : (
+                    activityLogs.map((log, i) => (
+                      <li key={i} className="activity-item">
+                        <div className="activity-content">
+                          <span className="activity-description">
+                            <span className="log-username">
+                              {log.systemuser?.username || "Someone"}
+                            </span>{" "}
+                            {log.action_desc}
+                          </span>
+                          <span className="activity-time">
+                            {formatDistanceToNow(new Date(log.created_at), { addSuffix: true })}
+                          </span>
+                        </div>
+                      </li>
+                    ))
+                  )}
+                </ul>
               </div>
             </div>
           </div>
