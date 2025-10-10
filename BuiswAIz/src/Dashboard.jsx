@@ -332,7 +332,6 @@ function downloadTemplate() {
           <div className="dashboard-content">
             <div className="dashboard-panel sales-summary">
               <div className="panel-header-with-action">
-                <h3>Sales Summary</h3>
                 <SalesSummaryDashboard />
               </div>
             </div>
