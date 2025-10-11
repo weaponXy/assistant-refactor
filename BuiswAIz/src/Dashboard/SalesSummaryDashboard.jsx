@@ -218,7 +218,7 @@ const SalesSummaryDashboard = () => {
       <div className="sales-summary-header">
         <h3>Sales Summary</h3>
         <button className="download-csv-btn" onClick={downloadCSV} title="Download as CSV">
-          📥 Download Summary
+          Download Summary
         </button>
       </div>
 

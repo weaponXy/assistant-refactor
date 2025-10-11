@@ -370,16 +370,16 @@ body {
   overflow: hidden; 
 }
 .monthly-expense {
-  flex: 1.2;
+  flex: 1;
   min-width: 300px;
   display: flex;
   flex-direction: column;
   height: 100%;
-  max-width: 100%;
+  max-width: 90%;
 }
 
 .top-selling {
-  flex: 0.8;
+  flex: 1;
   display: flex;
   flex-direction: column;
   height: 100%;
