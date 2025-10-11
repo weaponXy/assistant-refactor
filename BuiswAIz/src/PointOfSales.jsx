@@ -315,16 +315,15 @@ const PointOfSales = () => {
               <ul>
                 <li onClick={() => navigate("/Dashboard")}>Dashboard</li>
                 <li onClick={() => navigate("/inventory")}>Inventory</li>
-                <li onClick={() => navigate("/supplier")}>Supplier</li>
-                <li className="active">Point of Sales</li>
                 <li onClick={() => navigate("/TablePage")}>Sales</li>
                 <li onClick={() => navigate("/expenses")}>Expenses</li>
                 <li onClick={() => navigate("/assistant")}>AI Assistant</li>
               </ul>
-              <p className="nav-header">SUPPORT</p>
+              <p className="nav-header">Related</p>
               <ul>
-                <li>Help</li>
-                <li>Settings</li>
+                <li onClick={() => navigate("/supplier")}>Supplier</li>
+                <li className="active">Point of Sales</li>
+                <li onClick={() => navigate("/PlannedPaymentsPage")}>Planned Payment</li>
               </ul>
             </div>
           </aside>
@@ -349,16 +348,15 @@ const PointOfSales = () => {
             <ul>
               <li onClick={() => navigate("/Dashboard")}>Dashboard</li>
               <li onClick={() => navigate("/inventory")}>Inventory</li>
-              <li onClick={() => navigate("/supplier")}>Supplier</li>
-              <li className="active">Point of Sales</li>
               <li onClick={() => navigate("/TablePage")}>Sales</li>
               <li onClick={() => navigate("/expenses")}>Expenses</li>
               <li onClick={() => navigate("/assistant")}>AI Assistant</li>
             </ul>
-            <p className="nav-header">SUPPORT</p>
+            <p className="nav-header">RELATED</p>
             <ul>
-              <li>Help</li>
-              <li>Settings</li>
+              <li onClick={() => navigate("/supplier")}>Supplier</li>
+              <li className="active">Point of Sales</li>
+              <li onClick={() => navigate("/PlannedPaymentsPage")}>Planned Payment</li>
             </ul>
           </div>
         </aside>
