@@ -1,17 +1,18 @@
 .pos-order-section {
   flex: 1;
-  min-width: clamp(350px, 35vw, 420px);
-  max-width: clamp(480px, 45vw, 550px);
+  min-width: 380px;
+  max-width: auto;
   background: white;
   border-radius: 12px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  max-height: auto;
 }
 
 .order-header {
-  padding: clamp(14px, 1.5vw, 20px);
+  padding: 17px;
   border-bottom: 2px solid #f0f0f0;
   display: flex;
   justify-content: space-between;
@@ -19,26 +20,26 @@
 }
 
 .order-header h2 {
-  font-size: clamp(16px, 1.6vw, 20px);
+  font-size: 18px;
   color: #333;
 }
 
 .order-count {
   background: linear-gradient(135deg, #04B4FC, #0299D9);
   color: white;
-  padding: clamp(3px, 0.4vw, 4px) clamp(10px, 1vw, 12px);
+  padding: 4px 11px;
   border-radius: 20px;
-  font-size: clamp(11px, 1.1vw, 13px);
+  font-size: 12px;
   font-weight: 600;
 }
 
 .order-items {
   flex: 1;
   overflow-y: auto;
-  padding: clamp(12px, 1.3vw, 16px);
+  padding: 14px;
   display: flex;
   flex-direction: column;
-  gap: clamp(10px, 1vw, 12px);
+  gap: 11px;
 }
 
 .empty-order {
@@ -50,16 +51,16 @@
   color: #999;
   text-align: center;
   gap: 8px;
-  font-size: clamp(13px, 1.2vw, 15px);
+  font-size: 14px;
 }
 
 .order-item {
   background: #f9fafb;
-  padding: clamp(12px, 1.3vw, 16px);
+  padding: 14px;
   border-radius: 8px;
   display: flex;
   flex-direction: column;
-  gap: clamp(10px, 1vw, 12px);
+  gap: 11px;
   border: 1px solid #e1e4ea;
 }
 
@@ -76,7 +77,7 @@
 }
 
 .order-item-info h4 {
-  font-size: clamp(12px, 1.2vw, 14px);
+  font-size: 13px;
   font-weight: 600;
   color: #333;
   margin-bottom: 4px;
@@ -84,19 +85,19 @@
 }
 
 .order-item-variant {
-  font-size: clamp(10px, 0.95vw, 11px);
+  font-size: 10.5px;
   color: #666;
   margin-bottom: 4px;
   font-weight: 500;
 }
 
 .order-item-price {
-  font-size: clamp(11px, 1vw, 12px);
+  font-size: 11.5px;
   color: #666;
 }
 
 .order-item-total {
-  font-size: clamp(14px, 1.4vw, 16px);
+  font-size: 15px;
   font-weight: 700;
   color: #000000;
   white-space: nowrap;
@@ -117,13 +118,13 @@
 }
 
 .qty-btn {
-  width: clamp(24px, 2.2vw, 28px);
-  height: clamp(24px, 2.2vw, 28px);
+  width: 26px;
+  height: 26px;
   border: 1px solid #ddd;
   background: white;
   border-radius: 6px;
   cursor: pointer;
-  font-size: clamp(14px, 1.4vw, 16px);
+  font-size: 15px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -137,10 +138,10 @@
 }
 
 .qty-display {
-  min-width: clamp(26px, 2.5vw, 30px);
+  min-width: 28px;
   text-align: center;
   font-weight: 600;
-  font-size: clamp(12px, 1.2vw, 14px);
+  font-size: 13px;
 }
 
 .remove-btn1 {
@@ -148,7 +149,7 @@
   border-radius: 8px;
   background: red;
   cursor: pointer;
-  font-size: clamp(16px, 1.5vw, 18px);
+  font-size: 17px;
   padding: 4px;
   margin-left: auto;
   transition: transform 0.2s;
@@ -160,159 +161,51 @@
 }
 
 .order-summary {
-  padding: clamp(14px, 1.5vw, 20px);
+  padding: 17px;
   border-top: 2px solid #f0f0f0;
   background: #fafbfc;
-}
-
-.summary-row {
   display: flex;
-  justify-content: space-between;
-  margin-bottom: clamp(10px, 1vw, 12px);
-  font-size: clamp(12px, 1.2vw, 14px);
-  color: #666;
-}
-
-.summary-row.total {
-  font-size: clamp(16px, 1.8vw, 20px);
-  font-weight: 700;
-  color: #333;
-  padding-top: clamp(10px, 1vw, 12px);
-  border-top: 2px solid #e1e4ea;
-  margin-top: 8px;
-  margin-bottom: clamp(12px, 1.3vw, 16px);
-}
-
-.payment-input-section {
-  margin: clamp(12px, 1.3vw, 16px) 0;
-  padding: clamp(12px, 1.3vw, 16px);
-  background: #f9fafb;
-  border-radius: 8px;
-  border: 2px solid #e1e4ea;
-}
-
-.payment-input-section label {
-  display: block;
-  font-size: clamp(12px, 1.2vw, 14px);
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 8px;
-}
-
-.amount-paid-input {
-  width: 100%;
-  padding: clamp(10px, 1vw, 12px) clamp(12px, 1.3vw, 16px);
-  font-size: clamp(15px, 1.6vw, 18px);
-  font-weight: 600;
-  border: 2px solid #e1e4ea;
-  border-radius: 8px;
-  transition: all 0.3s;
-  text-align: left;
-}
-
-.amount-paid-input:focus {
-  outline: none;
-  border-color: #04B4FC;
-  box-shadow: 0 0 0 3px rgba(4, 180, 252, 0.1);
-}
-
-.summary-row.change-row {
-  font-size: clamp(15px, 1.6vw, 18px);
-  font-weight: 700;
-  padding: clamp(10px, 1vw, 12px) clamp(12px, 1.3vw, 16px);
-  background: #f0f9ff;
-  border-radius: 8px;
-  margin-bottom: clamp(10px, 1vw, 12px);
-}
-
-.change-positive {
-  color: #000000;
-}
-
-.change-negative {
-  color: red;
-}
-
-.checkout-btn {
-  width: 100%;
-  padding: clamp(12px, 1.2vw, 14px);
-  background: linear-gradient(135deg, #04B4FC, #0299D9);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: clamp(14px, 1.4vw, 16px);
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s;
-  margin-bottom: 8px;
-}
-
-.checkout-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(4, 180, 252, 0.4);
-}
-
-.clear-btn {
-  width: 100%;
-  padding: clamp(10px, 1vw, 12px);
-  background: white;
-  color: #666;
-  border: 2px solid #e1e4ea;
-  border-radius: 8px;
-  font-size: clamp(12px, 1.2vw, 14px);
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.clear-btn:hover {
-  background: #f9fafb;
-  border-color: #ff6b6b;
-  color: #ff6b6b;
+  flex-direction: column;
+  gap: 5px;
 }
 
 .datetime-section {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  padding: 15px;
-  background: linear-gradient(135deg, #f8faff 0%, #ffffff 100%);
-  border-radius: 12px;
-  border: 2px solid #e8efff;
-  margin-bottom: 15px;
+  gap: 11px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  margin-bottom: 0;
 }
 
 .datetime-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .datetime-group label {
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   color: #666;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  font-family: 'Montserrat', 'Segoe UI', sans-serif;
+  text-transform: capitalize;
 }
 
 .datetime-input {
-  padding: 10px 12px;
-  border: 2px solid #d0d7e2;
-  border-radius: 8px;
+  padding: 5px;
+  border: 2px solid #e1e4ea;
+  border-radius: 6px;
   font-size: 14px;
   font-weight: 500;
   color: #1a1a1a;
   background: white;
   transition: all 0.3s ease;
-  font-family: 'Montserrat', 'Segoe UI', sans-serif;
   cursor: pointer;
 }
 
 .datetime-input:hover {
   border-color: #04B4FC;
-  box-shadow: 0 2px 8px rgba(4, 180, 252, 0.15);
 }
 
 .datetime-input:focus {
@@ -321,7 +214,6 @@
   box-shadow: 0 0 0 3px rgba(4, 180, 252, 0.1);
 }
 
-/* Date input calendar icon styling */
 .datetime-input::-webkit-calendar-picker-indicator {
   cursor: pointer;
   filter: brightness(0) saturate(100%) invert(48%) sepia(79%) saturate(2476%) hue-rotate(186deg) brightness(97%) contrast(101%);
@@ -332,7 +224,96 @@
   transform: scale(1.1);
 }
 
-/* Time input clock icon styling */
 .datetime-input[type="time"]::-webkit-calendar-picker-indicator {
   filter: brightness(0) saturate(100%) invert(48%) sepia(79%) saturate(2476%) hue-rotate(186deg) brightness(97%) contrast(101%);
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 11px;
+}
+
+.summary-row1 {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13px;
+}
+
+.summary-row1 label {
+  font-size: 12px;
+  color: #666;
+  font-weight: 500;
+}
+
+.summary-row1 input {
+  width: 100%;
+  padding: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  border: 2px solid #e1e4ea;
+  border-radius: 6px;
+  background: white;
+}
+
+.summary-row1 input:focus {
+  outline: none;
+  border-color: #04B4FC;
+  box-shadow: 0 0 0 3px rgba(4, 180, 252, 0.1);
+}
+
+.summary-row1 input[readonly] {
+  background: #f9fafb;
+  cursor: default;
+}
+
+.change-positive {
+  color: #000000;
+}
+
+.change-negative {
+  color: red;
+}
+
+.button-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+  margin-top: 5px;
+}
+
+.checkout-btn {
+  padding: 14px;
+  background: linear-gradient(135deg, #04B4FC, #0299D9);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.checkout-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(4, 180, 252, 0.4);
+}
+
+.clear-btn {
+  padding: 14px;
+  background: white;
+  color: #666;
+  border: 2px solid #e1e4ea;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.clear-btn:hover {
+  background: #f9fafb;
+  border-color: #ff6b6b;
+  color: #ff6b6b;
 }

@@ -17,82 +17,82 @@ const Dashboard = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [topSellingProducts, setTopSellingProducts] = useState([]);
+  const [leastSellingProducts, setLeastSellingProducts] = useState([]);
+  const [notSellingProducts, setNotSellingProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(true);
   const [productsError, setProductsError] = useState(null);
   const [expenseChartData, setExpenseChartData] = useState([]);
   const [activityLogs, setActivityLogs] = useState([]);
 
 
-function downloadTemplate() {
-  const headers = [
-    "orderid",
-    "orderdate",     // use YYYY-MM-DD
-    "productname",
-    "color",
-    "agesize",
-    "quantity",
-    "unitprice",
-    "subtotal",      // = quantity * unitprice
-    "amountpaid",
-  ];
+  function downloadTemplate() {
+    const headers = [
+      "orderid",
+      "orderdate",     
+      "productname",
+      "color",
+      "agesize",
+      "quantity",
+      "unitprice",
+      "subtotal",     
+      "amountpaid",
+    ];
 
-  // one helpful example row
-  const sample = [
-    "10001",
-    "2025-10-04",
-    "Basic Tee",
-    "Black",
-    "M",
-    "2",
-    "250",
-    "500",
-    "500",
-  ];
+    // one helpful example row
+    const sample = [
+      "10001",
+      "2025-10-04",
+      "Basic Tee",
+      "Black",
+      "M",
+      "2",
+      "250",
+      "500",
+      "500",
+    ];
 
-  const hasXLSX = typeof window !== "undefined" && window.XLSX;
+    const hasXLSX = typeof window !== "undefined" && window.XLSX;
 
-  if (hasXLSX) {
-    const ws = window.XLSX.utils.aoa_to_sheet([headers, sample]);
-    const wb = window.XLSX.utils.book_new();
-    window.XLSX.utils.book_append_sheet(wb, ws, "Sales Upload Template");
-    const wbout = window.XLSX.write(wb, { bookType: "xlsx", type: "array" });
-    const blob = new Blob([wbout], {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "sales_upload_template.xlsx";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  } else {
-    // CSV fallback
-    const rows = [headers, sample];
-    const csv = rows
-      .map(r =>
-        r
-          .map(v => {
-            const s = String(v ?? "");
-            return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-          })
-          .join(",")
-      )
-      .join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "sales_upload_template.csv";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    if (hasXLSX) {
+      const ws = window.XLSX.utils.aoa_to_sheet([headers, sample]);
+      const wb = window.XLSX.utils.book_new();
+      window.XLSX.utils.book_append_sheet(wb, ws, "Sales Upload Template");
+      const wbout = window.XLSX.write(wb, { bookType: "xlsx", type: "array" });
+      const blob = new Blob([wbout], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "sales_upload_template.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } else {
+      // CSV fallback
+      const rows = [headers, sample];
+      const csv = rows
+        .map(r =>
+          r
+            .map(v => {
+              const s = String(v ?? "");
+              return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+            })
+            .join(",")
+        )
+        .join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "sales_upload_template.csv";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
   }
-}
-
-
 
   function getExpenseDate(row) {
     const raw =
@@ -243,7 +243,8 @@ function downloadTemplate() {
     try {
       setProductsLoading(true);
 
-      const { data, error } = await supabase
+      // Fetch all order items
+      const { data: orderData, error: orderError } = await supabase
         .from('orderitems')
         .select(`
           orderid,
@@ -255,10 +256,18 @@ function downloadTemplate() {
           products (productname, image_url)
         `);
 
-      if (error) throw error;
+      if (orderError) throw orderError;
 
+      // Fetch all products
+      const { data: allProducts, error: productsError } = await supabase
+        .from('products')
+        .select('productid, productname, image_url');
+
+      if (productsError) throw productsError;
+
+      // Process order items into summary
       const summary = {};
-      data.forEach(item => {
+      orderData.forEach(item => {
         const id = item.productid;
         const name = item.products?.productname || 'Unknown';
         const imageUrl = item.products?.image_url || '';
@@ -277,20 +286,46 @@ function downloadTemplate() {
         summary[id].timesBought.add(item.orderid);
       });
 
-      const topSellingArray = Object.values(summary).map(item => ({
+      // Convert to array
+      const sellingArray = Object.values(summary).map(item => ({
         ...item,
         timesBought: item.timesBought.size,
       }));
 
-      topSellingArray.sort((a, b) => b.totalQuantity - a.totalQuantity);
-      const sortedProducts = topSellingArray.slice(0, 5);
+      // Sort by quantity (descending)
+      sellingArray.sort((a, b) => b.totalQuantity - a.totalQuantity);
 
-      setTopSellingProducts(sortedProducts);
+      // Top 5 selling products
+      const topSelling = sellingArray.slice(0, 5);
+      setTopSellingProducts(topSelling);
+
+      // Least 5 selling products (products with sales but lowest quantities)
+      const leastSelling = sellingArray.length > 5 
+        ? sellingArray.slice(-5).reverse() 
+        : [];
+      setLeastSellingProducts(leastSelling);
+
+      // Not selling products (products with no sales at all)
+      const soldProductIds = new Set(sellingArray.map(p => p.productid));
+      const notSelling = allProducts
+        .filter(product => !soldProductIds.has(product.productid))
+        .slice(0, 10) // Limit to 10 products
+        .map(product => ({
+          productid: product.productid,
+          productname: product.productname,
+          image_url: product.image_url,
+          totalQuantity: 0,
+          timesBought: 0,
+        }));
+      setNotSellingProducts(notSelling);
+
       setProductsError(null);
     } catch (error) {
       console.error('Error fetching top selling products:', error);
       setProductsError('Failed to load top selling products');
       setTopSellingProducts([]);
+      setLeastSellingProducts([]);
+      setNotSellingProducts([]);
     } finally {
       setProductsLoading(false);
     }
@@ -330,7 +365,6 @@ function downloadTemplate() {
           <div className="dashboard-content">
             <div className="dashboard-panel sales-summary">
               <div className="panel-header-with-action">
-                <h3>Sales Summary</h3>
                 <SalesSummaryDashboard />
               </div>
             </div>
@@ -350,7 +384,7 @@ function downloadTemplate() {
                     {expenseChartData.length === 0 ? (
                       <p style={{ padding: 12 }}>No expense data yet.</p>
                     ) : (
-                      <ResponsiveContainer width="100%" height="100%">
+                      <ResponsiveContainer width="90%" height="105%">
                         <LineChart data={expenseChartData}>
                           <XAxis dataKey="day" />
                           <YAxis domain={[0, (dataMax) => (dataMax && dataMax > 0 ? dataMax : 1)]} />
@@ -370,7 +404,6 @@ function downloadTemplate() {
                 </div>
 
                 <div className="dashboard-panel top-selling">
-                  <h3>Top Selling Products</h3>
                   <div className="panel-content">
                     {productsLoading ? (
                       <div className="loading-state">
@@ -380,12 +413,12 @@ function downloadTemplate() {
                       <div className="error-state">
                         <p>{productsError}</p>
                       </div>
-                    ) : topSellingProducts.length === 0 ? (
-                      <div className="no-data-state">
-                        <p>No top selling products available.</p>
-                      </div>
                     ) : (
-                      <TopSellingProducts topSellingProducts={topSellingProducts} />
+                      <TopSellingProducts 
+                        topSellingProducts={topSellingProducts}
+                        leastSellingProducts={leastSellingProducts}
+                        notSellingProducts={notSellingProducts}
+                      />
                     )}
                   </div>
                 </div> 
@@ -409,8 +442,7 @@ function downloadTemplate() {
                   window.location.href = "/";
                 }}
               >
-                ⏻
-              </button>
+                ⏻              </button>
             </div>
 
             <div className="notification-panel">
