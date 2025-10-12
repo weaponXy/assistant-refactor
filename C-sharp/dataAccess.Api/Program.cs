@@ -56,19 +56,26 @@ builder.Services.AddScoped<SimpleForecastService>();
 builder.Services.AddScoped<ISqlCatalog, SqlCatalog>();
 builder.Services.AddScoped<dataAccess.Forecasts.IForecastStore, dataAccess.Forecasts.ForecastStore>();
 
-var routerYamlPath = Path.Combine(AppContext.BaseDirectory, "router.yaml");
-if (!File.Exists(routerYamlPath))
-    routerYamlPath = Path.Combine(Directory.GetCurrentDirectory(), "router.yaml");
-
-RouterConfig routerCfg;
+var possiblePaths = new[]
 {
-    var yaml = File.ReadAllText(routerYamlPath);
-    var des = new DeserializerBuilder()
-        .WithNamingConvention(UnderscoredNamingConvention.Instance)
-        .IgnoreUnmatchedProperties() // optional but helpful
-        .Build();
-    routerCfg = des.Deserialize<RouterConfig>(yaml) ?? new RouterConfig();
-}
+    Path.Combine(AppContext.BaseDirectory, "router.yaml"),                // runtime folder (EB = /var/app/current)
+    Path.Combine(Directory.GetCurrentDirectory(), "router.yaml"),         // working dir fallback
+    Path.Combine(Environment.CurrentDirectory, "router.yaml"),            // extra safety
+    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "router.yaml")    // another runtime base
+};
+
+string routerYamlPath = possiblePaths.FirstOrDefault(File.Exists)
+    ?? throw new FileNotFoundException("router.yaml not found in any known location.", string.Join(", ", possiblePaths));
+
+Console.WriteLine($"[Boot] Using router path: {routerYamlPath}");
+
+var yamlContent = File.ReadAllText(routerYamlPath);
+var deserializer = new DeserializerBuilder()
+    .WithNamingConvention(UnderscoredNamingConvention.Instance)
+    .IgnoreUnmatchedProperties()
+    .Build();
+
+var routerCfg = deserializer.Deserialize<RouterConfig>(yamlContent) ?? new RouterConfig();
 builder.Services.AddSingleton(routerCfg);
 builder.Services.AddSingleton<ITextRouter, YamlRouter>();
 
@@ -185,7 +192,11 @@ builder.Services.AddScoped<QueryPipeline>();
 // CORS
 builder.Services.AddCors(o => {
     o.AddPolicy("vite", p => p
-        .WithOrigins("http://localhost:5173", "http://127.0.0.1:5173")
+        .WithOrigins(
+            "http://localhost:5173", 
+            "http://127.0.0.1:5173",
+            "https://capstone-buisw-aiz-renzetorinos-projects.vercel.app",
+            "https://*.vercel.app")
         .AllowAnyHeader()
         .AllowAnyMethod()
         .AllowCredentials());
@@ -2020,9 +2031,11 @@ app.MapPost("/api/assistant", async (
     });
 });
 
+builder.WebHost.UseUrls("http://0.0.0.0:5000");
 app.Run();
 
 public sealed class RouteReq { public string? Input { get; set; } }
+public sealed record AssistantRequest(string Text, string? Domain);
 
 // -------------------------------
 // Helpers: sync trigger & debounce
