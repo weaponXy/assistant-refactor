@@ -25,22 +25,31 @@
 	</ItemGroup>
 	<ItemGroup>
 		<!-- Link the library's prompts into the API output -->
-		<None Include="..\dataAccess\Planning\Prompts\**\*.yaml" Link="Planning/Prompts/%(RecursiveDir)%(Filename)%(Extension)">
+		<None Include="..\dataAccess\Planning\**\*.json"
+				Exclude="..\dataAccess\Planning\bin\**;..\dataAccess\Planning\obj\**"
+				Link="Planning/%(RecursiveDir)%(Filename)%(Extension)">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
 		</None>
-		<!-- Include API-specific prompts -->
-		<None Update="Planning\Prompts\**\*.yaml">
+
+		<!-- (keep) YAMLs from the library -->
+		<None Include="..\dataAccess\Planning\Prompts\**\*.yaml"
+				Link="Planning/Prompts/%(RecursiveDir)%(Filename)%(Extension)">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
 		</None>
-		<!-- Link the library's schema registry into the API output -->
-		<None Include="..\dataAccess\Planning\SchemaRegistry.json" Link="Planning/SchemaRegistry.json">
+
+		<!-- (optional) API-local YAML/JSON under Planning/** -->
+		<None Update="Planning\**\*.yaml">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
 		</None>
-		<Compile Include="..\dataAccess\Planning\Nlq\**\*.cs">
-			<Link>Planning\Nlq\%(RecursiveDir)%(Filename)%(Extension)</Link>
-		</Compile>
+		<None Update="Planning\**\*.json">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+		</None>
+	</ItemGroup>
+	<ItemGroup>
+		<None Include="router.yaml" CopyToOutputDirectory="Always" CopyToPublishDirectory="Always" />
 	</ItemGroup>
 </Project>
