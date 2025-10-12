@@ -115,7 +115,7 @@ const SellingPanel = ({
           {/* Date and Time Section */}
           <div className="datetime-section">
             <div className="datetime-group">
-              <label htmlFor="orderDate">Date:</label>
+              <label htmlFor="orderDate">Date</label>
               <input
                 type="date"
                 id="orderDate"
@@ -125,7 +125,7 @@ const SellingPanel = ({
               />
             </div>
             <div className="datetime-group">
-              <label htmlFor="orderTime">Time:</label>
+              <label htmlFor="orderTime">Time</label>
               <input
                 type="time"
                 id="orderTime"
@@ -136,54 +136,57 @@ const SellingPanel = ({
             </div>
           </div>
 
-          <div className="summary-row">
-            <span>Subtotal:</span>
-            <span>₱{subtotal.toFixed(2)}</span>
-          </div>
-          <div className="summary-row total">
-            <span>Total:</span>
-            <span>₱{total.toFixed(2)}</span>
-          </div>
-
-          <div className="payment-input-section">
-            <label htmlFor="amountPaid">Amount Paid:</label>
-            <input
-              type="number"
-              id="amountPaid"
-              value={amountPaid}
-              onChange={(e) => {
-                const value = e.target.value;
-                if (value === '' || parseFloat(value) >= 0) {
-                  setAmountPaid(value);
-                }
-              }}
-              onKeyDown={(e) => {
-                if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
-                  e.preventDefault();
-                }
-              }}
-              placeholder="Enter amount paid"
-              className="amount-paid-input"
-              min="0"
-              step="0.01"
-            />
-          </div>
-
-          {amountPaid && parseFloat(amountPaid) > 0 && (
-            <div className="summary-row change-row">
-              <span>Change:</span>
-              <span className={change >= 0 ? 'change-positive' : 'change-negative'}>
-                ₱{change.toFixed(2)}
-              </span>
+          {/* Summary Grid */}
+          <div className="summary-grid">
+            <div className="summary-row1">
+              <label>Subtotal</label>
+              <input type="text" readOnly value={`₱${subtotal.toFixed(2)}`} />
             </div>
-          )}
+            <div className="summary-row1">
+              <label>Total</label>
+              <input type="text" readOnly value={`₱${total.toFixed(2)}`} />
+            </div>
+            <div className="summary-row1">
+              <label>Amount</label>
+              <input
+                type="number"
+                value={amountPaid}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === '' || parseFloat(value) >= 0) {
+                    setAmountPaid(value);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
+                    e.preventDefault();
+                  }
+                }}
+                placeholder="0.00"
+                min="0"
+                step="0.01"
+              />
+            </div>
+            <div className="summary-row1">
+              <label>Change</label>
+              <input 
+                type="text" 
+                readOnly 
+                value={amountPaid && parseFloat(amountPaid) > 0 ? `₱${change.toFixed(2)}` : '₱0.00'}
+                className={change < 0 ? 'change-negative' : 'change-positive'}
+              />
+            </div>
+          </div>
 
-          <button className="checkout-btn" onClick={handleCompleteTransaction}>
-            Complete Transaction
-          </button>
-          <button className="clear-btn" onClick={handleClearCart}>
-            Clear Order
-          </button>
+          {/* Button Grid */}
+          <div className="button-grid">
+            <button className="checkout-btn" onClick={handleCompleteTransaction}>
+              Complete Transaction
+            </button>
+            <button className="clear-btn" onClick={handleClearCart}>
+              Clear Orders
+            </button>
+          </div>
         </div>
       )}
     </div>
