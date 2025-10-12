@@ -11,11 +11,14 @@ public enum ForecastDomain { Sales, Expenses }
 public sealed record ForecastPoint(DateOnly Date, decimal Value, decimal Lower, decimal Upper);
 
 /// <summary>
-/// Simple deterministic forecasting (CMA trend + weekday seasonality + CI band).
+/// LEGACY: Simple deterministic forecasting (CMA trend + weekday seasonality + CI band).
+/// NOTE: This class is deprecated. Use HybridForecastService for production workloads.
+/// Kept for backward compatibility only.
 /// Works with either:
 ///   A) New QIDs: ISqlCatalog.GetSalesDailySeriesAsync / GetExpensesDailySeriesAsync
 ///   B) Existing QIDs via RunAsync: "SALES_BY_DAY" / "EXPENSE_BY_DAY"
 /// </summary>
+[Obsolete("Use HybridForecastService instead for improved accuracy with EMA/CMA blend.", false)]
 public sealed class SimpleForecastService
 {
     private readonly ISqlCatalog _sql;

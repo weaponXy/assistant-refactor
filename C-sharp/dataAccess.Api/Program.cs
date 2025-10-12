@@ -50,6 +50,8 @@ Console.WriteLine("[Boot] REL = " + Mask(rel));
 try { Console.WriteLine("[Boot] VEC = " + Mask(ResolveVecConn(builder.Configuration))); }
 catch { Console.WriteLine("[Boot] VEC = <missing>"); }
 
+// Forecasting services (Hybrid EMA/CMA is primary; SimpleForecast kept for backward compatibility)
+builder.Services.AddScoped<HybridForecastService>();
 builder.Services.AddScoped<SimpleForecastService>();
 builder.Services.AddScoped<ISqlCatalog, SqlCatalog>();
 builder.Services.AddScoped<dataAccess.Forecasts.IForecastStore, dataAccess.Forecasts.ForecastStore>();
@@ -1604,7 +1606,8 @@ app.MapPost("/api/assistant", async (
     HttpContext ctx,
     dataAccess.Reports.YamlIntentRunner intentRunner,
     dataAccess.Reports.YamlReportRunner yamlRunner,
-    SimpleForecastService forecastSvc,
+    HybridForecastService forecastSvc,
+    dataAccess.Forecasts.IForecastStore forecastStore,
     GroqJsonClient groq,
     CancellationToken ct) =>
 {
@@ -1688,8 +1691,15 @@ app.MapPost("/api/assistant", async (
                 days = Math.Clamp(parsed, 1, 60);
         }
 
-        // 1) Compute numbers (existing deterministic service)
-        var payload = await forecastSvc.ForecastAsync(domainEnum, days, null, null, ct);
+        // 1) Compute numbers using Hybrid EMA/CMA forecasting
+        var payload = await forecastSvc.ForecastAsync(
+            domainEnum, 
+            days, 
+            emaAlpha: 0.2,      // Default EMA smoothing factor
+            blendBeta: 0.7,     // Default blend weight (70% EMA, 30% CMA)
+            from: null, 
+            to: null, 
+            ct);
 
         // 2) Turn payload into JsonElement so we can lift KPIs/period
         using var tmp = JsonDocument.Parse(JsonSerializer.Serialize(payload));
@@ -1720,7 +1730,40 @@ app.MapPost("/api/assistant", async (
                         ?? new JsonObject();
         uiNode["notes"] = new JsonObject { ["narrative"] = narrative };
 
-        // 5) Return (mode=forecast) so the UI path remains unchanged
+        // 5) Save forecast to database
+        try
+        {
+            var paramsObj = new JsonObject();
+            if (payloadEl.TryGetProperty("period", out var periodProp))
+            {
+                if (periodProp.TryGetProperty("start", out var startProp) && startProp.ValueKind == JsonValueKind.String)
+                    paramsObj["start"] = startProp.GetString();
+                if (periodProp.TryGetProperty("end", out var endProp) && endProp.ValueKind == JsonValueKind.String)
+                    paramsObj["end"] = endProp.GetString();
+                if (periodProp.TryGetProperty("label", out var labelProp) && labelProp.ValueKind == JsonValueKind.String)
+                    paramsObj["label"] = labelProp.GetString();
+            }
+
+            // Store the full UI spec as the result
+            var resultObj = (JsonNode.Parse(uiNode.ToJsonString()) as JsonObject) ?? new JsonObject();
+
+            await forecastStore.SaveAsync(
+                domain: domainEnum.ToString().ToLowerInvariant(),
+                target: "overall",
+                horizonDays: days,
+                @params: paramsObj,
+                result: resultObj,
+                status: "done",
+                ct: ct
+            );
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[WARNING] Failed to save forecast to database: {ex.Message}");
+            // Continue without throwing - don't break the user experience
+        }
+
+        // 6) Return (mode=forecast) so the UI path remains unchanged
         return Results.Json(new
         {
             mode = "forecast",

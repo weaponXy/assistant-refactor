@@ -54,12 +54,11 @@ public static class SectionBundles
         public static IReadOnlyList<QuerySpec> OverviewQueries(string start, string end, bool includePrior, string? prevStart, string? prevEnd, string? ym)
         {
             var list = new List<QuerySpec> {
-                new("EXPENSE_SUMMARY", new() { ["start"]=start, ["end"]=end })
+                new("EXPENSE_SUMMARY", new() { ["start"]=start, ["end"]=end }),
+                new("EXPENSE_BUDGET_VS_ACTUAL", new() { ["start"]=start, ["end"]=end })
             };
             if (includePrior && prevStart != null && prevEnd != null)
                 list.Add(new("EXPENSE_SUMMARY", new() { ["start"] = prevStart, ["end"] = prevEnd, ["_role"] = "previous" }));
-            if (ym is not null)
-                list.Add(new("EXPENSE_BUDGET_VS_ACTUAL", new() { ["month_year"] = ym }));
             return list;
         }
 

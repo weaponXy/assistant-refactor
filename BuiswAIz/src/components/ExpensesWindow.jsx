@@ -139,6 +139,8 @@ export default function ExpensesWindow({ runId = null, onClose }) {
   const charts = Array.isArray(ui.charts) ? ui.charts : [];
   const tables = ui.tables || {};
   const narratives = ui.narratives || {};
+  const budgetComparison = ui.budget_comparison || null;
+  const historicalComparison = ui.historical_comparison || null;
 
   // --- Dynamic Data Extraction ---
   // Line chart: daily expenses (support both .data and .series shapes)
@@ -182,6 +184,11 @@ export default function ExpensesWindow({ runId = null, onClose }) {
   const summaryNarr = Array.isArray(narratives.summary)
     ? narratives.summary.filter(Boolean).join(" ")
     : (narratives.summary || "");
+
+  // Recommendations
+  const recommendations = Array.isArray(narratives.recommendations)
+    ? narratives.recommendations
+    : [];
 
   return (
     <div className="sr-root">
@@ -249,6 +256,90 @@ export default function ExpensesWindow({ runId = null, onClose }) {
 
         {/* RIGHT COL */}
         <div className="sr-col">
+          {/* Budget Comparison */}
+          {budgetComparison && budgetComparison.allocated_budget > 0 && (
+            <div className="sr-card">
+              <div className="sr-card-title">Budget Status</div>
+              <div style={{ padding: '12px 0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ color: '#64748b' }}>Allocated Budget:</span>
+                  <strong>{peso(budgetComparison.allocated_budget)}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ color: '#64748b' }}>Total Expenses:</span>
+                  <strong>{peso(budgetComparison.total_expenses)}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ color: '#64748b' }}>Remaining:</span>
+                  <strong style={{ color: budgetComparison.is_over_budget ? '#ef4444' : '#10b981' }}>
+                    {peso(budgetComparison.remaining_budget)}
+                  </strong>
+                </div>
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: '0.875rem' }}>
+                    <span>Utilization</span>
+                    <span>{budgetComparison.utilization_pct?.toFixed(1)}%</span>
+                  </div>
+                  <div style={{ background: '#e2e8f0', borderRadius: 4, height: 8, overflow: 'hidden' }}>
+                    <div
+                      style={{
+                        background: budgetComparison.is_over_budget ? '#ef4444' : '#3b82f6',
+                        height: '100%',
+                        width: `${Math.min(budgetComparison.utilization_pct, 100)}%`,
+                        transition: 'width 0.3s ease'
+                      }}
+                    />
+                  </div>
+                  {budgetComparison.is_over_budget && (
+                    <div style={{ color: '#ef4444', fontSize: '0.875rem', marginTop: 8 }}>
+                      ⚠️ Over budget!
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Historical Comparison */}
+          {historicalComparison && historicalComparison.previous_period_total > 0 && (
+            <div className="sr-card">
+              <div className="sr-card-title">Period Comparison</div>
+              <div style={{ padding: '12px 0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ color: '#64748b' }}>Current Period:</span>
+                  <strong>{peso(historicalComparison.current_period_total)}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ color: '#64748b' }}>Previous Period:</span>
+                  <strong>{peso(historicalComparison.previous_period_total)}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ color: '#64748b' }}>Change:</span>
+                  <strong style={{ 
+                    color: historicalComparison.change_amount >= 0 ? '#ef4444' : '#10b981'
+                  }}>
+                    {historicalComparison.change_amount >= 0 ? '+' : ''}
+                    {peso(historicalComparison.change_amount)} 
+                    ({historicalComparison.change_percentage >= 0 ? '+' : ''}
+                    {historicalComparison.change_percentage?.toFixed(1)}%)
+                  </strong>
+                </div>
+                <div style={{ 
+                  marginTop: 12, 
+                  padding: '8px 12px', 
+                  background: '#f8fafc', 
+                  borderRadius: 4,
+                  fontSize: '0.875rem'
+                }}>
+                  <strong>Trend:</strong> {historicalComparison.trend || 'stable'}
+                  {historicalComparison.trend === 'increasing' && ' 📈'}
+                  {historicalComparison.trend === 'decreasing' && ' 📉'}
+                  {historicalComparison.trend === 'stable' && ' ➡️'}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Summary */}
           <div className="sr-card">
             <div className="sr-card-title">Expense Analysis</div>
@@ -256,6 +347,20 @@ export default function ExpensesWindow({ runId = null, onClose }) {
               {summaryNarr || "Generating expense analysis..."}
             </div>
           </div>
+
+          {/* Recommendations */}
+          {recommendations.length > 0 && (
+            <div className="sr-card">
+              <div className="sr-card-title">💡 Recommendations</div>
+              <ul style={{ margin: '8px 0', paddingLeft: '20px' }}>
+                {recommendations.map((rec, i) => (
+                  <li key={i} style={{ marginBottom: 8, lineHeight: '1.5', color: '#475569' }}>
+                    {rec}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Recent Transactions */}
           <div className="sr-card">
