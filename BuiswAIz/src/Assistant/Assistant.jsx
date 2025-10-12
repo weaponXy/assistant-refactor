@@ -37,6 +37,7 @@ const Assistant = () => {
     },
   ]);
   const [loading, setLoading] = useState(false);
+  const [loadingPanels, setLoadingPanels] = useState(true);
 
   // CENTER panels
   const [reports, setReports] = useState([]);     // up to 2
@@ -122,22 +123,38 @@ const Assistant = () => {
   }, [navigate]);
 
 
-  // Preload Spotlight Adjust ko to pag okay na backend 
+  // Preload Spotlight - optimized version
   useEffect(() => {
     let alive = true;
-    (async () => {
+    
+    const loadData = async () => {
       try {
-        const [r, f] = await Promise.all([
+        // Fetch all domains in parallel for better performance
+        const [salesReports, expenseReports, inventoryReports, salesForecasts, expenseForecasts] = await Promise.all([
           fetchRecentReports(2, "sales"),
-          fetchRecentForecasts(2, "sales")
+          fetchRecentReports(2, "expenses"),
+          fetchRecentReports(2, "inventory"),
+          fetchRecentForecasts(2, "sales"),
+          fetchRecentForecasts(2, "expenses"),
         ]);
+
         if (!alive) return;
-        setReports(r);
-        setForecasts(f);
+
+        // Merge and take the most recent items (no sorting by created_at since backend may not provide it)
+        // Backend should return items in descending order by default
+        const allReports = [...salesReports, ...expenseReports, ...inventoryReports].slice(0, 4);
+        const allForecasts = [...salesForecasts, ...expenseForecasts].slice(0, 4);
+
+        setReports(allReports);
+        setForecasts(allForecasts);
+        setLoadingPanels(false);
       } catch (e) {
-        console.debug("preload spotlight/forecasts", e);
+        console.error("Failed to preload spotlight/forecasts:", e);
+        setLoadingPanels(false);
       }
-    })();
+    };
+
+    loadData();
     return () => { alive = false; };
   }, []);
 
@@ -166,14 +183,17 @@ const Assistant = () => {
       const res = await apiPost("/api/assistant", { text: trimmed });
 
       if (res.mode === "report") {
-        // show in chat (unchanged)
+        // Show simple success message in chat instead of full report payload
+        const dom = (res.domain || "report").toLowerCase();
+        const reportType = dom === "expenses" ? "Expense" : dom === "inventory" ? "Inventory" : "Sales";
+        const successMessage = `✓ ${reportType} report has been successfully created! You can view the full report in the panel above.`;
+        
         setMessages((prev) => [
           ...prev,
-          { id: newId(), role: "assistant", payload: res.uiSpec }
+          { id: newId(), role: "assistant", text: successMessage }
         ]);
 
         // 1) push a placeholder card (fast UI), but include the domain
-        const dom = (res.domain || "report").toLowerCase();
         const placeholder = normalizeReportForSpotlightRow({ ui_spec: res.uiSpec, domain: dom });
         if (placeholder) setReports((prev) => [placeholder, ...prev].slice(0, 2));
 
@@ -203,13 +223,9 @@ const Assistant = () => {
         const f = res.uiSpec ?? {};
         const domain = (res.domain || "sales").toLowerCase();
         const title = domain === "expenses" ? "Expense Forecast" : "Sales Forecast";
-        const peso = (n) =>
-          Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(n ?? 0);
 
         const lines = [
           `${title} — ${f?.period?.label || ""}`.trim(),
-          `Forecast (${f?.kpis?.horizon_days ?? "?"}d): ${peso(f?.kpis?.sum_forecast)}`,
-          `Last 7d actual: ${peso(f?.kpis?.last_7d_actual)}`
         ];
 
         if (typeof f?.notes?.narrative === "string" && f.notes.narrative.trim()) {
@@ -263,38 +279,55 @@ const Assistant = () => {
     }
   };
 
-  // ===== Recent fetchers =====
+  // ===== Recent fetchers (optimized with better error handling) =====
   async function fetchRecentReports(limit = 2, domain = "sales") {
-    const res = await fetch(`${API_BASE}/api/reports/recent?domain=${encodeURIComponent(domain)}&limit=${limit}`);
-    if (!res.ok) return [];
-    const data = await res.json(); // expect: [{ run_id, ui_spec, ... }, ...]
-    return data.map(normalizeReportForSpotlightRow).filter(Boolean);
+    try {
+      const res = await fetch(`${API_BASE}/api/reports/recent?domain=${encodeURIComponent(domain)}&limit=${limit}`);
+      if (!res.ok) {
+        console.warn(`Failed to fetch reports for ${domain}:`, res.status);
+        return [];
+      }
+      const data = await res.json();
+      return Array.isArray(data) ? data.map(normalizeReportForSpotlightRow).filter(Boolean) : [];
+    } catch (error) {
+      console.error(`Error fetching reports for ${domain}:`, error);
+      return [];
+    }
   }
 
   async function fetchRecentForecasts(limit = 2, domain = "sales") {
-  const res = await fetch(
-    `${API_BASE}/api/forecasts/recent?domain=${encodeURIComponent(domain)}&limit=${limit}`
-  );
-  if (!res.ok) return [];
-  const data = await res.json();
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/forecasts/recent?domain=${encodeURIComponent(domain)}&limit=${limit}`
+      );
+      if (!res.ok) {
+        console.warn(`Failed to fetch forecasts for ${domain}:`, res.status);
+        return [];
+      }
+      const data = await res.json();
+      
+      if (!Array.isArray(data)) return [];
 
-  return data.map((x) => {
-    const dom = (x?.domain || domain || "sales").toLowerCase();
-    const ui = {
-      period: {
-        start: x?.params?.start,
-        end: x?.params?.end,
-        label: x?.params?.label,
-      },
-      kpis: x?.result?.kpis ?? {},
-      // carry narrative if your API saved it; check both placements
-      notes: x?.result?.ui_spec?.notes ?? x?.result?.notes ?? null,
-      domain: dom,
-    };
+      return data.map((x) => {
+        const dom = (x?.domain || domain || "sales").toLowerCase();
+        const ui = {
+          period: {
+            start: x?.params?.start,
+            end: x?.params?.end,
+            label: x?.params?.label,
+          },
+          kpis: x?.result?.kpis ?? {},
+          notes: x?.result?.ui_spec?.notes ?? x?.result?.notes ?? null,
+          domain: dom,
+        };
 
-    return normalizeForecastForCard(ui, dom);
-  });
-}
+        return normalizeForecastForCard(ui, dom);
+      }).filter(Boolean);
+    } catch (error) {
+      console.error(`Error fetching forecasts for ${domain}:`, error);
+      return [];
+    }
+  }
 
   // ===== Open handlers =====
   function openSpotlightCard(card) {
@@ -379,7 +412,9 @@ const Assistant = () => {
             {/* TOP: ReportSpotlight (unchanged) */}
             <section className="report-spotlight">
               <div className="section-title">ReportSpotlight</div>
-              {reports.length === 0 ? (
+              {loadingPanels ? (
+                <div className="report-empty">Loading reports...</div>
+              ) : reports.length === 0 ? (
                 <div className="report-empty">
                   No reports yet. Ask me for a report to populate this section.
                 </div>
@@ -406,7 +441,9 @@ const Assistant = () => {
             {/* BOTTOM: Forecasts — now same minimal card UI as Spotlight */}
             <section className="forecast-panel">
               <div className="section-title">Forecasts</div>
-              {forecasts.length === 0 ? (
+              {loadingPanels ? (
+                <div className="forecast-empty">Loading forecasts...</div>
+              ) : forecasts.length === 0 ? (
                 <div className="forecast-empty">Independent forecasts will appear here.</div>
               ) : (
                 <div className="report-grid">{/* reuse same grid styles */}
@@ -508,11 +545,13 @@ const Assistant = () => {
 
 export default Assistant;
 
-/* ===== Helpers ===== */
+/* ===== Helpers (optimized) ===== */
 function normalizeReportForSpotlightRow(row) {
+  if (!row) return null;
+  
   const ui = row?.ui_spec ?? row?.ui ?? row ?? {};
 
-  // prefer explicit -> ui.domain -> guess-by-title -> default
+  // Prefer explicit domain -> ui.domain -> guess-by-title -> default
   const rawDom = (row?.domain ?? ui?.domain ?? guessDomainFromTitle(ui?.report_title) ?? "report").toString().toLowerCase();
   const domain =
     /expense/.test(rawDom) ? "expenses" :
@@ -521,20 +560,14 @@ function normalizeReportForSpotlightRow(row) {
     "report";
 
   const scope = String(ui?.scope ?? "overall").toLowerCase();
-
   const productName = (ui?.product?.name || ui?.product_name || ui?.item_name || "").toString().trim();
-
-  const periodLabel =
-    ui?.period?.label ||
-    buildPeriodLabel(ui?.period?.start, ui?.period?.end) ||
-    "Period";
+  const periodLabel = ui?.period?.label || buildPeriodLabel(ui?.period?.start, ui?.period?.end) || "Period";
 
   const title =
     scope === "item" && productName
       ? `${capitalize(domain)} Report — ${productName} (${periodLabel})`
       : `${capitalize(domain)} Report — ${periodLabel}`;
 
-  // <-- IMPORTANT: preserve the saved run id if present
   const runId = row?.run_id ?? row?.id ?? null;
 
   return {
@@ -544,14 +577,14 @@ function normalizeReportForSpotlightRow(row) {
     product: productName ? { id: null, name: productName } : null,
     period_label: periodLabel,
     title,
-    runId
+    runId,
   };
 }
 
-// NEW: normalize forecast result into a Spotlight-like card
 function normalizeForecastForCard(ui, domain = "sales") {
-  const periodLabel =
-    ui?.period?.label || buildPeriodLabel(ui?.period?.start, ui?.period?.end) || "Period";
+  if (!ui) return null;
+  
+  const periodLabel = ui?.period?.label || buildPeriodLabel(ui?.period?.start, ui?.period?.end) || "Period";
   const title = /expense/i.test(domain) ? "Expense Forecast" : "Sales Forecast";
 
   return {
@@ -559,7 +592,7 @@ function normalizeForecastForCard(ui, domain = "sales") {
     domain: /expense/i.test(domain) ? "expenses" : "sales",
     title,
     period_label: periodLabel,
-    ui_spec: ui // keep full uiSpec so popup can render it
+    ui_spec: ui,
   };
 }
 

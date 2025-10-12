@@ -388,44 +388,62 @@ namespace dataAccess.Services
 
         private async Task<object?> ExpenseBudgetVsActual(IDictionary<string, object?> a, CancellationToken ct)
         {
-            // Arg: month_year (yyyy-MM-01)
-            if (!a.TryGetValue("month_year", out var mv) || mv is null)
-                throw new ArgumentException("Missing required arg 'month_year' (yyyy-MM-01)");
+            // Try both: month_year (old) or start/end (new)
+            DateOnly start, end;
+            
+            if (a.TryGetValue("start", out var startVal) && startVal is not null)
+            {
+                // New approach: use start/end range
+                start = GetDateArg(a, "start");
+                end = GetDateArg(a, "end");
+            }
+            else if (a.TryGetValue("month_year", out var mv) && mv is not null)
+            {
+                // Old approach: month_year
+                mv = Unwrap(mv);
+                DateOnly month;
+                if (mv is DateOnly d) month = d;
+                else if (mv is string s && DateOnly.TryParse(s, out var ds)) month = ds;
+                else if (mv is DateTime dt) month = DateOnly.FromDateTime(dt);
+                else throw new InvalidCastException("Arg 'month_year' must be ISO date (yyyy-MM-01)");
 
-            mv = Unwrap(mv);
-            DateOnly month;
-            if (mv is DateOnly d) month = d;
-            else if (mv is string s && DateOnly.TryParse(s, out var ds)) month = ds;
-            else if (mv is DateTime dt) month = DateOnly.FromDateTime(dt);
-            else throw new InvalidCastException("Arg 'month_year' must be ISO date (yyyy-MM-01)");
+                start = new DateOnly(month.Year, month.Month, 1);
+                end = start.AddMonths(1).AddDays(-1);
+            }
+            else
+            {
+                throw new ArgumentException("Missing required args: either 'start'+'end' or 'month_year'");
+            }
 
             var userId = GetGuidArg(a, "user_id");
 
-            var start = new DateOnly(month.Year, month.Month, 1);
-            var end = start.AddMonths(1).AddDays(-1);
-
+            // Get actual expenses for the period
             var actual = await _db.Expenses
                 .Where(e => e.OccurredOn >= start
                     && e.OccurredOn <= end
                     && (!userId.HasValue || e.UserId == userId))
                 .SumAsync(e => (decimal?)e.Amount, ct) ?? 0m;
 
+            // Try to find budget for the month(s) in the range
+            // For simplicity, use the first day of the start date's month
+            var monthStart = new DateOnly(start.Year, start.Month, 1);
             var budgetRow = await _db.Budgets
-                .Where(b => b.MonthYear == start)
+                .Where(b => b.MonthYear == monthStart)
                 .Select(b => new { b.MonthYear, b.MonthlyBudgetAmount })
                 .FirstOrDefaultAsync(ct);
 
             decimal budget = budgetRow?.MonthlyBudgetAmount ?? 0m;
-            var variance = actual - budget;
-            decimal? variancePct = budget == 0 ? (decimal?)null : Math.Round(variance / budget * 100m, 2);
+            decimal remaining = budget - actual;
+            decimal utilizationPct = budget == 0 ? 0 : Math.Round((actual / budget) * 100m, 2);
+            bool isOverBudget = actual > budget;
 
             return new
             {
-                month_year = start,
-                budget_amount = Math.Round(budget, 2),
-                actual_amount = Math.Round(actual, 2),
-                variance = Math.Round(variance, 2),
-                variance_pct = variancePct
+                allocated_budget = Math.Round(budget, 2),
+                total_expenses = Math.Round(actual, 2),
+                remaining_budget = Math.Round(remaining, 2),
+                utilization_pct = utilizationPct,
+                is_over_budget = isOverBudget
             };
         }
 

@@ -215,6 +215,7 @@ namespace dataAccess.Reports
                         list.AddRange(Expense.OverviewQueries(h.Start!, h.End!, h.CompareToPrior, h.PrevStart, h.PrevEnd, ym));
                         list.AddRange(Expense.TopCategoryQueries(h.Start!, h.End!, 10));
                         list.AddRange(Expense.ByDayQueries(h.Start!, h.End!));
+                        list.AddRange(Expense.RecentTransactionsQueries(h.Start!, h.End!, 10));
                         break;
                     }
 
