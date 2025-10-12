@@ -192,7 +192,11 @@ builder.Services.AddScoped<QueryPipeline>();
 // CORS
 builder.Services.AddCors(o => {
     o.AddPolicy("vite", p => p
-        .WithOrigins("http://localhost:5173", "http://127.0.0.1:5173")
+        .WithOrigins(
+            "http://localhost:5173", 
+            "http://127.0.0.1:5173",
+            "https://capstone-buisw-aiz-renzetorinos-projects.vercel.app",
+            "https://*.vercel.app")
         .AllowAnyHeader()
         .AllowAnyMethod()
         .AllowCredentials());
