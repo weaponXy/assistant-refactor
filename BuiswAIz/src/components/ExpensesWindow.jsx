@@ -1,51 +1,85 @@
 // src/components/ExpensesWindow.jsx
 import React, { useEffect, useState } from "react";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 const API_BASE = import.meta.env.VITE_API_ASSISTANT_URL;
 
 // Helper for PHP currency
-const peso = (n) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(Number(n ?? 0));
+const peso = (n) =>
+  new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(
+    Number(n ?? 0)
+  );
 
-// Simple SVG line chart (no external lib)
-function LineChart({ data = [], width = 320, height = 80 }) {
-  if (!Array.isArray(data) || data.length === 0) return <div style={{ height }}>No chart data</div>;
+// -------------------- LineChart --------------------
+function LineChart({ data = [], width = 400, height = 120 }) {
+  if (!Array.isArray(data) || data.length === 0)
+    return <div style={{ height }}>No chart data</div>;
+
   const min = Math.min(...data.map((d) => d.value));
   const max = Math.max(...data.map((d) => d.value));
   const range = max - min || 1;
+
+  const padding = 32;
+
+  // Map points
   const points = data.map((d, i) => {
-    const x = (i / (data.length - 1)) * (width - 32) + 16;
-    const y = height - 16 - ((d.value - min) / range) * (height - 32);
-    return `${x},${y}`;
+    const x = padding + (i / (data.length - 1)) * (width - 2 * padding);
+    const y = height - padding - ((d.value - min) / range) * (height - 2 * padding);
+    return { x, y, label: d.label, value: d.value };
   });
+
   return (
     <svg width={width} height={height} style={{ background: "#f8fafc", borderRadius: 8 }}>
+      {/* Axes */}
+      <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="#94a3b8" />
+      <line x1={padding} y1={padding} x2={padding} y2={height - padding} stroke="#94a3b8" />
+
+      {/* X axis labels */}
+      {points.map((pt, i) => (
+        <text key={i} x={pt.x} y={height - padding + 12} textAnchor="middle" fontSize="10" fill="#64748b">
+          {pt.label}
+        </text>
+      ))}
+
+      {/* Y axis labels */}
+      {[0, 0.25, 0.5, 0.75, 1].map((frac, i) => {
+        const y = height - padding - frac * (height - 2 * padding);
+        const val = (min + frac * range).toFixed(0);
+        return (
+          <g key={i}>
+            <line x1={padding - 4} y1={y} x2={padding} y2={y} stroke="#94a3b8" />
+            <text x={padding - 6} y={y + 4} textAnchor="end" fontSize="10" fill="#64748b">
+              {val}
+            </text>
+          </g>
+        );
+      })}
+
+      {/* Line */}
       <polyline
         fill="none"
         stroke="#3b82f6"
         strokeWidth="2"
-        points={points.join(" ")}
+        points={points.map((pt) => `${pt.x},${pt.y}`).join(" ")}
       />
-      {data.map((d, i) => {
-        const x = (i / (data.length - 1)) * (width - 32) + 16;
-        const y = height - 16 - ((d.value - min) / range) * (height - 32);
-        return <circle key={i} cx={x} cy={y} r={2.5} fill="#3b82f6" />;
-      })}
+
+      {/* Points */}
+      {points.map((pt, i) => (
+        <circle key={i} cx={pt.x} cy={pt.y} r={3} fill="#3b82f6" />
+      ))}
     </svg>
   );
 }
 
-/**
- * Props:
- * - runId?: string   -> if present, loads that saved expense run; otherwise loads the latest expense report
- * - onClose?: () => void -> optional, for PopupWindow close button
- */
+// -------------------- ExpensesWindow --------------------
 export default function ExpensesWindow({ runId = null, onClose }) {
   const [loading, setLoading] = useState(true);
   const [ui, setUi] = useState(null);
   const [error, setError] = useState(null);
-  const [refreshKey, setRefreshKey] = useState(0); // for Retry without full reload
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  // ------- data fetch -------
+  // -------------------- Fetch Data --------------------
   useEffect(() => {
     let abort = false;
 
@@ -57,34 +91,13 @@ export default function ExpensesWindow({ runId = null, onClose }) {
         let uiSpec = null;
 
         if (runId) {
-          // NOTE: singular "expense" (matches Program.cs)
           const r = await fetch(`${API_BASE}/api/reports/expense/by-id/${runId}`);
-          if (!r.ok) {
-            // try to surface server JSON error if available
-            let msg = `by-id failed: ${r.status}`;
-            try {
-              const j = await r.json();
-              msg = j?.message || j?.error || msg;
-            } catch (err) {
-              // swallow JSON parse issues, but keep something so ESLint won't flag the block
-              if (import.meta.env?.DEV) console.debug("by-id error payload parse failed", err);
-            }
-            throw new Error(msg);
-          }
+          if (!r.ok) throw new Error(`by-id failed: ${r.status}`);
           const j = await r.json();
           uiSpec = j.ui_spec ?? j.uiSpec ?? j.ui ?? null;
         } else {
           const r = await fetch(`${API_BASE}/api/reports/recent?domain=expenses&limit=1`);
-          if (!r.ok) {
-            let msg = `recent failed: ${r.status}`;
-            try {
-              const j = await r.json();
-              msg = j?.message || j?.error || msg;
-            } catch (err) {
-              if (import.meta.env?.DEV) console.debug("recent error payload parse failed", err);
-            }
-            throw new Error(msg);
-          }
+          if (!r.ok) throw new Error(`recent failed: ${r.status}`);
           const j = await r.json();
           if (!Array.isArray(j) || j.length === 0) throw new Error("No recent expense reports");
           uiSpec = j[0]?.ui_spec ?? j[0]?.uiSpec ?? j[0]?.ui ?? null;
@@ -104,8 +117,48 @@ export default function ExpensesWindow({ runId = null, onClose }) {
     };
   }, [runId, refreshKey]);
 
-  // ------- UI states -------
-  if (loading) {
+  // -------------------- Export PDF --------------------
+  const exportPDF = async () => {
+    const element = document.querySelector(".sr-root");
+
+    // Hide buttons inside the element before capture
+    const buttons = element.querySelectorAll(".sr-actions button");
+    buttons.forEach((btn) => (btn.style.display = "none"));
+
+    const canvas = await html2canvas(element, { scale: 2 });
+    const imgData = canvas.toDataURL("image/png");
+
+    // Restore buttons after capture
+    buttons.forEach((btn) => (btn.style.display = ""));
+
+    // A4 landscape dimensions
+    const pdfWidth = 297 * 3.78;
+    const pdfHeight = 210 * 3.78;
+    const pdf = new jsPDF({
+      orientation: "landscape",
+      unit: "px",
+      format: [pdfWidth, pdfHeight],
+    });
+
+    // Scale to fit
+    const scaleX = pdfWidth / canvas.width;
+    const scaleY = pdfHeight / canvas.height;
+    const scale = Math.min(scaleX, scaleY);
+
+    const imgWidth = canvas.width * scale;
+    const imgHeight = canvas.height * scale;
+
+    const xOffset = (pdfWidth - imgWidth) / 2;
+    const yOffset = (pdfHeight - imgHeight) / 2;
+
+    pdf.addImage(imgData, "PNG", xOffset, yOffset, imgWidth, imgHeight);
+    pdf.save("expense-report.pdf");
+  };
+
+
+
+  // -------------------- UI States --------------------
+  if (loading)
     return (
       <div className="pw-card pw-loader">
         <div className="sr-header sr-header--loading">
@@ -113,8 +166,8 @@ export default function ExpensesWindow({ runId = null, onClose }) {
         </div>
       </div>
     );
-  }
-  if (error) {
+
+  if (error)
     return (
       <div className="pw-card">
         <div className="sr-header">
@@ -128,12 +181,10 @@ export default function ExpensesWindow({ runId = null, onClose }) {
         </div>
       </div>
     );
-  }
-  if (!ui) {
-    return <div className="pw-card">No data.</div>;
-  }
 
-  // ------- Parse new JSON spec -------
+  if (!ui) return <div className="pw-card">No data.</div>;
+
+  // -------------------- Parse JSON Spec --------------------
   const title = ui.report_title ?? "Expense Report";
   const period = ui.period?.label ?? "";
   const charts = Array.isArray(ui.charts) ? ui.charts : [];
@@ -142,54 +193,50 @@ export default function ExpensesWindow({ runId = null, onClose }) {
   const budgetComparison = ui.budget_comparison || null;
   const historicalComparison = ui.historical_comparison || null;
 
-  // --- Dynamic Data Extraction ---
-  // Line chart: daily expenses (support both .data and .series shapes)
+  // Line chart
   let lineChartData = [];
   const lineChart = charts.find((c) => c.type === "line");
   if (lineChart) {
     if (Array.isArray(lineChart.data)) {
-      // [{label, value}]
       lineChartData = lineChart.data.map((d) => ({
         value: d.value ?? d.y ?? 0,
-        label: d.label ?? d.x ?? ""
+        label: d.label ?? d.x ?? "",
       }));
     } else if (Array.isArray(lineChart.series) && lineChart.series[0]?.points) {
-      // [{series: [{points: [{x, y}]}]}]
       lineChartData = lineChart.series[0].points.map((pt) => ({
         value: pt.y ?? pt.value ?? 0,
-        label: pt.x ?? pt.label ?? ""
+        label: pt.x ?? pt.label ?? "",
       }));
     }
   }
 
-  // Top Categories: support both {category} and {name}
+  // Top categories
   const topCategories = Array.isArray(tables.top_categories)
     ? tables.top_categories.map((row) => ({
         category: row.category ?? row.name ?? "",
         share_pct: row.share_pct ?? 0,
-        amount: row.amount ?? 0
+        amount: row.amount ?? 0,
       }))
     : [];
 
-  // Recent Transactions: support both {date} and {occurred_on} - NO NOTES
-  // Recent Transactions: use recent_transactions from backend
+  // Recent transactions
   const recentTx = Array.isArray(tables.recent_transactions)
     ? tables.recent_transactions.map((row) => ({
         date: row.date ?? row.occurred_on ?? "",
-        amount: row.amount ?? 0
+        amount: row.amount ?? 0,
       }))
     : [];
 
-  // Summary narrative only
+  // Summary narrative
   const summaryNarr = Array.isArray(narratives.summary)
     ? narratives.summary.filter(Boolean).join(" ")
-    : (narratives.summary || "");
+    : narratives.summary || "";
 
   // Recommendations
   const recommendations = Array.isArray(narratives.recommendations)
     ? narratives.recommendations
     : [];
-
+// -------------------- Render --------------------
   return (
     <div className="sr-root">
       {/* Header */}
@@ -213,11 +260,10 @@ export default function ExpensesWindow({ runId = null, onClose }) {
         )}
       </div>
 
-      {/* 2-column grid - focused expense report */}
+      {/* 2-column grid */}
       <div className="sr-grid">
         {/* LEFT COL */}
         <div className="sr-col">
-          {/* Line Chart */}
           <div className="sr-card">
             <div className="sr-card-title">Daily Expenses</div>
             {lineChartData.length > 0 ? (
@@ -227,7 +273,6 @@ export default function ExpensesWindow({ runId = null, onClose }) {
             )}
           </div>
 
-          {/* Top Categories */}
           <div className="sr-card">
             <div className="sr-card-title">Top Expense Categories</div>
             {topCategories.length === 0 ? (
@@ -260,40 +305,38 @@ export default function ExpensesWindow({ runId = null, onClose }) {
           {budgetComparison && budgetComparison.allocated_budget > 0 && (
             <div className="sr-card">
               <div className="sr-card-title">Budget Status</div>
-              <div style={{ padding: '12px 0' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <span style={{ color: '#64748b' }}>Allocated Budget:</span>
+              <div style={{ padding: "12px 0" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                  <span style={{ color: "#64748b" }}>Allocated Budget:</span>
                   <strong>{peso(budgetComparison.allocated_budget)}</strong>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <span style={{ color: '#64748b' }}>Total Expenses:</span>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                  <span style={{ color: "#64748b" }}>Total Expenses:</span>
                   <strong>{peso(budgetComparison.total_expenses)}</strong>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <span style={{ color: '#64748b' }}>Remaining:</span>
-                  <strong style={{ color: budgetComparison.is_over_budget ? '#ef4444' : '#10b981' }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                  <span style={{ color: "#64748b" }}>Remaining:</span>
+                  <strong style={{ color: budgetComparison.is_over_budget ? "#ef4444" : "#10b981" }}>
                     {peso(budgetComparison.remaining_budget)}
                   </strong>
                 </div>
                 <div style={{ marginTop: 12 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: '0.875rem' }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, fontSize: "0.875rem" }}>
                     <span>Utilization</span>
                     <span>{budgetComparison.utilization_pct?.toFixed(1)}%</span>
                   </div>
-                  <div style={{ background: '#e2e8f0', borderRadius: 4, height: 8, overflow: 'hidden' }}>
+                  <div style={{ background: "#e2e8f0", borderRadius: 4, height: 8, overflow: "hidden" }}>
                     <div
                       style={{
-                        background: budgetComparison.is_over_budget ? '#ef4444' : '#3b82f6',
-                        height: '100%',
+                        background: budgetComparison.is_over_budget ? "#ef4444" : "#3b82f6",
+                        height: "100%",
                         width: `${Math.min(budgetComparison.utilization_pct, 100)}%`,
-                        transition: 'width 0.3s ease'
+                        transition: "width 0.3s ease",
                       }}
                     />
                   </div>
                   {budgetComparison.is_over_budget && (
-                    <div style={{ color: '#ef4444', fontSize: '0.875rem', marginTop: 8 }}>
-                      ⚠️ Over budget!
-                    </div>
+                    <div style={{ color: "#ef4444", fontSize: "0.875rem", marginTop: 8 }}>⚠️ Over budget!</div>
                   )}
                 </div>
               </div>
@@ -304,37 +347,29 @@ export default function ExpensesWindow({ runId = null, onClose }) {
           {historicalComparison && historicalComparison.previous_period_total > 0 && (
             <div className="sr-card">
               <div className="sr-card-title">Period Comparison</div>
-              <div style={{ padding: '12px 0' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <span style={{ color: '#64748b' }}>Current Period:</span>
+              <div style={{ padding: "12px 0" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                  <span style={{ color: "#64748b" }}>Current Period:</span>
                   <strong>{peso(historicalComparison.current_period_total)}</strong>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <span style={{ color: '#64748b' }}>Previous Period:</span>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                  <span style={{ color: "#64748b" }}>Previous Period:</span>
                   <strong>{peso(historicalComparison.previous_period_total)}</strong>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <span style={{ color: '#64748b' }}>Change:</span>
-                  <strong style={{ 
-                    color: historicalComparison.change_amount >= 0 ? '#ef4444' : '#10b981'
-                  }}>
-                    {historicalComparison.change_amount >= 0 ? '+' : ''}
-                    {peso(historicalComparison.change_amount)} 
-                    ({historicalComparison.change_percentage >= 0 ? '+' : ''}
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                  <span style={{ color: "#64748b" }}>Change:</span>
+                  <strong style={{ color: historicalComparison.change_amount >= 0 ? "#ef4444" : "#10b981" }}>
+                    {historicalComparison.change_amount >= 0 ? "+" : ""}
+                    {peso(historicalComparison.change_amount)} (
+                    {historicalComparison.change_percentage >= 0 ? "+" : ""}
                     {historicalComparison.change_percentage?.toFixed(1)}%)
                   </strong>
                 </div>
-                <div style={{ 
-                  marginTop: 12, 
-                  padding: '8px 12px', 
-                  background: '#f8fafc', 
-                  borderRadius: 4,
-                  fontSize: '0.875rem'
-                }}>
-                  <strong>Trend:</strong> {historicalComparison.trend || 'stable'}
-                  {historicalComparison.trend === 'increasing' && ' 📈'}
-                  {historicalComparison.trend === 'decreasing' && ' 📉'}
-                  {historicalComparison.trend === 'stable' && ' ➡️'}
+                <div style={{ marginTop: 12, padding: "8px 12px", background: "#f8fafc", borderRadius: 4, fontSize: "0.875rem" }}>
+                  <strong>Trend:</strong> {historicalComparison.trend || "stable"}
+                  {historicalComparison.trend === "increasing" && " 📈"}
+                  {historicalComparison.trend === "decreasing" && " 📉"}
+                  {historicalComparison.trend === "stable" && " ➡️"}
                 </div>
               </div>
             </div>
@@ -343,7 +378,7 @@ export default function ExpensesWindow({ runId = null, onClose }) {
           {/* Summary */}
           <div className="sr-card">
             <div className="sr-card-title">Expense Analysis</div>
-            <div className="sr-text" style={{ lineHeight: '1.6' }}>
+            <div className="sr-text" style={{ lineHeight: "1.6" }}>
               {summaryNarr || "Generating expense analysis..."}
             </div>
           </div>
@@ -352,9 +387,9 @@ export default function ExpensesWindow({ runId = null, onClose }) {
           {recommendations.length > 0 && (
             <div className="sr-card">
               <div className="sr-card-title">💡 Recommendations</div>
-              <ul style={{ margin: '8px 0', paddingLeft: '20px' }}>
+              <ul style={{ margin: "8px 0", paddingLeft: "20px" }}>
                 {recommendations.map((rec, i) => (
-                  <li key={i} style={{ marginBottom: 8, lineHeight: '1.5', color: '#475569' }}>
+                  <li key={i} style={{ marginBottom: 8, lineHeight: "1.5", color: "#475569" }}>
                     {rec}
                   </li>
                 ))}
@@ -392,11 +427,11 @@ export default function ExpensesWindow({ runId = null, onClose }) {
           </div>
 
           {/* Actions */}
-          <div className="sr-actions">
-            <button className="btn-ghost" onClick={() => setRefreshKey(k => k + 1)}>
+           <div className="sr-actions">
+            <button className="btn-ghost" onClick={() => setRefreshKey((k) => k + 1)}>
               Regenerate Report
             </button>
-            <button className="btn-dark" onClick={() => alert("PDF export coming soon")}>
+            <button className="btn-dark" onClick={exportPDF}>
               Download PDF
             </button>
           </div>
