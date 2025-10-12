@@ -2027,6 +2027,7 @@ app.MapPost("/api/assistant", async (
     });
 });
 
+builder.WebHost.UseUrls("http://0.0.0.0:5000");
 app.Run();
 
 public sealed class RouteReq { public string? Input { get; set; } }
