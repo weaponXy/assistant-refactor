@@ -17,9 +17,9 @@
       "applicationUrl": "http://localhost:5115",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "APP__GROQ__API_KEY": "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",
-        "GROQ_API_KEY": "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",
-        "APP__VEC__CONNECTIONSTRING": "Host=aws-1-ap-southeast-1.pooler.supabase.com;Port=5432;Database=postgres;Username=postgres.ykdyawmyzzpiotygguhs;Password=CSP14PLRRab1Vi6g;Ssl Mode=Require;Pooling=true"
+        "APP__GROQ__API_KEY": "*",
+        "GROQ_API_KEY": "*",
+        "APP__VEC__CONNECTIONSTRING": "*"
       }
     },
     "https": {
@@ -30,7 +30,7 @@
       "applicationUrl": "https://localhost:7245;http://localhost:5115",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "APP__VEC__CONNECTIONSTRING": "Host=aws-1-ap-southeast-1.pooler.supabase.com;Port=5432;Database=postgres;Username=postgres.ykdyawmyzzpiotygguhs;Password=CSP14PLRRab1Vi6g;Ssl Mode=Require;Pooling=true"
+        "APP__VEC__CONNECTIONSTRING": "*"
       }
     },
     "IIS Express": {
@@ -39,7 +39,7 @@
       "launchUrl": "swagger",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "APP__VEC__CONNECTIONSTRING": "Host=aws-1-ap-southeast-1.pooler.supabase.com;Port=5432;Database=postgres;Username=postgres.ykdyawmyzzpiotygguhs;Password=CSP14PLRRab1Vi6g;Ssl Mode=Require;Pooling=true"
+        "APP__VEC__CONNECTIONSTRING": "*"
       }
     }
   }
