@@ -1,78 +1,120 @@
-using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using System.Data;
-using System.Text.Json;
 
 namespace dataAccess.Api.Services;
 
 /// <summary>
-/// Executes validated SQL queries safely with read-only access.
+/// Executes validated SQL queries safely with read-only access and defensive limits.
 /// </summary>
-public class SafeSqlExecutor
+public interface ISafeSqlExecutor
+{
+    Task<List<Dictionary<string, object?>>> ExecuteQueryAsync(string sql, CancellationToken ct = default);
+    Task<object> ExecuteAndFormatAsync(string sql, string? explanation = null, CancellationToken ct = default);
+    string FormatAsMarkdown(List<Dictionary<string, object?>> rows, string? explanation = null);
+}
+
+/// <inheritdoc cref="ISafeSqlExecutor" />
+public class SafeSqlExecutor : ISafeSqlExecutor
 {
     private readonly string _connectionString;
     private readonly ILogger<SafeSqlExecutor> _logger;
+    private readonly int _commandTimeoutSeconds;
+    private readonly int _maxRows;
 
     public SafeSqlExecutor(IConfiguration configuration, ILogger<SafeSqlExecutor> logger)
     {
-        _connectionString = Environment.GetEnvironmentVariable("APP__REL__CONNECTIONSTRING")
-                          ?? configuration["APP__REL__CONNECTIONSTRING"]
-                          ?? throw new Exception("APP__REL__CONNECTIONSTRING missing");
         _logger = logger;
+
+        var configuredReadOnly = configuration.GetConnectionString("DefaultConnectionReadOnly")
+                                 ?? configuration["ConnectionStrings:DefaultConnectionReadOnly"];
+
+        if (string.IsNullOrWhiteSpace(configuredReadOnly))
+        {
+            _connectionString = configuration.GetConnectionString("DefaultConnection")
+                ?? configuration["APP__REL__CONNECTIONSTRING"]
+                ?? Environment.GetEnvironmentVariable("APP__REL__CONNECTIONSTRING")
+                ?? throw new InvalidOperationException("Read-only connection string is not configured. Set ConnectionStrings:DefaultConnectionReadOnly to a read-only user.");
+
+            _logger.LogWarning("DefaultConnectionReadOnly missing; falling back to DefaultConnection. Ensure this credential is read-only.");
+        }
+        else
+        {
+            _connectionString = configuredReadOnly;
+        }
+
+        _commandTimeoutSeconds = configuration.GetValue<int?>("SqlExecution:CommandTimeoutSeconds") ?? 30;
+        _maxRows = configuration.GetValue<int?>("SqlExecution:MaxRows") ?? 1000;
     }
 
-    /// <summary>
-    /// Executes a SELECT query and returns results as a list of dictionaries.
-    /// </summary>
-    public async Task<List<Dictionary<string, object?>>> ExecuteQueryAsync(
-        string sql, 
-        CancellationToken ct = default)
+    /// <inheritdoc />
+    public async Task<List<Dictionary<string, object?>>> ExecuteQueryAsync(string sql, CancellationToken ct = default)
     {
         var results = new List<Dictionary<string, object?>>();
 
         try
         {
-            await using var conn = new NpgsqlConnection(_connectionString);
-            await conn.OpenAsync(ct);
+            await using var connection = new NpgsqlConnection(_connectionString);
+            await connection.OpenAsync(ct);
 
-            await using var cmd = new NpgsqlCommand(sql, conn)
+            await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
+
+            // Force the transaction into read-only mode even if the user credential is misconfigured.
+            await using (var setReadOnly = new NpgsqlCommand("SET TRANSACTION READ ONLY", connection, transaction))
             {
-                CommandTimeout = 30 // 30 second timeout
+                await setReadOnly.ExecuteNonQueryAsync(ct);
+            }
+
+            await using var command = new NpgsqlCommand(sql, connection, transaction)
+            {
+                CommandTimeout = _commandTimeoutSeconds
             };
 
-            await using var reader = await cmd.ExecuteReaderAsync(ct);
+            await using var reader = await command.ExecuteReaderAsync(ct);
 
             while (await reader.ReadAsync(ct))
             {
                 var row = new Dictionary<string, object?>();
-                
-                for (int i = 0; i < reader.FieldCount; i++)
+
+                for (var i = 0; i < reader.FieldCount; i++)
                 {
                     var columnName = reader.GetName(i);
                     var value = reader.IsDBNull(i) ? null : reader.GetValue(i);
                     row[columnName] = value;
                 }
-                
+
                 results.Add(row);
+
+                if (results.Count >= _maxRows)
+                {
+                    _logger.LogWarning("Query returned more than {MaxRows} rows. Truncating result set.", _maxRows);
+                    break;
+                }
             }
 
-            _logger.LogInformation("Query executed successfully, returned {RowCount} rows", results.Count);
+            await transaction.CommitAsync(ct);
+
+            _logger.LogInformation("Query executed successfully with {RowCount} rows.", results.Count);
             return results;
+        }
+        catch (PostgresException ex)
+        {
+            _logger.LogError(ex, "PostgreSQL error during query execution: {Sql}", sql);
+            throw new InvalidOperationException("The database rejected the query execution.", ex);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogWarning("SQL execution cancelled for query: {Sql}", sql);
+            throw;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error executing SQL query: {Sql}", sql);
-            throw;
+            _logger.LogError(ex, "Unexpected error executing SQL query: {Sql}", sql);
+            throw new InvalidOperationException("SQL execution failed.", ex);
         }
     }
 
-    /// <summary>
-    /// Executes a query and returns results formatted for the frontend.
-    /// </summary>
-    public async Task<object> ExecuteAndFormatAsync(
-        string sql, 
-        string? explanation = null,
-        CancellationToken ct = default)
+    /// <inheritdoc />
+    public async Task<object> ExecuteAndFormatAsync(string sql, string? explanation = null, CancellationToken ct = default)
     {
         try
         {
@@ -83,7 +125,7 @@ public class SafeSqlExecutor
                 success = true,
                 rowCount = rows.Count,
                 data = rows,
-                sql = sql,
+                sql,
                 explanation = explanation ?? "Query executed successfully",
                 executedAt = DateTime.UtcNow
             };
@@ -95,56 +137,51 @@ public class SafeSqlExecutor
             {
                 success = false,
                 error = ex.Message,
-                sql = sql,
+                sql,
                 executedAt = DateTime.UtcNow
             };
         }
     }
 
-    /// <summary>
-    /// Formats query results as markdown table for chat display.
-    /// </summary>
+    /// <inheritdoc />
     public string FormatAsMarkdown(List<Dictionary<string, object?>> rows, string? explanation = null)
     {
         if (rows.Count == 0)
-            return explanation != null 
-                ? $"{explanation}\n\nNo results found." 
+        {
+            return !string.IsNullOrWhiteSpace(explanation)
+                ? $"{explanation}\n\nNo results found."
                 : "No results found.";
+        }
 
         var sb = new System.Text.StringBuilder();
-        
+
         if (!string.IsNullOrWhiteSpace(explanation))
         {
             sb.AppendLine(explanation);
             sb.AppendLine();
         }
 
-        // Get column names from first row
         var columns = rows[0].Keys.ToList();
 
-        // Header
         sb.Append("| ");
         sb.AppendJoin(" | ", columns);
         sb.AppendLine(" |");
 
-        // Separator
         sb.Append("| ");
         sb.AppendJoin(" | ", columns.Select(_ => "---"));
         sb.AppendLine(" |");
 
-        // Rows (limit to first 50 for display)
-        var displayRows = rows.Take(50);
-        foreach (var row in displayRows)
+        foreach (var row in rows.Take(50))
         {
             sb.Append("| ");
-            sb.AppendJoin(" | ", columns.Select(col => 
+            sb.AppendJoin(" | ", columns.Select(col =>
             {
                 var value = row[col];
                 if (value == null) return "NULL";
                 if (value is DateTime dt) return dt.ToString("yyyy-MM-dd HH:mm");
                 if (value is DateOnly d) return d.ToString("yyyy-MM-dd");
                 if (value is decimal dec) return dec.ToString("N2");
-                return value.ToString() ?? "";
+                return value.ToString() ?? string.Empty;
             }));
             sb.AppendLine(" |");
         }

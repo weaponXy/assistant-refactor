@@ -23,259 +23,596 @@ namespace dataAccess.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("dataAccess.Entities.Attachment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("ExpenseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("expense_id");
+
+                    b.Property<string>("MimeType")
+                        .HasColumnType("text")
+                        .HasColumnName("mime_type");
+
+                    b.Property<int?>("SizeBytes")
+                        .HasColumnType("integer")
+                        .HasColumnName("size_bytes");
+
+                    b.Property<string>("StorageKey")
+                        .HasColumnType("text")
+                        .HasColumnName("storage_key");
+
+                    b.Property<DateTime?>("UploadedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("uploaded_at");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_attachments");
+
+                    b.ToTable("attachments", "public");
+                });
+
             modelBuilder.Entity("dataAccess.Entities.Budget", b =>
                 {
                     b.Property<int>("BudgetId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
-                        .HasColumnName("budgetid");
+                        .HasColumnName("id");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("BudgetId"));
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("createdat");
+                        .HasColumnName("created_at");
 
                     b.Property<DateOnly>("MonthYear")
                         .HasColumnType("date")
                         .HasColumnName("month_year");
 
-                    b.Property<decimal>("MonthlyBudgetAmount")
+                    b.Property<decimal?>("MonthlyBudgetAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("monthly_budget_amount");
 
-                    b.HasKey("BudgetId");
+                    b.HasKey("BudgetId")
+                        .HasName("pk_budget");
 
-                    b.HasIndex("MonthYear");
+                    b.HasIndex("MonthYear")
+                        .HasDatabaseName("ix_budget_month_year");
 
-                    b.ToTable("budgets", "public");
+                    b.ToTable("budget", "public");
                 });
 
             modelBuilder.Entity("dataAccess.Entities.BudgetHistory", b =>
                 {
-                    b.Property<int>("BudgetHistoryId")
+                    b.Property<long>("BudgetHistoryId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("budgethistoryid");
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("BudgetHistoryId"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("BudgetHistoryId"));
 
-                    b.Property<int>("BudgetId")
+                    b.Property<int?>("BudgetId")
                         .HasColumnType("integer")
-                        .HasColumnName("budgetid");
+                        .HasColumnName("budget_id");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("createdat");
+                        .HasColumnName("created_at");
 
-                    b.Property<decimal>("NewAmount")
+                    b.Property<decimal?>("NewAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("new_amount");
 
-                    b.Property<decimal>("OldAmount")
+                    b.Property<decimal?>("OldAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("old_amount");
 
-                    b.HasKey("BudgetHistoryId");
+                    b.HasKey("BudgetHistoryId")
+                        .HasName("pk_budgethistory");
 
-                    b.HasIndex("BudgetId");
+                    b.HasIndex("BudgetId")
+                        .HasDatabaseName("ix_budgethistory_budget_id");
 
                     b.ToTable("budgethistory", "public");
                 });
 
             modelBuilder.Entity("dataAccess.Entities.Category", b =>
                 {
-                    b.Property<int>("CategoryId")
+                    b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("categoryid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("CategoryId"));
-
-                    b.Property<DateTime>("CreatedAt")
+                    b.Property<DateTime?>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("createdat");
+                        .HasColumnName("created_at");
 
-                    b.Property<bool>("IsActive")
+                    b.Property<bool?>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)")
+                        .HasColumnType("text")
                         .HasColumnName("name");
 
-                    b.Property<DateTime>("UpdatedAt")
+                    b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updatedat");
+                        .HasColumnName("updated_at");
 
-                    b.Property<string>("UserId")
-                        .HasColumnType("text")
-                        .HasColumnName("userid");
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
 
-                    b.HasKey("CategoryId");
-
-                    b.HasIndex("UserId");
-
-                    b.HasIndex("UserId", "Name");
+                    b.HasKey("Id")
+                        .HasName("pk_categories");
 
                     b.ToTable("categories", "public");
+                });
+
+            modelBuilder.Entity("dataAccess.Entities.ChatFeedback", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Comment")
+                        .HasColumnType("text")
+                        .HasColumnName("comment");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("FeedbackType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("feedback_type");
+
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("message_id");
+
+                    b.Property<string>("Metadata")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("metadata");
+
+                    b.Property<int?>("Rating")
+                        .HasColumnType("integer")
+                        .HasColumnName("rating");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_chat_feedback");
+
+                    b.HasIndex("FeedbackType")
+                        .HasDatabaseName("idx_chat_feedback_feedback_type");
+
+                    b.HasIndex("MessageId")
+                        .HasDatabaseName("idx_chat_feedback_message_id");
+
+                    b.HasIndex("SessionId")
+                        .HasDatabaseName("idx_chat_feedback_session_id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("idx_chat_feedback_user_id");
+
+                    b.ToTable("chat_feedback", "public");
+                });
+
+            modelBuilder.Entity("dataAccess.Entities.ChatMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal?>("Confidence")
+                        .HasPrecision(5, 4)
+                        .HasColumnType("numeric(5,4)")
+                        .HasColumnName("confidence");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("content");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Domain")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("domain");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("text")
+                        .HasColumnName("error_message");
+
+                    b.Property<string>("Intent")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("intent");
+
+                    b.Property<int?>("LatencyMs")
+                        .HasColumnType("integer")
+                        .HasColumnName("latency_ms");
+
+                    b.Property<string>("Metadata")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("metadata");
+
+                    b.Property<string>("ModelUsed")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("model_used");
+
+                    b.Property<int?>("ResultCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("result_count");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("role");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
+                    b.Property<bool?>("SqlExecuted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("sql_executed");
+
+                    b.Property<string>("SqlGenerated")
+                        .HasColumnType("text")
+                        .HasColumnName("sql_generated");
+
+                    b.Property<bool?>("SqlValidated")
+                        .HasColumnType("boolean")
+                        .HasColumnName("sql_validated");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_chat_messages");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("idx_chat_messages_created_at");
+
+                    b.HasIndex("Intent")
+                        .HasDatabaseName("idx_chat_messages_intent");
+
+                    b.HasIndex("SessionId")
+                        .HasDatabaseName("idx_chat_messages_session_id");
+
+                    b.ToTable("chat_messages", "public");
+                });
+
+            modelBuilder.Entity("dataAccess.Entities.ChatSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTime>("LastActivityAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_activity_at");
+
+                    b.Property<string>("Metadata")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("metadata");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_chat_sessions");
+
+                    b.HasIndex("ExpiresAt")
+                        .HasDatabaseName("idx_chat_sessions_expires_at");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("idx_chat_sessions_user_id");
+
+                    b.ToTable("chat_sessions", "public");
+                });
+
+            modelBuilder.Entity("dataAccess.Entities.Contact", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Address")
+                        .HasColumnType("text")
+                        .HasColumnName("address");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Email")
+                        .HasColumnType("text")
+                        .HasColumnName("email");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("note");
+
+                    b.Property<string>("Phone")
+                        .HasColumnType("text")
+                        .HasColumnName("phone");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_contacts");
+
+                    b.ToTable("contacts", "public");
                 });
 
             modelBuilder.Entity("dataAccess.Entities.DefectiveItem", b =>
                 {
                     b.Property<int>("DefectiveItemId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("defectiveitemid");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("DefectiveItemId"));
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("createdat");
 
                     b.Property<string>("DefectDescription")
-                        .IsRequired()
-                        .HasMaxLength(250)
-                        .HasColumnType("character varying(250)");
+                        .HasColumnType("text")
+                        .HasColumnName("defectdescription");
+
+                    b.Property<int>("ProductCategoryId")
+                        .HasColumnType("integer")
+                        .HasColumnName("productcategoryid");
 
                     b.Property<int>("ProductId")
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("productid");
 
                     b.Property<int>("Quantity")
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity");
 
-                    b.Property<int?>("ReportedByUserId")
-                        .HasColumnType("integer");
+                    b.Property<Guid?>("ReportedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reportedbyuserid");
 
-                    b.Property<DateTime>("ReportedDate")
-                        .HasColumnType("timestamp with time zone");
+                    b.Property<DateOnly>("ReportedDate")
+                        .HasColumnType("date")
+                        .HasColumnName("reporteddate");
 
                     b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
+                        .HasColumnType("text")
+                        .HasColumnName("status");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("updatedat");
 
-                    b.HasKey("DefectiveItemId");
+                    b.HasKey("DefectiveItemId")
+                        .HasName("pk_defectiveitems");
 
-                    b.HasIndex("ProductId");
+                    b.HasIndex("ProductCategoryId")
+                        .HasDatabaseName("ix_defectiveitems_productcategoryid");
 
-                    b.ToTable("defective_items", "public");
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("ix_defectiveitems_product_id");
+
+                    b.ToTable("defectiveitems", "public");
                 });
 
             modelBuilder.Entity("dataAccess.Entities.Expense", b =>
                 {
-                    b.Property<int>("ExpenseId")
+                    b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("expenseid");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("ExpenseId"));
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
 
                     b.Property<decimal>("Amount")
                         .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)")
+                        .HasColumnType("numeric(18,2)")
                         .HasColumnName("amount");
 
-                    b.Property<string>("Category")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("category");
+                    b.Property<Guid?>("CategoryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("category_id");
 
-                    b.Property<int?>("CategoryId")
-                        .HasColumnType("integer")
-                        .HasColumnName("categoryid");
+                    b.Property<Guid?>("ContactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("contact_id");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("createdat");
+                        .HasColumnName("created_at");
 
-                    b.Property<string>("CreatedByUserId")
+                    b.Property<string>("Notes")
                         .HasColumnType("text")
-                        .HasColumnName("createdbyuserid");
+                        .HasColumnName("notes");
 
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasMaxLength(250)
-                        .HasColumnType("character varying(250)")
-                        .HasColumnName("description");
+                    b.Property<DateOnly>("OccurredOn")
+                        .HasColumnType("date")
+                        .HasColumnName("occurred_on");
 
-                    b.Property<DateTime>("ExpenseDate")
+                    b.Property<Guid?>("PlannedPaymentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("planned_payment_id");
+
+                    b.Property<string>("Status")
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<string>("TaxJson")
+                        .HasColumnType("text")
+                        .HasColumnName("tax_json");
+
+                    b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("expensedate");
+                        .HasColumnName("updated_at");
 
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updatedat");
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
 
-                    b.HasKey("ExpenseId");
+                    b.HasKey("Id")
+                        .HasName("pk_expenses");
 
-                    b.HasIndex("CategoryId");
+                    b.HasIndex("CategoryId")
+                        .HasDatabaseName("ix_expenses_category_id");
 
-                    b.HasIndex("CreatedByUserId");
-
-                    b.HasIndex("ExpenseDate");
+                    b.HasIndex("ContactId")
+                        .HasDatabaseName("ix_expenses_contact_id");
 
                     b.ToTable("expenses", "public");
                 });
 
             modelBuilder.Entity("dataAccess.Entities.ExpenseLabel", b =>
                 {
-                    b.Property<int>("ExpenseId")
-                        .HasColumnType("integer")
-                        .HasColumnName("expenseid");
+                    b.Property<Guid>("LabelId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("label_id");
 
-                    b.Property<int>("LabelId")
-                        .HasColumnType("integer")
-                        .HasColumnName("labelid");
+                    b.Property<Guid>("ExpenseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("expense_id");
 
-                    b.HasKey("ExpenseId", "LabelId");
+                    b.HasKey("LabelId", "ExpenseId")
+                        .HasName("pk_expense_labels");
 
-                    b.HasIndex("LabelId");
+                    b.HasIndex("ExpenseId")
+                        .HasDatabaseName("ix_expense_labels_expense_id");
 
                     b.ToTable("expense_labels", "public");
                 });
 
+            modelBuilder.Entity("dataAccess.Entities.FaqSearchLog", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AnswerSnippet")
+                        .HasColumnType("text")
+                        .HasColumnName("answer_snippet");
+
+                    b.Property<decimal>("Confidence")
+                        .HasColumnType("numeric")
+                        .HasColumnName("confidence");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<bool?>("Helpful")
+                        .HasColumnType("boolean")
+                        .HasColumnName("helpful");
+
+                    b.Property<string>("Intent")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("intent");
+
+                    b.Property<string>("Query")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("query");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_faq_search_logs");
+
+                    b.ToTable("faq_search_logs", "public");
+                });
+
             modelBuilder.Entity("dataAccess.Entities.Label", b =>
                 {
-                    b.Property<int>("LabelId")
+                    b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("labelid");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("LabelId"));
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
 
                     b.Property<string>("Color")
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
+                        .HasColumnType("text")
                         .HasColumnName("color");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("createdat");
+                        .HasColumnName("created_at");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)")
+                        .HasColumnType("text")
                         .HasColumnName("name");
 
-                    b.Property<string>("UserId")
-                        .HasColumnType("text")
-                        .HasColumnName("userid");
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
 
-                    b.HasKey("LabelId");
-
-                    b.HasIndex("UserId");
-
-                    b.HasIndex("UserId", "Name");
+                    b.HasKey("Id")
+                        .HasName("pk_labels");
 
                     b.ToTable("labels", "public");
                 });
@@ -284,29 +621,43 @@ namespace dataAccess.Migrations
                 {
                     b.Property<int>("OrderId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("orderid");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("OrderId"));
 
+                    b.Property<decimal>("AmountPaid")
+                        .HasColumnType("numeric")
+                        .HasColumnName("amount_paid");
+
+                    b.Property<decimal>("Change")
+                        .HasColumnType("numeric")
+                        .HasColumnName("change");
+
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("createdat");
 
                     b.Property<DateTime>("OrderDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("orderdate");
 
                     b.Property<string>("OrderStatus")
                         .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
+                        .HasColumnType("text")
+                        .HasColumnName("orderstatus");
 
                     b.Property<decimal>("TotalAmount")
                         .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("totalamount");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("updatedat");
 
-                    b.HasKey("OrderId");
+                    b.HasKey("OrderId")
+                        .HasName("pk_orders");
 
                     b.ToTable("orders", "public");
                 });
@@ -315,40 +666,162 @@ namespace dataAccess.Migrations
                 {
                     b.Property<int>("OrderItemId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("orderitemid");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("OrderItemId"));
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("createdat");
 
                     b.Property<int>("OrderId")
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("orderid");
+
+                    b.Property<int?>("ProductCategoryId")
+                        .HasColumnType("integer")
+                        .HasColumnName("productcategoryid");
 
                     b.Property<int>("ProductId")
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("productid");
 
                     b.Property<int>("Quantity")
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity");
 
                     b.Property<decimal>("Subtotal")
                         .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("subtotal");
 
                     b.Property<decimal>("UnitPrice")
                         .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("unitprice");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("updatedat");
 
-                    b.HasKey("OrderItemId");
+                    b.HasKey("OrderItemId")
+                        .HasName("pk_orderitems");
 
-                    b.HasIndex("OrderId");
+                    b.HasIndex("OrderId")
+                        .HasDatabaseName("ix_orderitems_order_id");
 
-                    b.HasIndex("ProductId");
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("ix_orderitems_product_id");
 
-                    b.ToTable("order_items", "public");
+                    b.ToTable("orderitems", "public");
+                });
+
+            modelBuilder.Entity("dataAccess.Entities.PlannedPayment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<Guid?>("CategoryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("category_id");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<Guid?>("ContactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("contact_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateOnly?>("DueDate")
+                        .HasColumnType("date")
+                        .HasColumnName("due_date");
+
+                    b.Property<Guid?>("ExpenseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("expense_id");
+
+                    b.Property<string>("Frequency")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("frequency");
+
+                    b.Property<Guid?>("LabelId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("label_id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text")
+                        .HasColumnName("notes");
+
+                    b.Property<string>("Notify")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("notify");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_planned_payments");
+
+                    b.ToTable("planned_payments", "public");
+                });
+
+            modelBuilder.Entity("dataAccess.Entities.PlannedRecurrence", b =>
+                {
+                    b.Property<Guid>("PlannedPaymentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("planned_payment_id");
+
+                    b.Property<string>("Duration")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("duration");
+
+                    b.Property<int>("Every")
+                        .HasColumnType("integer")
+                        .HasColumnName("every");
+
+                    b.Property<int?>("OccurrencesCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("occurrences_count");
+
+                    b.Property<string>("Repeat")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("repeat");
+
+                    b.Property<DateOnly?>("UntilDate")
+                        .HasColumnType("date")
+                        .HasColumnName("until_date");
+
+                    b.HasKey("PlannedPaymentId")
+                        .HasName("pk_planned_recurrence");
+
+                    b.ToTable("planned_recurrence", "public");
                 });
 
             modelBuilder.Entity("dataAccess.Entities.Product", b =>
@@ -386,11 +859,12 @@ namespace dataAccess.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updatedat");
 
-                    b.Property<int?>("UpdatedByUserId")
-                        .HasColumnType("integer")
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uuid")
                         .HasColumnName("updatedbyuserid");
 
-                    b.HasKey("ProductId");
+                    b.HasKey("ProductId")
+                        .HasName("pk_products");
 
                     b.ToTable("products", "public");
                 });
@@ -436,7 +910,8 @@ namespace dataAccess.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updatedstock");
 
-                    b.HasKey("ProductCategoryId");
+                    b.HasKey("ProductCategoryId")
+                        .HasName("pk_productcategory");
 
                     b.ToTable("productcategory", "public");
                 });
@@ -444,32 +919,41 @@ namespace dataAccess.Migrations
             modelBuilder.Entity("dataAccess.Entities.Sales", b =>
                 {
                     b.Property<DateTime>("OrderDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("order_date");
 
                     b.Property<int>("OrderId")
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("order_id");
 
                     b.Property<int>("ProductId")
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("product_id");
 
                     b.Property<string>("ProductName")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("product_name");
 
                     b.Property<decimal>("Profit")
-                        .HasColumnType("numeric");
+                        .HasColumnType("numeric")
+                        .HasColumnName("profit");
 
                     b.Property<int>("Quantity")
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity");
 
                     b.Property<decimal>("Revenue")
-                        .HasColumnType("numeric");
+                        .HasColumnType("numeric")
+                        .HasColumnName("revenue");
 
                     b.Property<decimal>("Subtotal")
-                        .HasColumnType("numeric");
+                        .HasColumnType("numeric")
+                        .HasColumnName("subtotal");
 
                     b.Property<decimal>("UnitPrice")
-                        .HasColumnType("numeric");
+                        .HasColumnType("numeric")
+                        .HasColumnName("unit_price");
 
                     b.ToTable((string)null);
 
@@ -522,7 +1006,8 @@ namespace dataAccess.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updatedat");
 
-                    b.HasKey("SupplierId");
+                    b.HasKey("SupplierId")
+                        .HasName("pk_suppliers");
 
                     b.ToTable("suppliers", "public");
                 });
@@ -533,18 +1018,59 @@ namespace dataAccess.Migrations
                         .WithMany()
                         .HasForeignKey("BudgetId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasConstraintName("fk_budgethistory_budget_budget_id");
 
                     b.Navigation("Budget");
                 });
 
+            modelBuilder.Entity("dataAccess.Entities.ChatFeedback", b =>
+                {
+                    b.HasOne("dataAccess.Entities.ChatMessage", "Message")
+                        .WithMany()
+                        .HasForeignKey("MessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_chat_feedback_chat_messages_message_id");
+
+                    b.HasOne("dataAccess.Entities.ChatSession", "Session")
+                        .WithMany("Feedbacks")
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_chat_feedback_chat_sessions_session_id");
+
+                    b.Navigation("Message");
+
+                    b.Navigation("Session");
+                });
+
+            modelBuilder.Entity("dataAccess.Entities.ChatMessage", b =>
+                {
+                    b.HasOne("dataAccess.Entities.ChatSession", "Session")
+                        .WithMany("Messages")
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_chat_messages_chat_sessions_session_id");
+
+                    b.Navigation("Session");
+                });
+
             modelBuilder.Entity("dataAccess.Entities.DefectiveItem", b =>
                 {
+                    b.HasOne("dataAccess.Entities.ProductCategory", null)
+                        .WithMany()
+                        .HasForeignKey("ProductCategoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_defectiveitems_productcategory_productcategoryid");
+
                     b.HasOne("dataAccess.Entities.Product", "Product")
                         .WithMany("DefectiveItems")
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_defectiveitems_products_product_id");
 
                     b.Navigation("Product");
                 });
@@ -554,9 +1080,16 @@ namespace dataAccess.Migrations
                     b.HasOne("dataAccess.Entities.Category", "CategoryRef")
                         .WithMany()
                         .HasForeignKey("CategoryId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .HasConstraintName("expenses_category_id_fkey");
+
+                    b.HasOne("dataAccess.Entities.Contact", "ContactRef")
+                        .WithMany()
+                        .HasForeignKey("ContactId")
+                        .HasConstraintName("expenses_contact_id_fkey");
 
                     b.Navigation("CategoryRef");
+
+                    b.Navigation("ContactRef");
                 });
 
             modelBuilder.Entity("dataAccess.Entities.ExpenseLabel", b =>
@@ -565,13 +1098,15 @@ namespace dataAccess.Migrations
                         .WithMany()
                         .HasForeignKey("ExpenseId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("expense_labels_expense_id_fkey");
 
                     b.HasOne("dataAccess.Entities.Label", "Label")
                         .WithMany()
                         .HasForeignKey("LabelId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("expense_labels_label_id_fkey");
 
                     b.Navigation("Expense");
 
@@ -584,17 +1119,36 @@ namespace dataAccess.Migrations
                         .WithMany("OrderItems")
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_orderitems_orders_order_id");
 
                     b.HasOne("dataAccess.Entities.Product", "Product")
                         .WithMany("OrderItems")
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_orderitems_products_product_id");
 
                     b.Navigation("Order");
 
                     b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("dataAccess.Entities.PlannedRecurrence", b =>
+                {
+                    b.HasOne("dataAccess.Entities.PlannedPayment", null)
+                        .WithOne()
+                        .HasForeignKey("dataAccess.Entities.PlannedRecurrence", "PlannedPaymentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_planned_recurrence_planned_payments_planned_payment_id");
+                });
+
+            modelBuilder.Entity("dataAccess.Entities.ChatSession", b =>
+                {
+                    b.Navigation("Feedbacks");
+
+                    b.Navigation("Messages");
                 });
 
             modelBuilder.Entity("dataAccess.Entities.Order", b =>

@@ -6,6 +6,7 @@ using dataAccess.Services;
 using DotNetEnv;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
+using Microsoft.SemanticKernel;
 using OllamaSharp.Models.Chat;
 using Sprache;
 using System.Data;
@@ -25,9 +26,54 @@ var conn = builder.Configuration["APP__VEC__CONNECTIONSTRING"]
 
 Console.WriteLine($"[DB] {conn}");
 
+// ==============================================================================
+// SEMANTIC KERNEL INTEGRATION (Day 1)
+// ==============================================================================
+
+// Get API keys from environment/config
+var fastLlmApiKey = builder.Configuration["APP__SK__FAST_LLM__API_KEY"]
+    ?? Environment.GetEnvironmentVariable("APP__SK__FAST_LLM__API_KEY")
+    ?? throw new InvalidOperationException("Missing APP__SK__FAST_LLM__API_KEY");
+
+var smartLlmApiKey = builder.Configuration["APP__SK__SMART_LLM__API_KEY"]
+    ?? Environment.GetEnvironmentVariable("APP__SK__SMART_LLM__API_KEY")
+    ?? throw new InvalidOperationException("Missing APP__SK__SMART_LLM__API_KEY");
+
+// Build Semantic Kernel with two LLM services
+var kernelBuilder = Kernel.CreateBuilder();
+
+// Fast LLM for routing/classification (Llama 3.1 8B)
+kernelBuilder.AddOpenAIChatCompletion(
+    modelId: builder.Configuration["APP__SK__FAST_LLM__MODEL"] ?? "llama-3.1-8b-instant",
+    apiKey: fastLlmApiKey,
+    serviceId: "fast-llm",
+    endpoint: new Uri(builder.Configuration["APP__SK__FAST_LLM__ENDPOINT"] ?? "https://api.groq.com/openai/v1")
+);
+
+// Smart LLM for SQL generation/analysis (Llama 3.3 70B)
+kernelBuilder.AddOpenAIChatCompletion(
+    modelId: builder.Configuration["APP__SK__SMART_LLM__MODEL"] ?? "llama-3.3-70b-versatile",
+    apiKey: smartLlmApiKey,
+    serviceId: "smart-llm",
+    endpoint: new Uri(builder.Configuration["APP__SK__SMART_LLM__ENDPOINT"] ?? "https://api.groq.com/openai/v1")
+);
+
+var kernel = kernelBuilder.Build();
+builder.Services.AddSingleton(kernel);
+builder.Services.AddSingleton<LlmChatService>();
+
+Console.WriteLine("[SK] Semantic Kernel initialized with multi-LLM strategy");
+Console.WriteLine("[SK] Fast LLM: llama-3.1-8b-instant (routing)");
+Console.WriteLine("[SK] Smart LLM: llama-3.3-70b-versatile (SQL/analysis)");
+
+// ==============================================================================
+// EXISTING SERVICES
+// ==============================================================================
+
 builder.Services.AddHttpClient<GroqChatLlm>();
 builder.Services.AddSingleton<IChatLlm, GroqChatLlm>();
 builder.Services.AddDbContext<AppDbContext>(opt => opt.UseNpgsql(conn));
+builder.Services.AddScoped<TelemetryLogger>();
 
 builder.Services.AddScoped<SqlQueryService>();
 builder.Services.AddScoped<VectorSearchService>();

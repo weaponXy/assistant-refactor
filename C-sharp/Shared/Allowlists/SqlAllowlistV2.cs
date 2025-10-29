@@ -9,14 +9,23 @@ namespace Shared.Allowlists
         // Backing set of allowed tables (updated to match AppDbContext)
         private static readonly HashSet<string> _tables = new(StringComparer.OrdinalIgnoreCase)
         {
-            // Inventory/Sales
-            "products", "suppliers", "productcategory", "orders", "orderitems", "defectiveitems",
-            // Expense domain
-            "expenses", "categories", "contacts", "labels", "expense_labels", "budget", "budgethistory",
-            // Attachments, Planner
-            "attachments", "planned_payments", "planned_recurrence",
-            // Sales reporting view
-            "sales"
+            "attachments",
+            "budget",
+            "budget_history",
+            "categories",
+            "contacts",
+            "defective_items",
+            "expense_labels",
+            "expenses",
+            "labels",
+            "order_items",
+            "orders",
+            "planned_payments",
+            "planned_recurrence",
+            "product_category",
+            "products",
+            "sales",
+            "suppliers"
         };
 
         // ISqlAllowlist.Tables
@@ -28,64 +37,203 @@ namespace Shared.Allowlists
         private static readonly Dictionary<string, HashSet<string>> Columns =
             new(StringComparer.OrdinalIgnoreCase)
             {
-                // products
-                ["products"] = new(StringComparer.OrdinalIgnoreCase)
-                { "productid","productname","description","supplierid","createdat","updatedat","image_url","updatedbyuserid" },
-                // suppliers
-                ["suppliers"] = new(StringComparer.OrdinalIgnoreCase)
-                { "supplierid","suppliername","contactperson","phonenumber","supplieremail","address","createdat","updatedat","supplierstatus","defectreturned" },
-                // productcategory
-                ["productcategory"] = new(StringComparer.OrdinalIgnoreCase)
-                { "productcategoryid","productid","price","cost","color","agesize","currentstock","reorderpoint","updatedstock" },
-                // orders
-                ["orders"] = new(StringComparer.OrdinalIgnoreCase)
-                { "orderid","orderdate","totalamount","orderstatus","createdat","updatedat","amount_paid","change" },
-                // orderitems
-                ["orderitems"] = new(StringComparer.OrdinalIgnoreCase)
-                { "orderitemid","orderid","productid","productcategoryid","quantity","unitprice","subtotal","createdat","updatedat" },
-                // defectiveitems
-                ["defectiveitems"] = new(StringComparer.OrdinalIgnoreCase)
-                { "defectiveitemid","productid","productcategoryid","reporteddate","defectdescription","quantity","status","createdat","updatedat","reportedbyuserid" },
-                // expenses
-                ["expenses"] = new(StringComparer.OrdinalIgnoreCase)
-                { "id","user_id","occurred_on","category_id","amount","notes","status","contact_id","updated_at","created_at","planned_payment_id","tax_json" },
-                // categories
-                ["categories"] = new(StringComparer.OrdinalIgnoreCase)
-                { "id","user_id","name","is_active","created_at","updated_at" },
-                // contacts
-                ["contacts"] = new(StringComparer.OrdinalIgnoreCase)
-                { "id","user_id","name","phone","email","address","note","created_at","updated_at" },
-                // labels
-                ["labels"] = new(StringComparer.OrdinalIgnoreCase)
-                { "id","user_id","name","color","created_at" },
-                // expense_labels
-                ["expense_labels"] = new(StringComparer.OrdinalIgnoreCase)
-                { "expense_id","label_id" },
-                // budget (table = budget)
-                ["budget"] = new(StringComparer.OrdinalIgnoreCase)
-                { "id","month_year","monthly_budget_amount","created_at" },
-                // budgethistory
-                ["budgethistory"] = new(StringComparer.OrdinalIgnoreCase)
-                { "id","budget_id","old_amount","new_amount","created_at" },
-                // attachments
                 ["attachments"] = new(StringComparer.OrdinalIgnoreCase)
-                { "id","user_id","expense_id","storage_key","mime_type","size_bytes","uploaded_at","created_at" },
-                // planned_payments
+                {
+                    "id",
+                    "user_id",
+                    "expense_id",
+                    "storage_key",
+                    "mime_type",
+                    "size_bytes",
+                    "uploaded_at",
+                    "created_at"
+                },
+                ["budget"] = new(StringComparer.OrdinalIgnoreCase)
+                {
+                    "id",
+                    "month_year",
+                    "monthly_budget_amount",
+                    "created_at"
+                },
+                ["budget_history"] = new(StringComparer.OrdinalIgnoreCase)
+                {
+                    "id",
+                    "budget_id",
+                    "old_amount",
+                    "new_amount",
+                    "created_at"
+                },
+                ["categories"] = new(StringComparer.OrdinalIgnoreCase)
+                {
+                    "id",
+                    "user_id",
+                    "name",
+                    "parent_id",
+                    "sort_order",
+                    "is_active",
+                    "created_at",
+                    "updated_at"
+                },
+                ["contacts"] = new(StringComparer.OrdinalIgnoreCase)
+                {
+                    "id",
+                    "user_id",
+                    "name",
+                    "phone",
+                    "email",
+                    "address",
+                    "note",
+                    "created_at",
+                    "updated_at"
+                },
+                ["defective_items"] = new(StringComparer.OrdinalIgnoreCase)
+                {
+                    "defective_item_id",
+                    "product_id",
+                    "product_category_id",
+                    "reported_date",
+                    "defect_description",
+                    "quantity",
+                    "status",
+                    "created_at",
+                    "updated_at",
+                    "reported_by_user_id"
+                },
+                ["expense_labels"] = new(StringComparer.OrdinalIgnoreCase)
+                {
+                    "expense_id",
+                    "label_id"
+                },
+                ["expenses"] = new(StringComparer.OrdinalIgnoreCase)
+                {
+                    "id",
+                    "user_id",
+                    "occurred_on",
+                    "category_id",
+                    "amount",
+                    "notes",
+                    "status",
+                    "contact_id",
+                    "updated_at",
+                    "created_at",
+                    "planned_payment_id",
+                    "tax_json"
+                },
+                ["labels"] = new(StringComparer.OrdinalIgnoreCase)
+                {
+                    "id",
+                    "user_id",
+                    "name",
+                    "color",
+                    "created_at"
+                },
+                ["order_items"] = new(StringComparer.OrdinalIgnoreCase)
+                {
+                    "order_item_id",
+                    "order_id",
+                    "product_id",
+                    "product_category_id",
+                    "quantity",
+                    "unit_price",
+                    "subtotal",
+                    "created_at",
+                    "updated_at"
+                },
+                ["orders"] = new(StringComparer.OrdinalIgnoreCase)
+                {
+                    "order_id",
+                    "order_date",
+                    "total_amount",
+                    "order_status",
+                    "created_at",
+                    "updated_at",
+                    "amount_paid",
+                    "change"
+                },
                 ["planned_payments"] = new(StringComparer.OrdinalIgnoreCase)
-                { "id","user_id","name","category_id","amount","contact_id","frequency","due_date","notes","label_id","notify","created_at","updated_at","expense_id","completed_at" },
-                // planned_recurrence
+                {
+                    "id",
+                    "user_id",
+                    "name",
+                    "category_id",
+                    "amount",
+                    "contact_id",
+                    "frequency",
+                    "due_date",
+                    "notes",
+                    "label_id",
+                    "notify",
+                    "created_at",
+                    "updated_at",
+                    "expense_id",
+                    "completed_at",
+                    "tax_json"
+                },
                 ["planned_recurrence"] = new(StringComparer.OrdinalIgnoreCase)
-                { "planned_payment_id","repeat","every","duration","until_date","occurrences_count" },
-                // sales (view)
+                {
+                    "planned_payment_id",
+                    "repeat",
+                    "every",
+                    "duration",
+                    "until_date",
+                    "occurrences_count"
+                },
+                ["product_category"] = new(StringComparer.OrdinalIgnoreCase)
+                {
+                    "product_category_id",
+                    "product_id",
+                    "price",
+                    "cost",
+                    "color",
+                    "age_size",
+                    "current_stock",
+                    "reorder_point",
+                    "updated_stock"
+                },
+                ["products"] = new(StringComparer.OrdinalIgnoreCase)
+                {
+                    "product_id",
+                    "product_name",
+                    "description",
+                    "supplier_id",
+                    "created_at",
+                    "updated_at",
+                    "image_url",
+                    "updated_by_user_id"
+                },
                 ["sales"] = new(StringComparer.OrdinalIgnoreCase)
                 {
-                    // Sales view columns (based on Sales entity and AppDbContext view definition)
-                    "orderid", "orderdate", "productid", "productname", 
-                    "quantity", "unitprice", "subtotal", "revenue", "profit",
-                    // Additional columns that may be useful in the view
-                    "totalamount", "orderstatus", "amount_paid", "change",
-                    "supplierid", "suppliername", "categoryid", "productcategoryid"
+                    "order_id",
+                    "order_date",
+                    "product_id",
+                    "product_name",
+                    "quantity",
+                    "unit_price",
+                    "subtotal",
+                    "revenue",
+                    "profit",
+                    "total_amount",
+                    "order_status",
+                    "amount_paid",
+                    "change",
+                    "supplier_id",
+                    "supplier_name",
+                    "category_id",
+                    "product_category_id"
                 },
+                ["suppliers"] = new(StringComparer.OrdinalIgnoreCase)
+                {
+                    "supplier_id",
+                    "supplier_name",
+                    "contact_person",
+                    "phone_number",
+                    "supplier_email",
+                    "address",
+                    "created_at",
+                    "updated_at",
+                    "supplier_status",
+                    "defect_returned"
+                }
             };
 
         private static readonly HashSet<string> Operators = new(StringComparer.OrdinalIgnoreCase)

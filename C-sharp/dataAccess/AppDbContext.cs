@@ -30,9 +30,6 @@ namespace dataAccess.Services
         public DbSet<PlannedRecurrence> PlannedRecurrences { get; set; } = default!;
         public DbSet<Attachment> Attachments { get; set; } = default!;
 
-        // --- FAQ Search Logs ---
-        public DbSet<FaqSearchLog> FaqSearchLogs { get; set; } = default!;
-
         // Read-only projection for Sales reporting (view)
         public DbSet<Sales> Sales { get; set; } = default!;
 
@@ -374,25 +371,8 @@ namespace dataAccess.Services
                     .HasForeignKey<PlannedRecurrence>(x => x.PlannedPaymentId);
             });
 
-            // =========================
-            // FAQ SEARCH LOGS
-            // =========================
-            modelBuilder.Entity<FaqSearchLog>(e =>
-            {
-                e.ToTable("faq_search_logs");
-                e.HasKey(x => x.Id);
-
-                e.Property(x => x.Id).HasColumnName("id");
-                e.Property(x => x.UserId).HasColumnName("user_id");
-                e.Property(x => x.Query).HasColumnName("query");
-                e.Property(x => x.Intent).HasColumnName("intent");
-                e.Property(x => x.AnswerSnippet).HasColumnName("answer_snippet");
-                e.Property(x => x.Confidence).HasColumnName("confidence");
-                e.Property(x => x.Helpful).HasColumnName("helpful");
-                e.Property(x => x.CreatedAt).HasColumnName("created_at");
-            });
-
-            // TIP: If you prefer, register UseSnakeCaseNamingConvention() on optionsBuilder to reduce HasColumnName boilerplate.
+            // NOTE: AI-related tables (chat_sessions, chat_messages, chat_feedback, faq_search_logs)
+            // have been moved to AiDbContext.cs for proper database separation.
         }
     }
 }

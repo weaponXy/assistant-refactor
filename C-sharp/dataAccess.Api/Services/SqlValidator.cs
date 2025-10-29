@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Shared.Allowlists;
 using System.Text.RegularExpressions;
 
@@ -56,6 +57,13 @@ public class SqlValidator
         
         // DO blocks (PostgreSQL anonymous code blocks)
         @"\bDO\s+\$\$", @"\bDO\s+LANGUAGE\b"
+    };
+
+    private static readonly Regex[] SqlInjectionPatterns = new[]
+    {
+        new Regex(@"\bOR\s+1\s*=\s*1\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"\bOR\s*''\s*=\s*''", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"\bOR\s+'?1'?\s*=\s*'?1'?", RegexOptions.IgnoreCase | RegexOptions.Compiled)
     };
 
     public SqlValidator(ISqlAllowlist allowlist, ILogger<SqlValidator> logger)
@@ -211,10 +219,17 @@ public class SqlValidator
 
         // 4. CRITICAL: Block SELECT ... INTO (creates new tables)
         // Supports quoted and schema-qualified targets: INTO "table", INTO schema.table, etc.
-        if (Regex.IsMatch(scan, @"\bSELECT\b[\s\S]*?\bINTO\b\s+(?!(OUTFILE|DUMPFILE)\b)(?:""[^""]+""|\w+)(?:\.(?:""[^""]+""|\w+))?", RegexOptions.IgnoreCase))
+    if (Regex.IsMatch(scan, @"\bSELECT\b[\s\S]*?\bINTO\b\s+(?!(OUTFILE|DUMPFILE)\b)(?:""[^""]+""|\w+)(?:\.(?:""[^""]+""|\w+))?", RegexOptions.IgnoreCase))
         {
             _logger.LogWarning("[VAL003_SELECT_INTO] Query rejected: SELECT INTO detected (table creation)");
             return (false, "SELECT ... INTO is not allowed (creates tables)");
+        }
+
+        // 4.1 Block SELECT ... INTO OUTFILE/DUMPFILE (file export)
+        if (Regex.IsMatch(scan, @"\bINTO\s+(OUTFILE|DUMPFILE)\b", RegexOptions.IgnoreCase))
+        {
+            _logger.LogWarning("[VAL003_SELECT_INTO_OUTFILE] Query rejected: SELECT INTO OUTFILE detected");
+            return (false, "SELECT ... INTO OUTFILE/DUMPFILE is not allowed (creates exports)");
         }
 
         // 5. Check for dangerous patterns (DML, DDL, DCL, execution, exports, etc.)
@@ -230,6 +245,16 @@ public class SqlValidator
             }
         }
 
+        // 5.25. Block common boolean tautologies used in SQL injection (e.g., OR 1=1, OR ''='')
+        foreach (var pattern in SqlInjectionPatterns)
+        {
+            if (pattern.IsMatch(scan))
+            {
+                _logger.LogWarning("[VAL005_INJECTION_PATTERN] Query rejected: boolean tautology detected");
+                return (false, "Potential SQL injection pattern detected (boolean tautology)");
+            }
+        }
+
         // 5.5. CRITICAL: Block derived tables in FROM/JOIN to prevent table allowlist bypass
         // Pattern: FROM ( ... ) or JOIN ( ... )
         // Derived tables can hide base tables from our allowlist check.
@@ -241,8 +266,7 @@ public class SqlValidator
         }
 
         // 6. Block SELECT * (requires explicit column selection for security)
-        // Pattern: SELECT * FROM | SELECT *, ... | SELECT ..., * | SELECT ..., *, ...
-        if (Regex.IsMatch(scan, @"\bSELECT\s+(?:\*|[^,]*,\s*\*(?:\s*,|$))", RegexOptions.IgnoreCase))
+        if (ContainsSelectWildcard(scan))
         {
             _logger.LogWarning("[VAL006_SELECT_STAR] Query rejected: SELECT * not allowed");
             return (false, "SELECT * is not allowed. Please specify explicit columns.");
@@ -460,7 +484,7 @@ public class SqlValidator
         
         // Find unqualified identifiers (not followed by a dot)
         // Pattern: word boundary + identifier + NOT followed by '.' or '('
-        var bareIdentifiers = Regex.Matches(selectList, @"\b([a-zA-Z_][a-zA-Z0-9_]*)\b(?!\s*[\.\(])");
+    var bareIdentifiers = Regex.Matches(selectList, @"(?<!\.)\b([a-zA-Z_][a-zA-Z0-9_]*)\b(?!\s*[\.\(])");
         
         if (bareIdentifiers.Count == 0)
             return (true, null); // All columns are qualified, perfect!
@@ -716,39 +740,67 @@ public class SqlValidator
     /// </summary>
     private string RemoveFunctionContents(string sql)
     {
-        // Match function_name(...) where ... can contain nested parentheses
-        // We use a regex with balanced parentheses (limited depth for safety)
-        
-        // Simple approach: Replace everything inside parentheses with spaces
-        // This handles EXTRACT(MONTH FROM col), DATE_TRUNC('month', col), etc.
-        // We preserve the parentheses structure but blank the contents
-        
-        var result = sql;
-        var maxIterations = 10; // Prevent infinite loops
-        var iteration = 0;
-        
-        // Iteratively remove innermost parentheses content
-        // Pattern: ( ... ) where ... contains no parentheses
-        while (iteration < maxIterations && result.Contains('('))
+        if (string.IsNullOrEmpty(sql))
+            return sql;
+
+        var chars = sql.ToCharArray();
+        var stack = new Stack<(int index, bool isFunction)>();
+
+        for (var i = 0; i < chars.Length; i++)
         {
-            var beforeLength = result.Length;
-            
-            // Replace innermost parentheses content (no nested parens inside)
-            // Keep the parentheses but replace content with spaces to preserve positions
-            result = Regex.Replace(result, @"\([^()]+\)", m =>
+            var c = chars[i];
+            if (c == '(')
             {
-                // Return opening paren + spaces + closing paren
-                return "(" + new string(' ', m.Length - 2) + ")";
-            });
-            
-            // If no change, we're done
-            if (result.Length == beforeLength)
-                break;
-            
-            iteration++;
+                var j = i - 1;
+                while (j >= 0 && char.IsWhiteSpace(chars[j]))
+                {
+                    j--;
+                }
+
+                var isFunction = j >= 0 && (char.IsLetterOrDigit(chars[j]) || chars[j] == '_' || chars[j] == '.' || chars[j] == ')');
+                stack.Push((i, isFunction));
+            }
+            else if (c == ')' && stack.Count > 0)
+            {
+                var (start, isFunction) = stack.Pop();
+                if (!isFunction || i - start <= 1)
+                    continue;
+
+                // Inspect inner text to avoid blanking subqueries (which start with SELECT/WITH)
+                var innerSpan = new ReadOnlySpan<char>(chars, start + 1, i - start - 1);
+                var trimmed = innerSpan.Trim();
+                if (trimmed.StartsWith("SELECT", StringComparison.OrdinalIgnoreCase) ||
+                    trimmed.StartsWith("WITH", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                for (var k = start + 1; k < i; k++)
+                {
+                    if (!char.IsWhiteSpace(chars[k]))
+                    {
+                        chars[k] = ' ';
+                    }
+                }
+            }
         }
-        
-        return result;
+
+        return new string(chars);
+    }
+
+    private static bool ContainsSelectWildcard(string sql)
+    {
+        var selectList = ExtractTopLevelSelectList(sql);
+        if (string.IsNullOrWhiteSpace(selectList))
+            return false;
+
+        if (Regex.IsMatch(selectList, @"(^|[\s,])\*(?=([\s,]|$))", RegexOptions.IgnoreCase))
+            return true;
+
+        if (Regex.IsMatch(selectList, @"\b[a-zA-Z_][a-zA-Z0-9_]*\.\*", RegexOptions.IgnoreCase))
+            return true;
+
+        return false;
     }
 
     /// <summary>

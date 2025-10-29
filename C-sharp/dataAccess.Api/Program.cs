@@ -10,13 +10,21 @@ using dataAccess.Services;
 using dataAccess.Forecasts;
 using dataAccess.LLM;
 using DotNetEnv;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.SemanticKernel;
 using Npgsql;
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+using System.Threading.RateLimiting;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -34,13 +42,63 @@ var candidates = new[] {
 foreach (var p in candidates) { if (File.Exists(p)) { Env.Load(p); break; } }
 
 builder.Configuration.AddEnvironmentVariables();
-var rel = Environment.GetEnvironmentVariable("APP__REL__CONNECTIONSTRING")
-          ?? builder.Configuration["APP__REL__CONNECTIONSTRING"]
-          ?? throw new Exception("APP__REL__CONNECTIONSTRING missing");
 
-var vec = Environment.GetEnvironmentVariable("APP__VEC__CONNECTIONSTRING")
+// Normalize legacy connection string keys into the new ConnectionStrings section
+var legacyRel = Environment.GetEnvironmentVariable("APP__REL__CONNECTIONSTRING")
+              ?? builder.Configuration["APP__REL__CONNECTIONSTRING"];
+if (!string.IsNullOrWhiteSpace(legacyRel))
+{
+    builder.Configuration["ConnectionStrings:DefaultConnection"] = legacyRel;
+}
+
+var legacyVec = Environment.GetEnvironmentVariable("APP__VEC__CONNECTIONSTRING")
+              ?? builder.Configuration["APP__VEC__CONNECTIONSTRING"];
+if (!string.IsNullOrWhiteSpace(legacyVec))
+{
+    builder.Configuration["ConnectionStrings:VEC"] = legacyVec;
+}
+
+var allowedOriginsSetting = builder.Configuration["ALLOWED_ORIGINS"]
+    ?? Environment.GetEnvironmentVariable("ALLOWED_ORIGINS");
+
+string[]? configuredCorsOrigins = null;
+if (!string.IsNullOrWhiteSpace(allowedOriginsSetting))
+{
+    configuredCorsOrigins = allowedOriginsSetting
+        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Select(origin => origin.Trim())
+        .Where(origin => !string.IsNullOrWhiteSpace(origin) && origin != "*")
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+}
+              
+var rel = builder.Configuration.GetConnectionString("DefaultConnection")
+          ?? builder.Configuration["ConnectionStrings:DefaultConnection"]
+          ?? builder.Configuration["APP__REL__CONNECTIONSTRING"]
+          ?? Environment.GetEnvironmentVariable("APP__REL__CONNECTIONSTRING");
+
+if (string.IsNullOrWhiteSpace(rel))
+{
+    throw new InvalidOperationException(
+        "APP__REL__CONNECTIONSTRING is required for database connectivity. " +
+        "Set it in appsettings.json, .env file, or environment variables. " +
+        "Application cannot start without proper database configuration."
+    );
+}
+
+var vec = builder.Configuration.GetConnectionString("VEC")
+          ?? builder.Configuration["ConnectionStrings:VEC"]
           ?? builder.Configuration["APP__VEC__CONNECTIONSTRING"]
-          ?? throw new Exception("APP__VEC__CONNECTIONSTRING missing");
+          ?? Environment.GetEnvironmentVariable("APP__VEC__CONNECTIONSTRING");
+
+if (string.IsNullOrWhiteSpace(vec))
+{
+    throw new InvalidOperationException(
+        "APP__VEC__CONNECTIONSTRING is required for vector/AI database connectivity. " +
+        "Set it in appsettings.json, .env file, or environment variables. " +
+        "Application cannot start without proper database configuration."
+    );
+}
 
 builder.Services.AddSingleton<VecConnResolver>();
 
@@ -118,7 +176,33 @@ builder.Services.AddScoped<NlqService>();
 builder.Services.AddScoped<IVertexAISearchService, VertexAISearchService>();
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Description = "Enter your Supabase JWT token"
+    });
+
+    options.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    {
+        {
+            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            {
+                Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                {
+                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
 
 builder.Services.AddSingleton(new PromptLoader());
 builder.Services.AddSingleton(provider =>
@@ -157,10 +241,150 @@ builder.Services.AddSingleton<Registry>(sp =>
     return JsonSerializer.Deserialize<Registry>(json) ?? new Registry();
 });
 
+// ==============================================================================
+// DATABASE CONTEXTS (Proper Separation)
+// ==============================================================================
+// AppDbContext: Business data (products, orders, expenses, suppliers, etc.)
+// Uses REL (relational/business) database connection
 builder.Services.AddDbContext<AppDbContext>(opt =>
     opt.UseNpgsql(rel)
        .UseSnakeCaseNamingConvention()
 );
+
+// AiDbContext: AI-related data (chat sessions, messages, feedback, FAQ logs)
+// Uses VEC (vector/AI) database connection
+builder.Services.AddDbContext<AiDbContext>(opt =>
+    opt.UseNpgsql(vec)
+       .UseSnakeCaseNamingConvention()
+);
+
+// ==============================================================================
+// SEMANTIC KERNEL INTEGRATION (Day 1)
+// ==============================================================================
+
+// Get API keys from environment/config
+var fastLlmApiKey = builder.Configuration["APP__SK__FAST_LLM__API_KEY"]
+    ?? Environment.GetEnvironmentVariable("APP__SK__FAST_LLM__API_KEY");
+
+var smartLlmApiKey = builder.Configuration["APP__SK__SMART_LLM__API_KEY"]
+    ?? Environment.GetEnvironmentVariable("APP__SK__SMART_LLM__API_KEY");
+
+if (!string.IsNullOrWhiteSpace(fastLlmApiKey) && !string.IsNullOrWhiteSpace(smartLlmApiKey))
+{
+    // Build Semantic Kernel with two LLM services
+    var kernelBuilder = Microsoft.SemanticKernel.Kernel.CreateBuilder();
+
+    // Fast LLM for routing/classification (Llama 3.1 8B)
+    kernelBuilder.AddOpenAIChatCompletion(
+        modelId: builder.Configuration["APP__SK__FAST_LLM__MODEL"] ?? "llama-3.1-8b-instant",
+        apiKey: fastLlmApiKey,
+        serviceId: "fast-llm",
+        endpoint: new Uri(builder.Configuration["APP__SK__FAST_LLM__ENDPOINT"] ?? "https://api.groq.com/openai/v1")
+    );
+
+    // Smart LLM for SQL generation/analysis (Llama 3.3 70B)
+    kernelBuilder.AddOpenAIChatCompletion(
+        modelId: builder.Configuration["APP__SK__SMART_LLM__MODEL"] ?? "llama-3.3-70b-versatile",
+        apiKey: smartLlmApiKey,
+        serviceId: "smart-llm",
+        endpoint: new Uri(builder.Configuration["APP__SK__SMART_LLM__ENDPOINT"] ?? "https://api.groq.com/openai/v1")
+    );
+
+    var kernel = kernelBuilder.Build();
+
+    // ✅ Import SK plugins from Plugins directory (Day 2)
+    try
+    {
+        var pluginsPath = Path.Combine(AppContext.BaseDirectory, "Plugins");
+        
+        if (Directory.Exists(pluginsPath))
+        {
+            // Import all plugins from the Plugins directory
+            // This will automatically discover skprompt.txt + config.json in subdirectories
+            var orchestrationPath = Path.Combine(pluginsPath, "Orchestration");
+            var databasePath = Path.Combine(pluginsPath, "Database");
+            var analysisPath = Path.Combine(pluginsPath, "Analysis");
+            var businessRulesPath = Path.Combine(pluginsPath, "BusinessRules");
+
+            var pluginsLoaded = 0;
+
+            if (Directory.Exists(orchestrationPath))
+            {
+                kernel.ImportPluginFromPromptDirectory(orchestrationPath, "Orchestration");
+                pluginsLoaded++;
+            }
+            
+            if (Directory.Exists(databasePath))
+            {
+                kernel.ImportPluginFromPromptDirectory(databasePath, "Database");
+                pluginsLoaded++;
+            }
+            
+            if (Directory.Exists(analysisPath))
+            {
+                kernel.ImportPluginFromPromptDirectory(analysisPath, "Analysis");
+                pluginsLoaded++;
+            }
+
+            if (Directory.Exists(businessRulesPath))
+            {
+                kernel.ImportPluginFromPromptDirectory(businessRulesPath, "BusinessRules");
+                pluginsLoaded++;
+            }
+
+            Console.WriteLine($"[SK] ✅ Plugins loaded from: {pluginsPath}");
+            
+            // Log all registered plugins and functions for debugging
+            Console.WriteLine($"[SK] Registered plugins ({kernel.Plugins.Count}):");
+            foreach (var plugin in kernel.Plugins)
+            {
+                Console.WriteLine($"[SK]   - Plugin: '{plugin.Name}' ({plugin.Count()} functions)");
+                foreach (var function in plugin)
+                {
+                    Console.WriteLine($"[SK]     └─ Function: '{function.Name}' (Description: {function.Description ?? "N/A"})");
+                }
+            }
+
+            if (pluginsLoaded == 0)
+            {
+                throw new InvalidOperationException("No plugins were loaded. Check Plugins directory structure.");
+            }
+        }
+        else
+        {
+            Console.WriteLine($"[SK] ⚠️ Plugins directory not found: {pluginsPath}");
+            throw new DirectoryNotFoundException($"Plugins directory not found: {pluginsPath}");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[SK] ❌ Failed to load plugins: {ex.Message}");
+        Console.WriteLine($"[SK] Stack trace: {ex.StackTrace}");
+        throw; // Fail startup if plugins cannot be loaded
+    }
+
+    builder.Services.AddSingleton(kernel);
+
+    Console.WriteLine("[SK] Semantic Kernel initialized with multi-LLM strategy");
+    Console.WriteLine("[SK] Fast LLM: llama-3.1-8b-instant (routing)");
+    Console.WriteLine("[SK] Smart LLM: llama-3.3-70b-versatile (SQL/analysis)");
+}
+else
+{
+    Console.WriteLine("[SK] Semantic Kernel disabled - API keys not found");
+}
+
+// ✅ Day 2: LLM Orchestration Services
+builder.Services.AddScoped<IDatabaseSchemaService, DatabaseSchemaService>();
+builder.Services.AddScoped<IChatOrchestratorService, ChatOrchestratorService>();
+builder.Services.AddSingleton<IPluginValidator, PluginValidator>();
+
+// Telemetry Logger Service
+builder.Services.AddScoped<TelemetryLogger>();
+
+// ==============================================================================
+// EXISTING SERVICES
+// ==============================================================================
 
 builder.Services.AddScoped<PlannerService>();
 builder.Services.AddScoped<PlanValidator>();
@@ -183,7 +407,7 @@ builder.Services.AddScoped<VectorSearchService>();
 builder.Services.AddSingleton<LlmSqlPromptLoader>();
 builder.Services.AddScoped<LlmSqlGenerator>();
 builder.Services.AddScoped<SqlValidator>();
-builder.Services.AddScoped<SafeSqlExecutor>();
+builder.Services.AddScoped<ISafeSqlExecutor, SafeSqlExecutor>();
 builder.Services.AddSingleton<VirtualTableRewriter>();
 
 // Query Pipeline services (new architecture)
@@ -192,25 +416,205 @@ builder.Services.AddSingleton<ResponseFormatter>();
 builder.Services.AddScoped<QueryPipeline>();
 
 // CORS
-builder.Services.AddCors(o => {
-    o.AddPolicy("vite", p => p
-        .WithOrigins(
-            "http://localhost:5173", 
-            "http://127.0.0.1:5173",
-            "https://capstone-buisw-a-iz.vercel.app",
-            "https://*.vercel.app")
-        .AllowAnyHeader()
-        .AllowAnyMethod()
-        .AllowCredentials());
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("default", policy =>
+    {
+        var origins = configuredCorsOrigins is { Length: > 0 }
+            ? configuredCorsOrigins
+            : new[] { "http://localhost:5173" };
+
+        policy.WithOrigins(origins)
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
 });
+
+// JWT Authentication (Supabase)
+builder.Services.AddAuthentication("Bearer")
+    .AddJwtBearer("Bearer", options =>
+    {
+        var supabaseUrl = builder.Configuration["SUPABASE_URL"] 
+            ?? Environment.GetEnvironmentVariable("SUPABASE_URL");
+        var supabaseJwtSecret = builder.Configuration["SUPABASE_JWT_SECRET"]
+            ?? Environment.GetEnvironmentVariable("SUPABASE_JWT_SECRET");
+
+        // CRITICAL: Fail fast if JWT secret is not configured (security requirement)
+        if (string.IsNullOrWhiteSpace(supabaseJwtSecret))
+        {
+            throw new InvalidOperationException(
+                "SUPABASE_JWT_SECRET is required for JWT authentication. " +
+                "Set it in appsettings.json, .env file, or environment variables. " +
+                "Application cannot start without proper JWT configuration."
+            );
+        }
+
+        if (string.IsNullOrWhiteSpace(supabaseUrl))
+        {
+            throw new InvalidOperationException(
+                "SUPABASE_URL is required for JWT authentication. " +
+                "Set it in appsettings.json, .env file, or environment variables."
+            );
+        }
+
+        // Enforce HTTPS metadata in production (security requirement)
+        options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+
+        options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(
+                System.Text.Encoding.UTF8.GetBytes(supabaseJwtSecret)
+            ),
+            // Environment-specific validation: strict in production, flexible in development
+            ValidateIssuer = !builder.Environment.IsDevelopment(),
+            ValidIssuer = supabaseUrl,
+            ValidateAudience = !builder.Environment.IsDevelopment(),
+            // Accept multiple audiences for tighter security validation
+            ValidAudiences = new[] { "authenticated", "api" },
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromMinutes(1), // Reduced from 5 minutes for tighter security
+            // Map Supabase 'sub' claim to NameIdentifier for proper User.Identity resolution
+            NameClaimType = "sub"
+        };
+
+        options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
+        {
+            OnAuthenticationFailed = context =>
+            {
+                // SECURITY: Log authentication failures with source IP for monitoring/alerting
+                var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                var remoteIp = context.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                var host = context.Request.Host.ToString();
+                var path = context.Request.Path.ToString();
+                
+                logger.LogWarning(
+                    "JWT authentication failed from {RemoteIp} for {Host}{Path}. Reason: {ErrorMessage}",
+                    remoteIp,
+                    host,
+                    path,
+                    context.Exception.Message
+                );
+                
+                // Keep console log for backward compatibility
+                Console.WriteLine($"[Auth] JWT validation failed: {context.Exception.Message}");
+                return Task.CompletedTask;
+            },
+            OnTokenValidated = context =>
+            {
+                var userId = context.Principal?.FindFirst("sub")?.Value;
+                Console.WriteLine($"[Auth] JWT validated for user: {userId}");
+                return Task.CompletedTask;
+            }
+        };
+    });
+
+builder.Services.AddAuthorization(options =>
+{
+    // Define "ApiUser" policy for all authenticated API access
+    options.AddPolicy("ApiUser", policy =>
+    {
+        policy.RequireAuthenticatedUser();
+    });
+});
+
+// Rate Limiting (security requirement - prevent brute force and DoS)
+builder.Services.AddRateLimiter(options =>
+{
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: partition => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 100,
+                Window = TimeSpan.FromSeconds(10),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0 // No queueing, reject immediately when limit exceeded
+            }));
+
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+});
+
 builder.Services.AddControllers();
 var app = builder.Build();
+
+// ✅ Validate SK plugins on startup (Day 2)
+if (!string.IsNullOrWhiteSpace(fastLlmApiKey) && !string.IsNullOrWhiteSpace(smartLlmApiKey))
+{
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var validator = scope.ServiceProvider.GetRequiredService<IPluginValidator>();
+        var validationResult = await validator.ValidateAllPluginsAsync();
+
+        if (!validationResult.IsValid)
+        {
+            Console.WriteLine("[SK] ❌ Plugin validation failed:");
+            foreach (var error in validationResult.Errors)
+                Console.WriteLine($"  - {error}");
+            
+            if (app.Environment.IsProduction())
+            {
+                throw new InvalidOperationException("SK plugin validation failed in production. Cannot start application.");
+            }
+        }
+        else
+        {
+            Console.WriteLine($"[SK] ✅ All {validationResult.ValidPlugins.Count} plugins validated successfully:");
+            foreach (var plugin in validationResult.ValidPlugins)
+                Console.WriteLine($"  - {plugin}");
+        }
+
+        if (validationResult.Warnings.Count > 0)
+        {
+            Console.WriteLine("[SK] ⚠️ Plugin warnings:");
+            foreach (var warning in validationResult.Warnings)
+                Console.WriteLine($"  - {warning}");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[SK] ❌ Plugin validation error: {ex.Message}");
+        if (app.Environment.IsProduction())
+            throw;
+    }
+}
 
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseExceptionHandler(errorApp =>
+{
+    errorApp.Run(async context =>
+    {
+        var feature = context.Features.Get<IExceptionHandlerPathFeature>();
+        if (feature is null)
+        {
+            return;
+        }
+
+        var loggerFactory = context.RequestServices.GetRequiredService<ILoggerFactory>();
+        var logger = loggerFactory.CreateLogger("GlobalExceptionHandler");
+
+        var exception = feature.Error;
+        var traceId = Activity.Current?.Id ?? context.TraceIdentifier;
+
+        logger.LogError(exception, "Unhandled exception {TraceId} at {RequestPath}", traceId, feature.Path);
+
+        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        context.Response.ContentType = "application/json";
+
+        object payload = app.Environment.IsDevelopment()
+            ? new { error = exception.GetType().Name, message = exception.Message, traceId }
+            : new { error = "InternalServerError", traceId };
+
+        await context.Response.WriteAsync(JsonSerializer.Serialize(payload));
+    });
+});
 
 static double? SafePct(double prev, double cur)
 {
@@ -220,8 +624,45 @@ static double? SafePct(double prev, double cur)
 
 static string NewRunId() => $"r_sales_{Guid.NewGuid():N}".ToLowerInvariant();
 
-app.UseCors("vite");
+app.UseCors("default");
+app.UseRateLimiter(); // Apply rate limiting before authentication
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapControllers();
+
+// ✅ Day 2: SK Orchestration Test Endpoint
+app.MapPost("/api/debug/sk-orchestrate", async (
+    HttpContext httpContext,
+    IChatOrchestratorService orchestrator,
+    DebugSkRequest req,
+    CancellationToken ct) =>
+{
+    try
+    {
+        // SECURITY: Extract userId from authenticated JWT token
+        var userIdClaim = httpContext.User?.FindFirst("sub")?.Value;
+        if (string.IsNullOrWhiteSpace(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Results.Problem(
+                title: "Unauthorized",
+                detail: "Valid JWT authentication required for debug endpoint.",
+                statusCode: 401
+            );
+        }
+
+        var result = await orchestrator.HandleQueryAsync(req.Query, userId, null, ct);
+        return Results.Ok(result);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(
+            title: "SK Orchestration Error",
+            detail: ex.Message,
+            statusCode: 500
+        );
+    }
+}).RequireAuthorization("ApiUser"); // Enforce JWT authentication with ApiUser policy
+
 app.MapGet("/api/debug/groq-ping", async (GroqJsonClient groq, CancellationToken ct) =>
 {
     // Instruct the model to return valid JSON immediately
@@ -316,6 +757,14 @@ app.MapGet("/api/debug/expense-spec-deep", async () =>
     {
         var path = Path.Combine(AppContext.BaseDirectory, "Planning", "Prompts", "reports.expense.yaml");
         var text = await File.ReadAllTextAsync(path);
+
+    app.MapGet("/api/debug/schema-mapping", (IDatabaseSchemaService schemaService, bool refresh = false) =>
+    {
+        var diagnostics = schemaService.GetDiagnostics(refresh);
+        return Results.Ok(diagnostics);
+    })
+    .WithName("DebugSchemaMapping")
+    .WithTags("Debug");
         // simple heuristics
         var hasTabs = text.Contains('\t');
         var beginsWithBom = text.Length > 0 && text[0] == '\uFEFF';
@@ -365,24 +814,6 @@ app.MapGet("/api/debug/expense-spec-deep", async () =>
     catch (Exception exOuter)
     {
         return Results.Ok(new { ok = false, ex = exOuter.GetType().FullName, ex_message = exOuter.Message });
-    }
-});
-
-// Global JSON error wrapper
-app.Use(async (ctx, next) =>
-{
-    try { await next(); }
-    catch (Exception ex)
-    {
-        ctx.Response.StatusCode = 500;
-        ctx.Response.ContentType = "application/json";
-        var payload = JsonSerializer.Serialize(new
-        {
-            error = ex.GetType().Name,
-            message = ex.Message,
-            stack = ex.ToString()
-        });
-        await ctx.Response.WriteAsync(payload);
     }
 });
 
@@ -2313,6 +2744,7 @@ app.Run();
 
 public sealed class RouteReq { public string? Input { get; set; } }
 public sealed record AssistantRequest(string Text, string? Domain);
+public sealed record DebugSkRequest(string Query);
 
 // -------------------------------
 // Helpers: sync trigger & debounce
