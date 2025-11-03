@@ -2737,7 +2737,7 @@ app.MapPost("/api/assistant", async (
         markdown = "Hi! How can I help?",
         router = new { intent = "chitchat", domain, confidence = conf }
     });
-});
+}).RequireAuthorization("ApiUser"); // Enforce JWT authentication with ApiUser policy
 
 builder.WebHost.UseUrls("http://0.0.0.0:5000");
 app.Run();
