@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabase";
+import { useAuth } from "../AuthContext";
 import "../stylecss/Assistant.css";
 import AssistantChat from "./AssistantChat";
 import prompts from "./prompts";
@@ -20,6 +21,7 @@ const newId = () =>
 
 const Assistant = () => {
   const navigate = useNavigate();
+  const { session } = useAuth(); // Get session with JWT token
   const [user, setUser] = useState(null);
 
   const [_activeWindow, setActiveWindow] = useState(null);
@@ -130,6 +132,12 @@ const Assistant = () => {
     
     const loadData = async () => {
       try {
+        // Wait for session to be available
+        if (!session || !session.access_token) {
+          setLoadingPanels(false);
+          return;
+        }
+
         // Fetch all domains in parallel for better performance
         const [salesReports, expenseReports, inventoryReports, salesForecasts, expenseForecasts] = await Promise.all([
           fetchRecentReports(2, "sales"),
@@ -157,16 +165,30 @@ const Assistant = () => {
 
     loadData();
     return () => { alive = false; };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]); // Session dependency is sufficient; fetch functions are stable
 
   // ===== API helper =====
   async function apiPost(path, body) {
+    // Check if session and access token exist
+    if (!session || !session.access_token) {
+      throw new Error("Authentication required. Please log in again.");
+    }
+
     const res = await fetch(`${API_BASE}${path}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${session.access_token}` // Add JWT token
+      },
       body: JSON.stringify(body || {}),
     });
+    
     if (!res.ok) {
+      // Handle 401 Unauthorized specifically
+      if (res.status === 401) {
+        throw new Error("Session expired. Please log in again.");
+      }
       throw new Error((await res.text()) || `HTTP ${res.status}`);
     }
     return res.json();
@@ -293,7 +315,21 @@ const Assistant = () => {
   // ===== Recent fetchers (optimized with better error handling) =====
   async function fetchRecentReports(limit = 2, domain = "sales") {
     try {
-      const res = await fetch(`${API_BASE}/api/reports/recent?domain=${encodeURIComponent(domain)}&limit=${limit}`);
+      // Check if session and access token exist
+      if (!session || !session.access_token) {
+        console.warn("No session available for fetching reports");
+        return [];
+      }
+
+      const res = await fetch(
+        `${API_BASE}/api/reports/recent?domain=${encodeURIComponent(domain)}&limit=${limit}`,
+        {
+          headers: {
+            "Authorization": `Bearer ${session.access_token}` // Add JWT token
+          }
+        }
+      );
+      
       if (!res.ok) {
         console.warn(`Failed to fetch reports for ${domain}:`, res.status);
         return [];
@@ -308,9 +344,21 @@ const Assistant = () => {
 
   async function fetchRecentForecasts(limit = 2, domain = "sales") {
     try {
+      // Check if session and access token exist
+      if (!session || !session.access_token) {
+        console.warn("No session available for fetching forecasts");
+        return [];
+      }
+
       const res = await fetch(
-        `${API_BASE}/api/forecasts/recent?domain=${encodeURIComponent(domain)}&limit=${limit}`
+        `${API_BASE}/api/forecasts/recent?domain=${encodeURIComponent(domain)}&limit=${limit}`,
+        {
+          headers: {
+            "Authorization": `Bearer ${session.access_token}` // Add JWT token
+          }
+        }
       );
+      
       if (!res.ok) {
         console.warn(`Failed to fetch forecasts for ${domain}:`, res.status);
         return [];
