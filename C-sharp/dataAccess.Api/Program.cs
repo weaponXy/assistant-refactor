@@ -3,7 +3,6 @@ using dataAccess.Api.Endpoints;
 using dataAccess.Api.Services;
 using dataAccess.Planning;
 using dataAccess.Planning.Nlq;
-using dataAccess.Planning.Time;
 using dataAccess.Planning.Validation;
 using dataAccess.Reports;
 using dataAccess.Services;
@@ -163,6 +162,8 @@ builder.Services.AddScoped<Func<string, CancellationToken, Task<string>>>(sp => 
     var spec = await ReportSpecLoader.LoadAsync(specFile, ct);
     return spec.Phase2System; // property from your ReportSpecLoader result
 });
+// Phase 4: Register IYamlReportRunner interface
+builder.Services.AddScoped<IYamlReportRunner, YamlReportRunner>();
 builder.Services.AddScoped<YamlReportRunner>();
 builder.Services.AddScoped<dataAccess.Reports.YamlIntentRunner>();
 builder.Services.AddSingleton<IReportRunStore, ReportRunStore>();
@@ -381,6 +382,12 @@ builder.Services.AddSingleton<IPluginValidator, PluginValidator>();
 
 // Telemetry Logger Service
 builder.Services.AddScoped<TelemetryLogger>();
+
+// Chat History Service (Phase 1: Slot-filling memory)
+builder.Services.AddScoped<ChatHistoryService>();
+
+// Phase 3: YAML-driven Runners with Slot Validation
+builder.Services.AddScoped<IForecastRunnerService, ForecastRunnerService>();
 
 // ==============================================================================
 // EXISTING SERVICES
@@ -2497,13 +2504,10 @@ app.MapPost("/api/assistant", async (
     {
         // ✅ normalize for reports (expenses → expense to match filename)
         var chosenDomain = NormalizeReportDomain(domain);
-        var tz = TimeZoneInfo.FindSystemTimeZoneById("Asia/Manila");
-        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(DateTime.UtcNow, tz).Date);
-        var per = ReportTimeResolver.Resolve(userText, today, DayOfWeek.Monday);
-        var userTextWithRange =
-        $"[PERIOD_START={per.Start:yyyy-MM-dd}][PERIOD_END={per.End:yyyy-MM-dd}]\n{userText}";
-
-        var ui = await yamlRunner.RunAsync(chosenDomain, userTextWithRange, ct);
+        
+        // Phase 3: Use YAML-driven slot-filling (no hardcoded fallbacks)
+        // The yamlRunner will handle slot validation and return clarification prompts if needed
+        var ui = await yamlRunner.RunAsync(chosenDomain, userText, ct);
 
         return Results.Json(new
         {

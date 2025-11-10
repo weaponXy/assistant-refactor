@@ -2,11 +2,17 @@ using Microsoft.SemanticKernel;
 using System.Text.Json;
 using System.Runtime.CompilerServices;
 using dataAccess.Services;
+using dataAccess.Planning;
+using dataAccess.Reports;
+using dataAccess.Contracts;
+using YamlDotNet.Serialization;
+using YamlDotNet.Serialization.NamingConventions;
 
 namespace dataAccess.Api.Services;
 
 /// <summary>
 /// Orchestrates the chat pipeline: Intent Classification → SQL Generation → Query Execution → Result Summarization
+/// Phase 4: Stateful 2-stage orchestrator with slot-filling validation
 /// </summary>
 public interface IChatOrchestratorService
 {
@@ -49,6 +55,13 @@ public class ChatOrchestratorService : IChatOrchestratorService
     private readonly SqlValidator _sqlValidator;
     private readonly ISafeSqlExecutor _safeSqlExecutor;
     private readonly int _maxResultRows;
+    
+    // Phase 4: New dependencies for slot-filling orchestration
+    private readonly ChatHistoryService _chatHistory;
+    private readonly PromptLoader _promptLoader;
+    private readonly IYamlReportRunner _reportRunner;
+    private readonly IForecastRunnerService _forecastRunner;
+    private readonly YamlIntentRunner _intentRunner;
 
     public ChatOrchestratorService(
         Kernel kernel,
@@ -57,7 +70,12 @@ public class ChatOrchestratorService : IChatOrchestratorService
         IConfiguration configuration,
         ILogger<ChatOrchestratorService> logger,
         SqlValidator sqlValidator,
-        ISafeSqlExecutor safeSqlExecutor)
+        ISafeSqlExecutor safeSqlExecutor,
+        ChatHistoryService chatHistory,
+        PromptLoader promptLoader,
+        IYamlReportRunner reportRunner,
+        IForecastRunnerService forecastRunner,
+        YamlIntentRunner intentRunner)
     {
         _kernel = kernel;
         _schemaService = schemaService;
@@ -66,6 +84,13 @@ public class ChatOrchestratorService : IChatOrchestratorService
         _sqlValidator = sqlValidator;
         _safeSqlExecutor = safeSqlExecutor;
         _maxResultRows = configuration.GetValue<int?>("SqlExecution:MaxRows") ?? 1000;
+        
+        // Phase 4 dependencies
+        _chatHistory = chatHistory;
+        _promptLoader = promptLoader;
+        _reportRunner = reportRunner;
+        _forecastRunner = forecastRunner;
+        _intentRunner = intentRunner;
     }
 
     public async Task<ChatOrchestrationResult> HandleQueryAsync(
@@ -84,61 +109,263 @@ public class ChatOrchestratorService : IChatOrchestratorService
 
         try
         {
-            _logger.LogInformation("Processing query for user {UserId}: {Query}", userId, userQuery);
+            _logger.LogInformation("[Phase 4] Processing query for user {UserId}: {Query}", userId, userQuery);
 
-            // Step 1: Classify Intent (with session context)
-            var intent = await ClassifyIntentAsync(userQuery, result.SessionId, cancellationToken);
-            result.Intent = intent;
-            result.IntentClassificationLatencyMs = (int)(DateTime.UtcNow - startTime).TotalMilliseconds;
+            // ═══════════════════════════════════════════════════════════════
+            // A. CHECK FOR PENDING STATE (Slot-Filling Resume)
+            // ═══════════════════════════════════════════════════════════════
+            var session = await _chatHistory.GetOrCreateSessionAsync(result.SessionId.ToString());
+            var (pendingPlanJson, pendingSlotName) = _chatHistory.GetPendingState(session);
+            
+            PlannerResult finalPlan;
 
-            _logger.LogInformation("Classified intent as: {Intent}", intent);
-
-            // Route based on intent
-            switch (intent.Trim())
+            if (pendingPlanJson != null)
             {
-                case "GetDataQuery":
+                // User is answering a clarification question - fill the slot
+                _logger.LogInformation("[Phase 4] Resuming slot-filling for slot: {SlotName}", pendingSlotName);
+                
+                finalPlan = PlannerResult.FromJsonDocument(pendingPlanJson) 
+                    ?? throw new InvalidOperationException("Failed to deserialize pending plan");
+
+                if (pendingSlotName == "sub_intent")
+                {
+                    // Stage 1: User provided the topic/sub-intent
+                    finalPlan.SubIntent = userQuery.Trim();
+                    _logger.LogInformation("[Phase 4] Filled sub_intent: {SubIntent}", finalPlan.SubIntent);
+                }
+                else if (pendingSlotName != null)
+                {
+                    // Stage 2: User provided a parameter value
+                    finalPlan.Slots[pendingSlotName] = userQuery.Trim();
+                    _logger.LogInformation("[Phase 4] Filled slot {SlotName}: {Value}", pendingSlotName, userQuery.Trim());
+                }
+                else
+                {
+                    throw new InvalidOperationException("Pending slot name is null");
+                }
+
+                // Clear pending state
+                await _chatHistory.ClearPendingStateAsync(session.Id);
+            }
+            else
+            {
+                // ═══════════════════════════════════════════════════════════════
+                // B. HANDLE NEW QUERY (Stage 1: Topic Check)
+                // ═══════════════════════════════════════════════════════════════
+                _logger.LogInformation("[Phase 4] Processing new query - classifying intent");
+                
+                var intentDoc = await _intentRunner.RunIntentAsync(userQuery, cancellationToken);
+                var intentResult = ParseIntentResult(intentDoc);
+                
+                result.Intent = intentResult.Intent;
+                result.IntentClassificationLatencyMs = (int)(DateTime.UtcNow - startTime).TotalMilliseconds;
+                
+                _logger.LogInformation("[Phase 4] Intent classified: {Intent}, Domain: {Domain}, Confidence: {Confidence}", 
+                    intentResult.Intent, intentResult.Domain, intentResult.Confidence);
+
+                // Check for ambiguous topic (Stage 1 clarification needed)
+                if ((intentResult.Intent.Equals("report", StringComparison.OrdinalIgnoreCase) || 
+                     intentResult.Intent.Equals("forecast", StringComparison.OrdinalIgnoreCase)) &&
+                    string.IsNullOrEmpty(intentResult.SubIntent))
+                {
+                    _logger.LogInformation("[Phase 4] Stage 1 clarification needed for intent: {Intent}", intentResult.Intent);
+                    
+                    // Load clarification prompt from router.intent.yaml
+                    var clarificationPrompt = GetClarificationPromptForIntent(intentResult.Intent);
+                    
+                    // Save pending state
+                    var pendingPlan = new PlannerResult
+                    {
+                        Intent = intentResult.Intent,
+                        Domain = intentResult.Domain,
+                        Confidence = intentResult.Confidence,
+                        UserText = userQuery
+                    };
+                    
+                    await _chatHistory.SavePendingStateAsync(session.Id, pendingPlan.ToJsonDocument(), "sub_intent");
+                    
+                    result.Response = clarificationPrompt;
+                    result.IsSuccess = true;
+                    result.TotalLatencyMs = (int)(DateTime.UtcNow - startTime).TotalMilliseconds;
+                    return result;
+                }
+
+                // Convert intent result to PlannerResult
+                finalPlan = new PlannerResult
+                {
+                    Intent = intentResult.Intent,
+                    Domain = intentResult.Domain,
+                    SubIntent = intentResult.SubIntent,
+                    Confidence = intentResult.Confidence,
+                    UserText = userQuery
+                };
+            }
+
+            // ═══════════════════════════════════════════════════════════════
+            // C. EXECUTE THE PLAN (Stage 2: Parameter Check)
+            // ═══════════════════════════════════════════════════════════════
+            _logger.LogInformation("[Phase 4] Executing plan for intent: {Intent}, SubIntent: {SubIntent}", 
+                finalPlan.Intent, finalPlan.SubIntent);
+            
+            OrchestrationStepResult stepResult;
+
+            switch (finalPlan.Intent.ToLowerInvariant())
+            {
+                case "report":
+                    stepResult = await _reportRunner.RunReportAsync(finalPlan, cancellationToken);
+                    break;
+
+                case "forecast":
+                case "forecasting":
+                    stepResult = await _forecastRunner.RunForecastAsync(finalPlan, cancellationToken);
+                    break;
+
+                case "chitchat":
+                    stepResult = new OrchestrationStepResult
+                    {
+                        IsSuccess = true,
+                        ReportData = new ReportResult
+                        {
+                            Title = "Chitchat Response",
+                            UiSpec = JsonDocument.Parse(JsonSerializer.Serialize(new { text = HandleChitChat(userQuery) }))
+                        }
+                    };
+                    break;
+
+                case "out_of_scope":
+                    stepResult = new OrchestrationStepResult
+                    {
+                        IsSuccess = true,
+                        ReportData = new ReportResult
+                        {
+                            Title = "Out of Scope",
+                            UiSpec = JsonDocument.Parse(JsonSerializer.Serialize(new { text = HandleOutOfScope() }))
+                        }
+                    };
+                    break;
+
+                case "nlq":
+                    // Fallback to old NLQ handler
                     await HandleDataQueryAsync(result, cancellationToken);
-                    break;
-
-                case "BusinessRuleQuery":
-                    result.Response = "Business rules RAG is not yet implemented. This feature is coming in Day 4!";
-                    result.IsSuccess = true;
-                    break;
-
-                case "ChitChat":
-                    result.Response = HandleChitChat(userQuery);
-                    result.IsSuccess = true;
-                    break;
-
-                case "Clarification":
-                    result.Response = HandleClarification(userQuery);
-                    result.IsSuccess = true;
-                    break;
-
-                case "OutOfScope":
-                    result.Response = HandleOutOfScope();
-                    result.IsSuccess = true;
-                    break;
+                    return result;
 
                 default:
-                    result.Response = "Sorry, I'm not sure how to handle that request. Can you rephrase it?";
-                    result.IsSuccess = false;
+                    stepResult = new OrchestrationStepResult
+                    {
+                        IsSuccess = false,
+                        ErrorMessage = $"Unknown intent: {finalPlan.Intent}"
+                    };
                     break;
             }
 
-            result.TotalLatencyMs = (int)(DateTime.UtcNow - startTime).TotalMilliseconds;
+            // ═══════════════════════════════════════════════════════════════
+            // D. PROCESS THE RESULT
+            // ═══════════════════════════════════════════════════════════════
+            if (stepResult.RequiresClarification)
+            {
+                // Stage 2: Parameter clarification needed
+                _logger.LogInformation("[Phase 4] Stage 2 clarification needed for parameter: {ParamName}", 
+                    stepResult.MissingParameterName);
+                
+                await _chatHistory.SavePendingStateAsync(
+                    session.Id, 
+                    stepResult.PendingPlan ?? finalPlan.ToJsonDocument(), 
+                    stepResult.MissingParameterName ?? "unknown");
+                
+                result.Response = stepResult.ClarificationPrompt ?? "Please provide more information.";
+                result.IsSuccess = true;
+            }
+            else if (stepResult.IsSuccess)
+            {
+                // Success - format the response
+                _logger.LogInformation("[Phase 4] Execution successful");
+                
+                if (stepResult.ReportData != null)
+                {
+                    // Report/Forecast result with structured data
+                    // Check if it's a simple text response (chitchat/out_of_scope)
+                    if (stepResult.ReportData.UiSpec != null && 
+                        stepResult.ReportData.UiSpec.RootElement.TryGetProperty("text", out var textProp))
+                    {
+                        result.Response = textProp.GetString() ?? "Operation completed successfully.";
+                    }
+                    else
+                    {
+                        result.Response = JsonSerializer.Serialize(stepResult.ReportData);
+                    }
+                }
+                else
+                {
+                    result.Response = "Operation completed successfully.";
+                }
+                
+                result.IsSuccess = true;
+            }
+            else
+            {
+                // Failure
+                _logger.LogWarning("[Phase 4] Execution failed: {Error}", stepResult.ErrorMessage);
+                result.Response = stepResult.ErrorMessage ?? "An error occurred.";
+                result.IsSuccess = false;
+                result.ErrorMessage = stepResult.ErrorMessage;
+            }
 
+            result.TotalLatencyMs = (int)(DateTime.UtcNow - startTime).TotalMilliseconds;
             return result;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing query: {Query}", userQuery);
+            _logger.LogError(ex, "[Phase 4] Error processing query: {Query}", userQuery);
             result.IsSuccess = false;
             result.ErrorMessage = ex.Message;
             result.Response = "Sorry, I encountered an error processing your request. Please try again.";
             result.TotalLatencyMs = (int)(DateTime.UtcNow - startTime).TotalMilliseconds;
             return result;
         }
+    }
+
+    // Helper: Parse intent classification result from JSON
+    private (string Intent, string? Domain, string? SubIntent, double Confidence) ParseIntentResult(JsonDocument doc)
+    {
+        var root = doc.RootElement;
+        var intent = root.TryGetProperty("intent", out var i) ? i.GetString() ?? "" : "";
+        var domain = root.TryGetProperty("domain", out var d) && d.ValueKind != JsonValueKind.Null ? d.GetString() : null;
+        var subIntent = root.TryGetProperty("sub_intent", out var si) ? si.GetString() : null;
+        var confidence = root.TryGetProperty("confidence", out var c) ? c.GetDouble() : 0.0;
+        
+        return (intent, domain, subIntent, confidence);
+    }
+
+    // Helper: Get clarification prompt from router.intent.yaml
+    private string GetClarificationPromptForIntent(string intent)
+    {
+        try
+        {
+            var routerYaml = _promptLoader.ReadText("router.intent.yaml");
+            var deserializer = new DeserializerBuilder()
+                .WithNamingConvention(UnderscoredNamingConvention.Instance)
+                .IgnoreUnmatchedProperties()
+                .Build();
+            
+            var config = deserializer.Deserialize<Dictionary<string, object>>(routerYaml);
+            
+            if (config.TryGetValue("intents", out var intentsObj) && intentsObj is Dictionary<object, object> intents)
+            {
+                if (intents.TryGetValue(intent, out var intentDefObj) && intentDefObj is Dictionary<object, object> intentDef)
+                {
+                    if (intentDef.TryGetValue("clarification_prompt", out var promptObj))
+                    {
+                        return promptObj?.ToString() ?? $"What type of {intent.ToLower()} would you like?";
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to load clarification prompt for intent: {Intent}", intent);
+        }
+
+        return $"What type of {intent.ToLower()} would you like?";
     }
 
     public async IAsyncEnumerable<StreamingChunk> StreamQueryAsync(

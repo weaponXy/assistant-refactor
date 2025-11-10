@@ -6,34 +6,33 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
+using dataAccess.Contracts;
+using dataAccess.Planning;
 using ISqlCatalog = dataAccess.Services.ISqlCatalog;
 using static dataAccess.Reports.SectionBundles;
 
 namespace dataAccess.Reports
 {
     /// <summary>
-    /// Deterministic Phase-1 (bundles) → SqlCatalog → YAML Phase-2 (LLM).
-    /// Helpers:
-    /// - DateRangeResolver (PH time + compare detection)
-    /// - YamlPreprocessor (guards, compare rules)
-    /// - IGroqJsonClient + GroqAdapter (model adapter)
-    /// - SectionBundles (fixed QID bundles)
-    /// 
-    /// API must provide a loader: Func<string, CancellationToken, Task<string>> (loads Phase-2 system text).
+    /// YAML-driven report runner with slot-filling validation.
+    /// Phase 3: Enforces YAML-defined required slots before execution.
+    /// No hardcoded fallbacks - all rules come from YAML configuration.
     /// </summary>
-    public sealed class YamlReportRunner
+    public sealed class YamlReportRunner : IYamlReportRunner
     {
         private readonly YamlPreprocessor _pre;
         private readonly ISqlCatalog _sql;
         private readonly IGroqJsonClient _groq;
         private readonly Func<string, CancellationToken, Task<string>> _loadPhase2;
         private readonly IReportRunStore _reportStore;
+        private readonly PromptLoader _promptLoader;
 
         public YamlReportRunner(
             YamlPreprocessor pre,
             ISqlCatalog sql,
             IGroqJsonClient groq,
             IReportRunStore reportStore,
+            PromptLoader promptLoader,
             Func<string, CancellationToken, Task<string>> loadPhase2System)
         {
             _pre = pre;
@@ -41,6 +40,199 @@ namespace dataAccess.Reports
             _groq = groq;
             _loadPhase2 = loadPhase2System;
             _reportStore = reportStore;
+            _promptLoader = promptLoader;
+        }
+
+        /// <summary>
+        /// Phase 3: Run report with YAML-driven slot validation.
+        /// NO hardcoded fallbacks - validates required slots from YAML before execution.
+        /// </summary>
+        public async Task<OrchestrationStepResult> RunReportAsync(PlannerResult plannerResult, CancellationToken ct = default)
+        {
+            try
+            {
+                // 1) Determine spec file based on domain
+                var domain = NormalizeDomain(plannerResult.Domain ?? "sales");
+                var specFile = domain switch
+                {
+                    "expenses" => "reports.expense.yaml",
+                    "sales" => "reports.sales.yaml",
+                    "inventory" => "reports.inventory.yaml",
+                    _ => throw new InvalidOperationException($"Unknown domain: {domain}")
+                };
+
+                // 2) Load spec to get slot definitions
+                var specYaml = _promptLoader.ReadText(specFile);
+                var spec = DomainPrompt.Parse(specYaml);
+
+                // 3) CRITICAL: Validate required slots from YAML (Phase 2 enforcement)
+                if (spec.Phase1?.Slots != null)
+                {
+                    foreach (var slotDef in spec.Phase1.Slots)
+                    {
+                        var slotName = slotDef.Key;
+                        var slotConfig = slotDef.Value;
+
+                        // If slot is required, it MUST exist and be non-empty
+                        if (slotConfig.Required)
+                        {
+                            if (!plannerResult.Slots.ContainsKey(slotName) || 
+                                string.IsNullOrWhiteSpace(plannerResult.Slots[slotName]))
+                            {
+                                // STOP: Return clarification request
+                                return new OrchestrationStepResult
+                                {
+                                    IsSuccess = false,
+                                    RequiresClarification = true,
+                                    MissingParameterName = slotName,
+                                    ClarificationPrompt = slotConfig.ClarificationPrompt ?? 
+                                        $"Please provide a value for {slotName}.",
+                                    PendingPlan = plannerResult.ToJsonDocument()
+                                };
+                            }
+                        }
+                    }
+                }
+
+                // 4) Validation passed - extract dates directly from slots (NO FALLBACKS)
+                if (!plannerResult.Slots.TryGetValue("period_start", out var startStr) || 
+                    string.IsNullOrWhiteSpace(startStr))
+                {
+                    throw new InvalidOperationException("period_start is required but missing from validated slots");
+                }
+
+                if (!plannerResult.Slots.TryGetValue("period_end", out var endStr) || 
+                    string.IsNullOrWhiteSpace(endStr))
+                {
+                    throw new InvalidOperationException("period_end is required but missing from validated slots");
+                }
+
+                // Parse dates (no defaults, no fallbacks)
+                if (!DateTime.TryParse(startStr, out var start))
+                {
+                    throw new InvalidOperationException($"Invalid period_start date format: {startStr}");
+                }
+
+                if (!DateTime.TryParse(endStr, out var end))
+                {
+                    throw new InvalidOperationException($"Invalid period_end date format: {endStr}");
+                }
+
+                // 5) Continue with existing report execution logic using validated dates
+                var compareStr = plannerResult.Slots.GetValueOrDefault("compare_to_prior", "false");
+                var compare = bool.TryParse(compareStr, out var cmp) && cmp;
+
+                // Calculate prior period if compare is enabled
+                string? prevStartStr = null;
+                string? prevEndStr = null;
+                if (compare)
+                {
+                    var days = (end - start).Days + 1;
+                    var prevEnd = start.AddDays(-1);
+                    var prevStart = prevEnd.AddDays(-(days - 1));
+                    prevStartStr = prevStart.ToString("yyyy-MM-dd");
+                    prevEndStr = prevEnd.ToString("yyyy-MM-dd");
+                }
+
+                // Build the hints structure for existing code compatibility
+                var hints = new YamlPreprocessor.Hints
+                {
+                    Start = startStr,
+                    End = endStr,
+                    Label = $"{start:MMM d}–{end:MMM d, yyyy}",
+                    CompareToPrior = compare,
+                    PrevStart = prevStartStr,
+                    PrevEnd = prevEndStr,
+                    Scope = plannerResult.Slots.GetValueOrDefault("scope", "overall"),
+                    ProductId = plannerResult.Slots.GetValueOrDefault("product_id"),
+                    TopK = plannerResult.Slots.TryGetValue("top_k", out var topKStr) && 
+                           int.TryParse(topKStr, out var topK) ? topK : 10
+                };
+
+                // Continue with existing batch execution...
+                var requests = BuildRequests(domain, hints);
+                var rows = await RunBatchAsync(domain, requests, ct);
+
+                var fmt = new
+                {
+                    currency = "PHP",
+                    symbol = "₱",
+                    locale = "en-PH",
+                    money_decimals = 2,
+                    pct_decimals = 2,
+                    use_thousands = true
+                };
+
+                var feature_flags = new { show_budget = false };
+
+                var sectionsPayload = requests
+                    .GroupBy(q => SectionId(domain, q.QueryId))
+                    .Select(g => new { id = g.Key, queries = g.Select(x => x.QueryId).ToArray() })
+                    .Cast<object>()
+                    .ToArray();
+
+                var phase2Input = new
+                {
+                    period = new { start = startStr, end = endStr, label = hints.Label },
+                    compare_to_prior = compare,
+                    sections = sectionsPayload,
+                    rows,
+                    fmt,
+                    feature_flags
+                };
+
+                var system = await _loadPhase2(specFile, ct);
+                var doc = await _groq.CompleteJsonAsyncReport(system, "render", new { input = phase2Input }, 0.0, ct);
+
+                // Save report run
+                var metaNode = new JsonObject
+                {
+                    ["filters"] = null,
+                    ["user_id"] = null,
+                    ["router_mode"] = "report"
+                };
+                using var metaDoc = JsonDocument.Parse(metaNode.ToJsonString());
+
+                var record = new ReportRecord(
+                    Domain: domain,
+                    Scope: hints.Scope ?? "overall",
+                    ReportType: "standard",
+                    ProductId: hints.ProductId,
+                    PeriodStart: startStr,
+                    PeriodEnd: endStr,
+                    PeriodLabel: hints.Label ?? $"{startStr}–{endStr}",
+                    CompareToPrior: compare,
+                    TopK: (short?)hints.TopK,
+                    YamlName: specFile,
+                    YamlVersion: null,
+                    ModelName: "groq/llama-3.3-70b-versatile",
+                    UiSpec: doc,
+                    Meta: metaDoc
+                );
+
+                var reportId = await _reportStore.SaveAsync(record, ct);
+
+                // Return success with report data
+                return new OrchestrationStepResult
+                {
+                    IsSuccess = true,
+                    ReportData = new ReportResult
+                    {
+                        Id = reportId,
+                        Title = $"{domain} Report",
+                        PeriodLabel = hints.Label,
+                        UiSpec = doc
+                    }
+                };
+            }
+            catch (Exception ex)
+            {
+                return new OrchestrationStepResult
+                {
+                    IsSuccess = false,
+                    ErrorMessage = ex.Message
+                };
+            }
         }
 
         public async Task<object> RunAsync(string domain, string userText, CancellationToken ct)
