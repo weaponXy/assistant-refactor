@@ -15,6 +15,18 @@ phase1:
     {"intent":"inventory_report","ack":true}
     Output JSON object only.
 
+  slots:
+    period_start:
+      type: date
+      required: true
+      desc: Start date (YYYY-MM-DD), Asia/Manila; inclusive.
+      clarification_prompt: "Sure, for what date range would you like that report?"
+    period_end:
+      type: date
+      required: true
+      desc: End date (YYYY-MM-DD), Asia/Manila; inclusive.
+      clarification_prompt: "Sure, for what date range would you like that report?"
+
 phase2:
   system: |
     You are the INVENTORY report renderer. Input:

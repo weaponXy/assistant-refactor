@@ -55,10 +55,12 @@ phase1:
       type: date
       required: true
       desc: Start date (YYYY-MM-DD), Asia/Manila; inclusive.
+      clarification_prompt: "Sure, for what date range would you like that report?"
     period_end:
       type: date
       required: true
       desc: End date (YYYY-MM-DD), Asia/Manila; inclusive.
+      clarification_prompt: "Sure, for what date range would you like that report?"
     compare_to_prior:
       type: boolean
       required: false

@@ -11,6 +11,21 @@ defaults:
     enforce_json_mode: true
     ordinals_bypass_ann: true
 
+# Phase 2: Intent definitions with sub-intents and clarification prompts
+intents:
+  Report:
+    clarification_prompt: "Sure, what kind of report would you like? (e.g., Sales, Inventory, or Expenses)"
+    sub_intents:
+      - Sales
+      - Inventory
+      - Expenses
+  
+  Forecast:
+    clarification_prompt: "Sure, what would you like to forecast? (e.g., Sales or Expenses)"
+    sub_intents:
+      - Sales
+      - Expenses
+
 system: |
   You are a strict intent/domain classifier for an analytics assistant.
   Input: a free-form user message (Tagalog/English).

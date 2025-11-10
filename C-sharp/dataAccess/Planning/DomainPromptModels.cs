@@ -24,9 +24,32 @@ public sealed class DomainPrompt
         public string? System { get; init; }
         public List<FewShot>? Few_Shot { get; init; } // optional
         public string? Fix_Format_Instruction { get; init; } // optional
+        [YamlMember(Alias = "slots")]
+        public Dictionary<string, ParameterDefinition>? Slots { get; init; } // Phase 2: slot definitions
     }
 
     public sealed class FewShot { public string? User { get; init; } public string? Output { get; init; } }
+
+    /// <summary>
+    /// Defines a parameter/slot with requirements and clarification prompts for slot-filling.
+    /// </summary>
+    public sealed class ParameterDefinition
+    {
+        [YamlMember(Alias = "type")]
+        public string? Type { get; init; }
+
+        [YamlMember(Alias = "desc")]
+        public string? Description { get; init; }
+
+        [YamlMember(Alias = "required")]
+        public bool Required { get; init; }
+
+        [YamlMember(Alias = "clarification_prompt")]
+        public string? ClarificationPrompt { get; init; }
+
+        [YamlMember(Alias = "default")]
+        public object? Default { get; init; }
+    }
 
     public sealed class Meta
     {

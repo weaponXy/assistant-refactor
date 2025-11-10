@@ -32,6 +32,18 @@ public class ChatSession
     [Column("metadata", TypeName = "jsonb")]
     public string? Metadata { get; set; }
 
+    /// <summary>
+    /// Stores serialized PlannerResultV2 JSON when waiting for user clarification
+    /// </summary>
+    [Column("pending_plan_json", TypeName = "jsonb")]
+    public string? PendingPlanJson { get; set; }
+
+    /// <summary>
+    /// Stores the name of the slot we are waiting for (e.g., "sub_intent", "date_range")
+    /// </summary>
+    [Column("pending_slot_name")]
+    public string? PendingSlotName { get; set; }
+
     // Navigation property for messages in this session
     public ICollection<ChatMessage> Messages { get; set; } = new List<ChatMessage>();
 
