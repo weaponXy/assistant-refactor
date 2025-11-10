@@ -57,7 +57,7 @@ public class ChatOrchestratorService : IChatOrchestratorService
     private readonly int _maxResultRows;
     
     // Phase 4: New dependencies for slot-filling orchestration
-    private readonly ChatHistoryService _chatHistory;
+    private readonly IChatHistoryService _chatHistory;
     private readonly PromptLoader _promptLoader;
     private readonly IYamlReportRunner _reportRunner;
     private readonly IForecastRunnerService _forecastRunner;
@@ -71,7 +71,7 @@ public class ChatOrchestratorService : IChatOrchestratorService
         ILogger<ChatOrchestratorService> logger,
         SqlValidator sqlValidator,
         ISafeSqlExecutor safeSqlExecutor,
-        ChatHistoryService chatHistory,
+        IChatHistoryService chatHistory,
         PromptLoader promptLoader,
         IYamlReportRunner reportRunner,
         IForecastRunnerService forecastRunner,

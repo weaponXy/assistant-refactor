@@ -23,4 +23,11 @@
       <Link>Plugins\%(RecursiveDir)%(Filename)%(Extension)</Link>
     </Content>
   </ItemGroup>
+  <!-- Copy Planning/Prompts directory for slot-filling tests -->
+  <ItemGroup>
+    <Content Include="..\dataAccess\Planning\Prompts\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>Planning\Prompts\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </Content>
+  </ItemGroup>
 </Project>
