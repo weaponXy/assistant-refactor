@@ -162,10 +162,11 @@ builder.Services.AddScoped<Func<string, CancellationToken, Task<string>>>(sp => 
     var spec = await ReportSpecLoader.LoadAsync(specFile, ct);
     return spec.Phase2System; // property from your ReportSpecLoader result
 });
-// Phase 4: Register IYamlReportRunner interface
+// Phase 4: Register IYamlReportRunner and IYamlIntentRunner interfaces
 builder.Services.AddScoped<IYamlReportRunner, YamlReportRunner>();
 builder.Services.AddScoped<YamlReportRunner>();
-builder.Services.AddScoped<dataAccess.Reports.YamlIntentRunner>();
+builder.Services.AddScoped<IYamlIntentRunner, dataAccess.Reports.YamlIntentRunner>();
+builder.Services.AddScoped<dataAccess.Reports.YamlIntentRunner>(); // Keep for backward compatibility
 builder.Services.AddSingleton<IReportRunStore, ReportRunStore>();
 builder.Services.AddSingleton<TimeResolver>();
 builder.Services.AddSingleton<CapabilityGuard>();

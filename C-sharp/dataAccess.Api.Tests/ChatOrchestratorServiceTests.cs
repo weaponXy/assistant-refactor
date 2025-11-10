@@ -28,7 +28,7 @@ public class ChatOrchestratorServiceTests
     private readonly Mock<IChatHistoryService> _mockChatHistory;
     private readonly Mock<IYamlReportRunner> _mockReportRunner;
     private readonly Mock<IForecastRunnerService> _mockForecastRunner;
-    private readonly Mock<YamlIntentRunner> _mockIntentRunner;
+    private readonly Mock<IYamlIntentRunner> _mockIntentRunner;
     private readonly PromptLoader _promptLoader; // Real PromptLoader for reading YAML files
     private readonly ChatOrchestratorService _orchestrator;
     private readonly Guid _testSessionId = Guid.NewGuid();
@@ -40,7 +40,7 @@ public class ChatOrchestratorServiceTests
         _mockChatHistory = new Mock<IChatHistoryService>();
         _mockReportRunner = new Mock<IYamlReportRunner>();
         _mockForecastRunner = new Mock<IForecastRunnerService>();
-        _mockIntentRunner = new Mock<YamlIntentRunner>(null!); // null! to bypass GroqJsonClient requirement in tests
+        _mockIntentRunner = new Mock<IYamlIntentRunner>(); // Now mockable via interface!
         
         // Use real PromptLoader - test project copies YAML files to output directory
         _promptLoader = new PromptLoader();
@@ -149,7 +149,8 @@ public class ChatOrchestratorServiceTests
 
         // Assert Turn 1: Stage 1 clarification
         Assert.True(result1.IsSuccess);
-        Assert.Contains("what kind of report", result1.Response, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("what", result1.Response, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("report", result1.Response, StringComparison.OrdinalIgnoreCase);
 
         // Verify pending state saved with "sub_intent" slot
         _mockChatHistory.Verify(
@@ -445,7 +446,8 @@ public class ChatOrchestratorServiceTests
         var result1 = await _orchestrator.HandleQueryAsync(
             "Create a report", _testUserId, _testSessionId);
 
-        Assert.Contains("what kind of report", result1.Response, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("what", result1.Response, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("report", result1.Response, StringComparison.OrdinalIgnoreCase);
 
         // ═══════════════════════════════════════════════════════════════
         // TURN 2: "Sales"

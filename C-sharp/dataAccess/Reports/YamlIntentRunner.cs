@@ -9,8 +9,11 @@ using YamlDotNet.Serialization.NamingConventions;
 
 namespace dataAccess.Reports
 {
-    // Dedicated runner for intent classification using the chat model
-    public class YamlIntentRunner
+    /// <summary>
+    /// Dedicated runner for intent classification using the chat model.
+    /// Implements IYamlIntentRunner for testability and loose coupling.
+    /// </summary>
+    public class YamlIntentRunner : IYamlIntentRunner
     {
         private readonly GroqJsonClient _groq;
         private readonly string _intentYamlPath;
