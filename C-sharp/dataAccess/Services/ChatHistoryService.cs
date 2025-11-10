@@ -5,10 +5,21 @@ using Microsoft.EntityFrameworkCore;
 namespace dataAccess.Services;
 
 /// <summary>
+/// Interface for managing chat session state and conversation memory.
+/// </summary>
+public interface IChatHistoryService
+{
+    Task<ChatSession> GetOrCreateSessionAsync(string? sessionId);
+    Task SavePendingStateAsync(Guid sessionId, JsonDocument plan, string missingSlotName);
+    Task ClearPendingStateAsync(Guid sessionId);
+    (JsonDocument? Plan, string? SlotName) GetPendingState(ChatSession session);
+}
+
+/// <summary>
 /// Service for managing chat session state and conversation memory.
 /// Handles saving/loading pending plan state for slot-filling clarification flow.
 /// </summary>
-public sealed class ChatHistoryService
+public sealed class ChatHistoryService : IChatHistoryService
 {
     private readonly AiDbContext _aiDb;
 

@@ -11,6 +11,9 @@ using Microsoft.SemanticKernel;
 using Microsoft.EntityFrameworkCore;
 using dataAccess.Api.Services;
 using dataAccess.Services;
+using dataAccess.Planning;
+using dataAccess.Reports;
+using dataAccess.Contracts;
 using Shared.Allowlists;
 
 #nullable enable
@@ -76,6 +79,13 @@ public class StreamingTests
         );
         var kernel = kernelBuilder.Build();
 
+        // Phase 4: Mock the new dependencies
+        var mockChatHistory = new Mock<IChatHistoryService>();
+        var mockPromptLoader = new PromptLoader(); // Use real PromptLoader
+        var mockReportRunner = new Mock<IYamlReportRunner>();
+        var mockForecastRunner = new Mock<IForecastRunnerService>();
+        var mockIntentRunner = new Mock<YamlIntentRunner>(null!); // null! to bypass GroqJsonClient
+
         var orchestrator = new ChatOrchestratorService(
             kernel,
             _mockSchemaService.Object,
@@ -83,7 +93,12 @@ public class StreamingTests
             _configuration,
             _mockLogger.Object,
             _sqlValidator,
-            _safeSqlExecutor.Object
+            _safeSqlExecutor.Object,
+            mockChatHistory.Object,
+            mockPromptLoader,
+            mockReportRunner.Object,
+            mockForecastRunner.Object,
+            mockIntentRunner.Object
         );
 
         // When - Stream a query (will fail at LLM call, but we can test structure)

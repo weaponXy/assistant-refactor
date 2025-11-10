@@ -384,7 +384,8 @@ builder.Services.AddSingleton<IPluginValidator, PluginValidator>();
 builder.Services.AddScoped<TelemetryLogger>();
 
 // Chat History Service (Phase 1: Slot-filling memory)
-builder.Services.AddScoped<ChatHistoryService>();
+builder.Services.AddScoped<IChatHistoryService, ChatHistoryService>();
+builder.Services.AddScoped<ChatHistoryService>(); // Keep for backward compatibility
 
 // Phase 3: YAML-driven Runners with Slot Validation
 builder.Services.AddScoped<IForecastRunnerService, ForecastRunnerService>();
