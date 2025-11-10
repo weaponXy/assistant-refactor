@@ -84,7 +84,7 @@ public class StreamingTests
         var mockPromptLoader = new PromptLoader(); // Use real PromptLoader
         var mockReportRunner = new Mock<IYamlReportRunner>();
         var mockForecastRunner = new Mock<IForecastRunnerService>();
-        var mockIntentRunner = new Mock<YamlIntentRunner>(null!); // null! to bypass GroqJsonClient
+        var mockIntentRunner = new Mock<IYamlIntentRunner>(); // Now mockable via interface!
 
         var orchestrator = new ChatOrchestratorService(
             kernel,

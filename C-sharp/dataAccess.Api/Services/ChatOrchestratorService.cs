@@ -61,7 +61,7 @@ public class ChatOrchestratorService : IChatOrchestratorService
     private readonly PromptLoader _promptLoader;
     private readonly IYamlReportRunner _reportRunner;
     private readonly IForecastRunnerService _forecastRunner;
-    private readonly YamlIntentRunner _intentRunner;
+    private readonly IYamlIntentRunner _intentRunner;
 
     public ChatOrchestratorService(
         Kernel kernel,
@@ -75,7 +75,7 @@ public class ChatOrchestratorService : IChatOrchestratorService
         PromptLoader promptLoader,
         IYamlReportRunner reportRunner,
         IForecastRunnerService forecastRunner,
-        YamlIntentRunner intentRunner)
+        IYamlIntentRunner intentRunner)
     {
         _kernel = kernel;
         _schemaService = schemaService;
