@@ -2179,8 +2179,8 @@ app.MapPost("/api/assistant", async (
     {
         try
         {
-            // Use YamlIntentRunner for LLM-based routing
-            using var doc = await intentRunner.RunIntentAsync(userText, ct);
+            // Use YamlIntentRunner for LLM-based routing (no history for minimal endpoint)
+            using var doc = await intentRunner.RunIntentAsync(userText, null, ct);
             var root = doc.RootElement;
 
             intent = root.TryGetProperty("intent", out var iEl) && iEl.ValueKind == JsonValueKind.String

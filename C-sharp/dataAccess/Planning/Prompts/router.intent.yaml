@@ -27,14 +27,45 @@ intents:
       - Expenses
 
 system: |
-  You are a strict intent/domain classifier for an analytics assistant.
-  Input: a free-form user message (Tagalog/English).
+  You are a strict intent/domain classifier for an analytics assistant with conversational memory.
+  Input: a free-form user message (Tagalog/English) with optional chat history for context.
   Output ONLY STRICT JSON with this schema:
   {
     "intent": "faq" | "forecasting" | "report" | "nlq" | "chitchat" | "out_of_scope",
     "domain": "sales" | "expenses" | null,
     "confidence": 0.0-1.0
   }
+
+  ## CONVERSATIONAL MEMORY - CRITICAL
+  You have access to chat history (previous user and assistant messages).
+  Use this history to understand context and resolve ambiguous follow-up questions.
+  
+  **Example of using history:**
+  Turn 1:
+    User: "Show sales for today."
+    Assistant: "Sales for today are ₱10,000."
+  Turn 2 (current):
+    User: "How about inventory?"
+    
+  In Turn 2, you should infer that the user still wants data for "today" based on the history.
+  Response: { "intent": "nlq", "domain": null, "confidence": 0.9 }
+  
+  **Example of context switch (ignoring history):**
+  Turn 1:
+    User: "Show sales for today."
+    Assistant: "Sales for today are ₱10,000."
+  Turn 2 (current):
+    User: "Forecast my expenses for next month."
+    
+  In Turn 2, the user is switching topics. The word "forecast" and "next month" indicate a new request.
+  Response: { "intent": "forecasting", "domain": "expenses", "confidence": 0.95 }
+  
+  **Guidelines for using history:**
+  1. If the current query is a follow-up (e.g., "how about...", "what about...", "and..."), 
+     inherit context (date ranges, topics) from the most recent assistant response.
+  2. If the current query contains explicit new information (new dates, new intents, new topics),
+     treat it as a fresh request and ignore previous context.
+  3. Pronouns like "that date", "that period", "those results" refer to the previous exchange.
 
   ## CRITICAL: Out-of-Scope Detection
   If the user asks about topics COMPLETELY UNRELATED to business, analytics, or the BuiswAIz system, return:
@@ -308,3 +339,32 @@ examples:
   - input: "thank you"
     output: |
       { "intent": "chitchat", "domain": null, "confidence": 0.95 }
+
+  # ═══════════════════════════════════════════════════════════════
+  # CONVERSATIONAL MEMORY - Follow-up Questions
+  # ═══════════════════════════════════════════════════════════════
+  # Note: These examples assume chat history is provided in the API call
+  
+  - input: "how about inventory?"
+    context: "Previous: User asked 'sales for today', system responded with sales data"
+    output: |
+      { "intent": "nlq", "domain": null, "confidence": 0.9 }
+    explanation: "Follow-up question - user wants inventory for the same period (today)"
+
+  - input: "what about expenses?"
+    context: "Previous: User asked 'forecast sales next week', system provided forecast"
+    output: |
+      { "intent": "forecasting", "domain": "expenses", "confidence": 0.9 }
+    explanation: "Follow-up question - user wants forecast for expenses (same future period)"
+
+  - input: "and for last month?"
+    context: "Previous: User asked 'show sales this month', system showed current month sales"
+    output: |
+      { "intent": "nlq", "domain": "sales", "confidence": 0.85 }
+    explanation: "Follow-up with explicit new date - user wants sales but for last month instead"
+
+  - input: "forecast next week"
+    context: "Previous: User asked 'show sales for today', system responded with sales data"
+    output: |
+      { "intent": "forecasting", "domain": null, "confidence": 0.85 }
+    explanation: "Context switch - explicit new intent (forecast) overrides previous query context"

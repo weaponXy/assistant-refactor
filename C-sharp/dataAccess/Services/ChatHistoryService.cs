@@ -13,6 +13,22 @@ public interface IChatHistoryService
     Task SavePendingStateAsync(Guid sessionId, JsonDocument plan, string missingSlotName);
     Task ClearPendingStateAsync(Guid sessionId);
     (JsonDocument? Plan, string? SlotName) GetPendingState(ChatSession session);
+    
+    /// <summary>
+    /// Adds a message (user or assistant) to the conversation history.
+    /// </summary>
+    /// <param name="sessionId">The chat session ID</param>
+    /// <param name="role">The role: "user" or "assistant"</param>
+    /// <param name="content">The message content</param>
+    Task AddMessageToHistoryAsync(Guid sessionId, string role, string content);
+    
+    /// <summary>
+    /// Retrieves recent messages from the conversation history.
+    /// </summary>
+    /// <param name="sessionId">The chat session ID</param>
+    /// <param name="limit">Maximum number of messages to retrieve (default: 5)</param>
+    /// <returns>List of chat messages ordered by creation time (oldest first)</returns>
+    Task<List<ChatMessage>> GetRecentMessagesAsync(Guid sessionId, int limit = 5);
 }
 
 /// <summary>
@@ -142,5 +158,47 @@ public sealed class ChatHistoryService : IChatHistoryService
             // If JSON is corrupted, return null
             return (null, null);
         }
+    }
+
+    /// <summary>
+    /// Adds a message (user or assistant) to the conversation history.
+    /// This enables the AI to maintain context across multiple turns.
+    /// </summary>
+    /// <param name="sessionId">The chat session ID</param>
+    /// <param name="role">The role: "user" or "assistant"</param>
+    /// <param name="content">The message content</param>
+    public async Task AddMessageToHistoryAsync(Guid sessionId, string role, string content)
+    {
+        var message = new ChatMessage
+        {
+            Id = Guid.NewGuid(),
+            SessionId = sessionId,
+            Role = role,
+            Content = content,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _aiDb.ChatMessages.Add(message);
+        await _aiDb.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Retrieves recent messages from the conversation history.
+    /// Messages are ordered chronologically (oldest first) to maintain conversation flow.
+    /// </summary>
+    /// <param name="sessionId">The chat session ID</param>
+    /// <param name="limit">Maximum number of messages to retrieve (default: 5)</param>
+    /// <returns>List of chat messages ordered by creation time (oldest first)</returns>
+    public async Task<List<ChatMessage>> GetRecentMessagesAsync(Guid sessionId, int limit = 5)
+    {
+        var messages = await _aiDb.ChatMessages
+            .Where(m => m.SessionId == sessionId)
+            .OrderByDescending(m => m.CreatedAt)
+            .Take(limit)
+            .ToListAsync();
+
+        // Reverse to get chronological order (oldest first)
+        messages.Reverse();
+        return messages;
     }
 }

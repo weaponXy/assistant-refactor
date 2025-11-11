@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using dataAccess.Entities;
 using dataAccess.LLM;
 using System.Text.Json;
 using YamlDotNet.Serialization;
@@ -12,6 +15,7 @@ namespace dataAccess.Reports
     /// <summary>
     /// Dedicated runner for intent classification using the chat model.
     /// Implements IYamlIntentRunner for testability and loose coupling.
+    /// Supports conversational memory for context-aware intent classification.
     /// </summary>
     public class YamlIntentRunner : IYamlIntentRunner
     {
@@ -25,7 +29,7 @@ namespace dataAccess.Reports
             _intentYamlPath = Path.Combine(AppContext.BaseDirectory, "Planning", "Prompts", "router.intent.yaml");
         }
 
-        public async Task<JsonDocument> RunIntentAsync(string userText, CancellationToken ct)
+        public async Task<JsonDocument> RunIntentAsync(string userText, List<ChatMessage>? history, CancellationToken ct)
         {
             var yaml = await File.ReadAllTextAsync(_intentYamlPath, ct);
             var des = new DeserializerBuilder().Build();
@@ -40,7 +44,8 @@ namespace dataAccess.Reports
             }
             catch { }
 
-            using var doc = await _groq.CompleteJsonAsyncChat(systemPrompt, userText, null, temperature, ct);
+            // Pass the history to the Groq client for conversational context
+            using var doc = await _groq.CompleteJsonAsyncChat(systemPrompt, userText, history, temperature, ct);
             // Return the parsed JSON document
             return JsonDocument.Parse(doc.RootElement.GetRawText());
         }
