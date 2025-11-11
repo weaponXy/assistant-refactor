@@ -154,7 +154,11 @@ public class ChatOrchestratorService : IChatOrchestratorService
                 // ═══════════════════════════════════════════════════════════════
                 _logger.LogInformation("[Phase 4] Processing new query - classifying intent");
                 
-                var intentDoc = await _intentRunner.RunIntentAsync(userQuery, cancellationToken);
+                // Fetch conversation history for context
+                var history = await _chatHistory.GetRecentMessagesAsync(session.Id);
+                _logger.LogInformation("[Phase 4] Fetched {Count} messages from conversation history", history.Count);
+                
+                var intentDoc = await _intentRunner.RunIntentAsync(userQuery, history, cancellationToken);
                 var intentResult = ParseIntentResult(intentDoc);
                 
                 result.Intent = intentResult.Intent;
@@ -311,6 +315,22 @@ public class ChatOrchestratorService : IChatOrchestratorService
             }
 
             result.TotalLatencyMs = (int)(DateTime.UtcNow - startTime).TotalMilliseconds;
+            
+            // ═══════════════════════════════════════════════════════════════
+            // E. SAVE TO CONVERSATION HISTORY (The "Array")
+            // ═══════════════════════════════════════════════════════════════
+            try
+            {
+                await _chatHistory.AddMessageToHistoryAsync(session.Id, "user", userQuery);
+                await _chatHistory.AddMessageToHistoryAsync(session.Id, "assistant", result.Response);
+                _logger.LogInformation("[Phase 4] Saved conversation turn to history");
+            }
+            catch (Exception historyEx)
+            {
+                // Don't fail the entire request if history save fails
+                _logger.LogWarning(historyEx, "[Phase 4] Failed to save conversation history");
+            }
+            
             return result;
         }
         catch (Exception ex)

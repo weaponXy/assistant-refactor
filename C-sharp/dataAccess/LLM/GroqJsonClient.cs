@@ -76,6 +76,15 @@ public sealed class GroqJsonClient
         CancellationToken ct = default)
         => CompleteJsonAsync(system, user, data, _chatModel, temperature, ct);
 
+    // Overload for chat with conversational history
+    public Task<JsonDocument> CompleteJsonAsyncChat(
+        string system,
+        string user,
+        List<Entities.ChatMessage>? history,
+        double temperature = 0.0,
+        CancellationToken ct = default)
+        => CompleteJsonAsyncChatWithHistory(system, user, history, _chatModel, temperature, ct);
+
     // Use this for reports: client.CompleteJsonAsyncReport(...)
     public Task<JsonDocument> CompleteJsonAsyncReport(
         string system,
@@ -117,6 +126,50 @@ public sealed class GroqJsonClient
             temperature = temperature,
             response_format = new { type = "json_object" },
             messages = BuildMessages(strictSystem, user, data)
+        };
+
+        using var httpContent = new StringContent(JsonSerializer.Serialize(req, _jsonOpts), Encoding.UTF8, "application/json");
+        var resp = await SendWithRetriesAsync(() => _http.PostAsync("chat/completions", httpContent, ct), ct);
+
+        var txt = await resp.Content.ReadAsStringAsync(ct);
+        if (!resp.IsSuccessStatusCode)
+            throw new HttpRequestException($"Groq HTTP {(int)resp.StatusCode} {resp.StatusCode}: {txt}");
+
+        using var outer = JsonDocument.Parse(txt);
+        var content = outer.RootElement
+            .GetProperty("choices")[0]
+            .GetProperty("message")
+            .GetProperty("content")
+            .GetString();
+
+        if (string.IsNullOrWhiteSpace(content))
+            throw new InvalidOperationException("Groq returned empty content (no assistant message).");
+
+        return EnsureJson(content!);
+    }
+
+    /// <summary>
+    /// Strict JSON-mode completion with conversational history for context-aware responses.
+    /// </summary>
+    private async Task<JsonDocument> CompleteJsonAsyncChatWithHistory(
+        string system,
+        string user,
+        List<Entities.ChatMessage>? history,
+        string model,
+        double temperature,
+        CancellationToken ct = default)
+    {
+        var strictSystem =
+            (system ?? string.Empty).Trim() +
+            "\n\nYou MUST return ONLY strict JSON. No explanations, no markdown, no code fences. " +
+            "If unsure, return an empty JSON object {}.";
+
+        var req = new
+        {
+            model = model,
+            temperature = temperature,
+            response_format = new { type = "json_object" },
+            messages = BuildMessagesWithHistory(strictSystem, user, history)
         };
 
         using var httpContent = new StringContent(JsonSerializer.Serialize(req, _jsonOpts), Encoding.UTF8, "application/json");
@@ -198,6 +251,28 @@ public sealed class GroqJsonClient
             new { role = "system", content = "Tool state:\n" + toolStateJson },
             new { role = "user",   content = user }
         };
+    }
+
+    private static object[] BuildMessagesWithHistory(string system, string user, List<Entities.ChatMessage>? history)
+    {
+        var messages = new List<object>
+        {
+            new { role = "system", content = system }
+        };
+
+        // Add conversation history if available (for context)
+        if (history != null && history.Count > 0)
+        {
+            foreach (var msg in history)
+            {
+                messages.Add(new { role = msg.Role, content = msg.Content });
+            }
+        }
+
+        // Add the current user message
+        messages.Add(new { role = "user", content = user });
+
+        return messages.ToArray();
     }
 
     private static JsonDocument EnsureJson(string content)

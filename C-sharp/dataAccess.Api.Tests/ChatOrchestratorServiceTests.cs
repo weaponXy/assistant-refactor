@@ -42,6 +42,15 @@ public class ChatOrchestratorServiceTests
         _mockForecastRunner = new Mock<IForecastRunnerService>();
         _mockIntentRunner = new Mock<IYamlIntentRunner>(); // Now mockable via interface!
         
+        // Setup default mocks for conversational memory methods
+        _mockChatHistory
+            .Setup(x => x.GetRecentMessagesAsync(It.IsAny<Guid>(), It.IsAny<int>()))
+            .ReturnsAsync(new List<ChatMessage>()); // Return empty history by default
+        
+        _mockChatHistory
+            .Setup(x => x.AddMessageToHistoryAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>()))
+            .Returns(Task.CompletedTask);
+        
         // Use real PromptLoader - test project copies YAML files to output directory
         _promptLoader = new PromptLoader();
 
@@ -135,7 +144,7 @@ public class ChatOrchestratorServiceTests
         }");
 
         _mockIntentRunner
-            .Setup(x => x.RunIntentAsync("Create a report", It.IsAny<CancellationToken>()))
+            .Setup(x => x.RunIntentAsync("Create a report", It.IsAny<List<ChatMessage>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(intentResult);
 
         // Note: GetClarificationPromptForIntent reads from router.intent.yaml file (copied to test output)
@@ -261,7 +270,7 @@ public class ChatOrchestratorServiceTests
         }");
 
         _mockIntentRunner
-            .Setup(x => x.RunIntentAsync("Create a sales report", It.IsAny<CancellationToken>()))
+            .Setup(x => x.RunIntentAsync("Create a sales report", It.IsAny<List<ChatMessage>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(intentResult);
 
         // Mock report runner: Missing "period_start" parameter
@@ -348,7 +357,7 @@ public class ChatOrchestratorServiceTests
         }");
 
         _mockIntentRunner
-            .Setup(x => x.RunIntentAsync("Create a sales report for yesterday", It.IsAny<CancellationToken>()))
+            .Setup(x => x.RunIntentAsync("Create a sales report for yesterday", It.IsAny<List<ChatMessage>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(intentResult);
 
         // Mock report runner: Successful execution (no clarification)
@@ -554,5 +563,179 @@ public class ChatOrchestratorServiceTests
         _mockReportRunner.Verify(
             x => x.RunReportAsync(It.IsAny<PlannerResult>(), It.IsAny<CancellationToken>()),
             Times.Exactly(2)); // Called in Turn 2 and Turn 3
+    }
+
+    [Fact]
+    public async Task Should_Handle_Forecast_Clarification_And_Execution()
+    {
+        // ═══════════════════════════════════════════════════════════════
+        // SCENARIO: User requests a forecast but doesn't specify days
+        // Expected: Stage 2 clarification for "forecast_days" slot
+        // ═══════════════════════════════════════════════════════════════
+
+        // ═══════════════════════════════════════════════════════════════
+        // TURN 1: User says "forecast my sales"
+        // ═══════════════════════════════════════════════════════════════
+
+        // Mock intent classification (forecast.sales with sub_intent, but no forecast_days slot)
+        var intentResult = JsonDocument.Parse(@"{
+            ""intent"": ""forecast"",
+            ""domain"": ""sales"",
+            ""sub_intent"": ""sales"",
+            ""confidence"": 0.95,
+            ""slots"": {}
+        }");
+
+        _mockIntentRunner
+            .Setup(x => x.RunIntentAsync("forecast my sales", It.IsAny<List<ChatMessage>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(intentResult);
+
+        // Mock session state (no pending state initially)
+        var testSession = new ChatSession
+        {
+            Id = _testSessionId,
+            UserId = _testUserId,
+            StartedAt = DateTime.UtcNow,
+            LastActivityAt = DateTime.UtcNow,
+            PendingPlanJson = null,
+            PendingSlotName = null
+        };
+
+        _mockChatHistory
+            .Setup(x => x.GetOrCreateSessionAsync(_testSessionId.ToString()))
+            .ReturnsAsync(testSession);
+
+        _mockChatHistory
+            .Setup(x => x.GetPendingState(It.IsAny<ChatSession>()))
+            .Returns(((JsonDocument)null, (string)null));
+
+        // Mock ForecastRunner to return clarification request for missing forecast_days
+        var clarificationResult = new OrchestrationStepResult
+        {
+            IsSuccess = false,
+            RequiresClarification = true,
+            MissingParameterName = "forecast_days",
+            ClarificationPrompt = "Sure, for how many days into the future would you like to forecast?",
+            PendingPlan = new PlannerResult
+            {
+                Intent = "forecast",
+                SubIntent = "sales",
+                Domain = "sales",
+                Confidence = 0.95,
+                Slots = new Dictionary<string, string>()
+            }.ToJsonDocument()
+        };
+
+        _mockForecastRunner
+            .Setup(x => x.RunForecastAsync(
+                It.Is<PlannerResult>(p => 
+                    p.Intent == "forecast" && 
+                    p.SubIntent == "sales" &&
+                    !p.Slots.ContainsKey("forecast_days")),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(clarificationResult);
+
+        // Execute Turn 1
+        var result1 = await _orchestrator.HandleQueryAsync(
+            "forecast my sales",
+            _testUserId,
+            _testSessionId,
+            CancellationToken.None);
+
+        // Assert Turn 1: Stage 2 clarification for forecast_days
+        Assert.True(result1.IsSuccess);
+        Assert.Contains("how many days", result1.Response, StringComparison.OrdinalIgnoreCase);
+
+        // Verify pending state saved with "forecast_days" slot
+        _mockChatHistory.Verify(
+            x => x.SavePendingStateAsync(
+                _testSessionId,
+                It.IsAny<JsonDocument>(),
+                "forecast_days"),
+            Times.Once);
+
+        // ═══════════════════════════════════════════════════════════════
+        // TURN 2: User says "30 days"
+        // ═══════════════════════════════════════════════════════════════
+
+        // Mock pending state from Turn 1
+        var pendingPlan = new PlannerResult
+        {
+            Intent = "forecast",
+            SubIntent = "sales",
+            Domain = "sales",
+            Confidence = 0.95,
+            Slots = new Dictionary<string, string>()
+        };
+
+        _mockChatHistory
+            .Setup(x => x.GetPendingState(It.IsAny<ChatSession>()))
+            .Returns((pendingPlan.ToJsonDocument(), "forecast_days"));
+
+        // Mock forecast runner success
+        var forecastResult = new OrchestrationStepResult
+        {
+            IsSuccess = true,
+            RequiresClarification = false,
+            ReportData = new ReportResult
+            {
+                Id = Guid.NewGuid(),
+                Title = "Sales Forecast",
+                PeriodLabel = "Next 30 days",
+                UiSpec = JsonDocument.Parse(@"{
+                    ""report_title"": ""Sales Forecast"",
+                    ""period"": {""label"": ""Next 30 days""},
+                    ""forecast_days"": 30,
+                    ""kpis"": [
+                        {""label"": ""Forecasted Total"", ""value"": 150000},
+                        {""label"": ""Last 7d Actual"", ""value"": 35000},
+                        {""label"": ""Last 28d Actual"", ""value"": 140000}
+                    ],
+                    ""charts"": [{
+                        ""type"": ""line"",
+                        ""title"": ""Sales Forecast"",
+                        ""series"": [
+                            {""name"": ""Historical"", ""points"": []},
+                            {""name"": ""Forecast"", ""points"": [], ""style"": ""dashed""}
+                        ]
+                    }]
+                }")
+            }
+        };
+
+        _mockForecastRunner
+            .Setup(x => x.RunForecastAsync(
+                It.Is<PlannerResult>(p => 
+                    p.Intent == "forecast" &&
+                    p.SubIntent == "sales" &&
+                    p.Slots.ContainsKey("forecast_days") &&
+                    p.Slots["forecast_days"] == "30 days"),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(forecastResult);
+
+        // Execute Turn 2
+        var result2 = await _orchestrator.HandleQueryAsync(
+            "30 days",
+            _testUserId,
+            _testSessionId,
+            CancellationToken.None);
+
+        // Assert Turn 2: Successful forecast execution
+        Assert.True(result2.IsSuccess);
+        Assert.Contains("Sales Forecast", result2.Response);
+
+        // Verify forecast runner was called
+        _mockForecastRunner.Verify(
+            x => x.RunForecastAsync(
+                It.Is<PlannerResult>(p => 
+                    p.Intent == "forecast" &&
+                    p.Slots.ContainsKey("forecast_days")),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+
+        // Verify pending state was cleared after execution
+        _mockChatHistory.Verify(
+            x => x.ClearPendingStateAsync(_testSessionId),
+            Times.Once);
     }
 }
