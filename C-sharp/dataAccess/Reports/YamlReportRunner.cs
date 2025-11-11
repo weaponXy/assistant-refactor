@@ -237,8 +237,8 @@ namespace dataAccess.Reports
 
         public async Task<object> RunAsync(string domain, string userText, CancellationToken ct)
         {
-            // 1) Preprocess (time window + guardrails)
-            var prep = _pre.Prepare(domain, userText);
+            // 1) Preprocess (time window + guardrails) - now uses LLM-based date parser
+            var prep = await _pre.PrepareAsync(domain, userText, ct);
             if (!prep.Allowed) throw new InvalidOperationException(prep.Message ?? "Not allowed.");
             var h = prep.Data;
             if (string.IsNullOrEmpty(h.Start) || string.IsNullOrEmpty(h.End))

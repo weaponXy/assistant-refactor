@@ -155,8 +155,10 @@ builder.Services.AddScoped<IGroqJsonClient>(sp =>
         sp.GetRequiredService<GroqJsonClient>(),
         sp.GetRequiredService<ReportGenOptions>()));
 
-builder.Services.AddSingleton<DateRangeResolver>();
-builder.Services.AddSingleton<YamlPreprocessor>();
+// Date parsing - LLM-based (replaces static DateRangeResolver)
+builder.Services.AddScoped<ILlmDateParser, LlmDateParser>();
+builder.Services.AddScoped<YamlPreprocessor>();
+
 builder.Services.AddScoped<Func<string, CancellationToken, Task<string>>>(sp => async (specFile, ct) =>
 {
     var spec = await ReportSpecLoader.LoadAsync(specFile, ct);
