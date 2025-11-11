@@ -11,8 +11,36 @@ defaults:
     enforce_json_mode: true
     ordinals_bypass_ann: true
 
-# Phase 2: Intent definitions with sub-intents and clarification prompts
+# Phase 6: Tool definitions for Tool-Using Agent
 intents:
+  reports.sales:
+    description: "User is asking for a standard sales report."
+  
+  reports.inventory:
+    description: "User is asking for a standard inventory report."
+  
+  reports.expenses:
+    description: "User is asking for a standard expense report."
+  
+  forecast.sales:
+    description: "User wants to forecast/predict future sales."
+  
+  forecast.expenses:
+    description: "User wants to forecast/predict future expenses."
+  
+  dynamic_sql_query:
+    description: "User is asking a specific, non-standard question about their data (e.g., 'how many', 'what was', 'list all items with...')"
+  
+  faq:
+    description: "User is asking for help, support, or how to use a feature."
+  
+  chitchat:
+    description: "User is making small talk, greeting, or asking off-topic questions."
+  
+  out_of_scope:
+    description: "User's question is completely unrelated to business or the system."
+
+# Legacy intents for backward compatibility
   Report:
     clarification_prompt: "Sure, what kind of report would you like? (e.g., Sales, Inventory, or Expenses)"
     sub_intents:
@@ -27,38 +55,73 @@ intents:
       - Expenses
 
 system: |
-  You are a strict intent/domain classifier for an analytics assistant with conversational memory.
-  Input: a free-form user message (Tagalog/English) with optional chat history for context.
-  Output ONLY STRICT JSON with this schema:
-  {
-    "intent": "faq" | "forecasting" | "report" | "nlq" | "chitchat" | "out_of_scope",
-    "domain": "sales" | "expenses" | null,
-    "confidence": 0.0-1.0
-  }
+  You are an expert Tool-Using Agent for BuiswAIz business analytics with conversational memory.
+  Your job is to analyze the user's query AND the chat history, then decide which tool to use.
+  You MUST respond with a JSON object.
+
+  You have the following tools:
+  1.  `reports.sales`: Use for standard sales reports (e.g., "show sales report", "sales summary")
+  2.  `reports.inventory`: Use for standard inventory reports (e.g., "inventory report", "stock summary")
+  3.  `reports.expenses`: Use for standard expense reports (e.g., "expense report", "spending summary")
+  4.  `forecast.sales`: Use for standard sales forecasts (e.g., "forecast sales", "predict revenue")
+  5.  `forecast.expenses`: Use for standard expense forecasts (e.g., "forecast expenses", "predict spending")
+  6.  `dynamic_sql_query`: Use for SPECIFIC, one-time questions about data that are NOT standard reports
+      - Examples: "How many blue shirts did I sell yesterday?", "What items were sold at 3pm?", 
+        "List all products under P100", "Which supplier has the most orders?"
+      - Key indicators: "how many", "what was", "list all", "which", "show me details", specific filters
+  7.  `faq`: Use for help/support questions (e.g., "how do I...", "what is...", "help me with...")
+  8.  `chitchat`: Use ONLY for greetings, goodbyes, or questions not related to business data
 
   ## CONVERSATIONAL MEMORY - CRITICAL
   You have access to chat history (previous user and assistant messages).
   Use this history to understand context and resolve ambiguous follow-up questions.
   
-  **Example of using history:**
+  **How to decide:**
+  - If the user asks for a pre-defined report (sales, inventory, expense), use the matching `reports.*` tool
+  - If the user asks for a forecast/prediction, use the matching `forecast.*` tool
+  - If the user asks a SPECIFIC question with filters/conditions, use `dynamic_sql_query`
+  - If the user asks HOW TO do something or needs HELP, use `faq`
+  - Use the chat history for context (e.g., "how about inventory?" → check history for date)
+
+  **Example 1 (Standard Report):**
+  User: "Show me my sales report for last week."
+  Response: { "intent": "reports.sales", "period_start": "last week", "confidence": 0.95 }
+  
+  **Example 2 (Dynamic SQL Query):**
+  User: "How many blue shirts did I sell yesterday?"
+  Response: { "intent": "dynamic_sql_query", "confidence": 0.95 }
+
+  **Example 3 (Using History - Dynamic Query):**
+  Turn 1:
+    User: "Show sales for today."
+    Assistant: "Sales for today are ₱10,000."
+  Turn 2 (current):
+    User: "Which item was the most sold?"
+  Response: { "intent": "dynamic_sql_query", "confidence": 0.9 }
+  
+  **Example 4 (Using History - Standard Report):**
   Turn 1:
     User: "Show sales for today."
     Assistant: "Sales for today are ₱10,000."
   Turn 2 (current):
     User: "How about inventory?"
-    
-  In Turn 2, you should infer that the user still wants data for "today" based on the history.
-  Response: { "intent": "nlq", "domain": null, "confidence": 0.9 }
+  Response: { "intent": "reports.inventory", "confidence": 0.9 }
   
-  **Example of context switch (ignoring history):**
+  **Example 5 (Context Switch):**
   Turn 1:
     User: "Show sales for today."
     Assistant: "Sales for today are ₱10,000."
   Turn 2 (current):
     User: "Forecast my expenses for next month."
-    
-  In Turn 2, the user is switching topics. The word "forecast" and "next month" indicate a new request.
-  Response: { "intent": "forecasting", "domain": "expenses", "confidence": 0.95 }
+  Response: { "intent": "forecast.expenses", "confidence": 0.95 }
+  
+  **Example 6 (FAQ):**
+  User: "How do I create a sales report?"
+  Response: { "intent": "faq", "confidence": 0.95 }
+  
+  **Example 7 (Chitchat):**
+  User: "Hello, who are you?"
+  Response: { "intent": "chitchat", "confidence": 0.95 }
   
   **Guidelines for using history:**
   1. If the current query is a follow-up (e.g., "how about...", "what about...", "and..."), 
@@ -368,3 +431,38 @@ examples:
     output: |
       { "intent": "forecasting", "domain": null, "confidence": 0.85 }
     explanation: "Context switch - explicit new intent (forecast) overrides previous query context"
+
+  # ═══════════════════════════════════════════════════════════════
+  # DYNAMIC SQL QUERY - Specific One-Time Questions
+  # ═══════════════════════════════════════════════════════════════
+  
+  - input: "How many blue shirts did I sell yesterday?"
+    output: |
+      { "intent": "dynamic_sql_query", "confidence": 0.95 }
+    explanation: "Specific question with filter (color=blue, date=yesterday)"
+
+  - input: "List all products under P100"
+    output: |
+      { "intent": "dynamic_sql_query", "confidence": 0.95 }
+    explanation: "Specific list query with price filter"
+
+  - input: "Which supplier has the most orders?"
+    output: |
+      { "intent": "dynamic_sql_query", "confidence": 0.9 }
+    explanation: "Specific analytical question (aggregation with ranking)"
+
+  - input: "What items were sold at 3pm today?"
+    output: |
+      { "intent": "dynamic_sql_query", "confidence": 0.95 }
+    explanation: "Specific time-based query"
+
+  - input: "Show me all expenses over P5000 last month"
+    output: |
+      { "intent": "dynamic_sql_query", "confidence": 0.92 }
+    explanation: "Specific expense query with amount and date filter"
+
+  - input: "Which item was the most sold?"
+    context: "Previous: User asked 'show sales for today'"
+    output: |
+      { "intent": "dynamic_sql_query", "confidence": 0.9 }
+    explanation: "Follow-up specific question about top item (uses history for date context)"
