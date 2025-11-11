@@ -62,6 +62,10 @@ public class ChatOrchestratorService : IChatOrchestratorService
     private readonly IYamlReportRunner _reportRunner;
     private readonly IForecastRunnerService _forecastRunner;
     private readonly IYamlIntentRunner _intentRunner;
+    
+    // Phase 6: Dynamic SQL Query dependencies
+    private readonly LlmSqlGenerator _sqlGenerator;
+    private readonly LlmSummarizer _summarizer;
 
     public ChatOrchestratorService(
         Kernel kernel,
@@ -75,7 +79,9 @@ public class ChatOrchestratorService : IChatOrchestratorService
         PromptLoader promptLoader,
         IYamlReportRunner reportRunner,
         IForecastRunnerService forecastRunner,
-        IYamlIntentRunner intentRunner)
+        IYamlIntentRunner intentRunner,
+        LlmSqlGenerator sqlGenerator,
+        LlmSummarizer summarizer)
     {
         _kernel = kernel;
         _schemaService = schemaService;
@@ -91,6 +97,10 @@ public class ChatOrchestratorService : IChatOrchestratorService
         _reportRunner = reportRunner;
         _forecastRunner = forecastRunner;
         _intentRunner = intentRunner;
+        
+        // Phase 6 dependencies
+        _sqlGenerator = sqlGenerator;
+        _summarizer = summarizer;
     }
 
     public async Task<ChatOrchestrationResult> HandleQueryAsync(
@@ -216,12 +226,89 @@ public class ChatOrchestratorService : IChatOrchestratorService
             switch (finalPlan.Intent.ToLowerInvariant())
             {
                 case "report":
+                case "reports.sales":
+                case "reports.inventory":
+                case "reports.expenses":
                     stepResult = await _reportRunner.RunReportAsync(finalPlan, cancellationToken);
                     break;
 
                 case "forecast":
                 case "forecasting":
+                case "forecast.sales":
+                case "forecast.expenses":
                     stepResult = await _forecastRunner.RunForecastAsync(finalPlan, cancellationToken);
+                    break;
+
+                // ═══════════════════════════════════════════════════════════════
+                // PHASE 6: DYNAMIC SQL QUERY (Tool-Using Agent)
+                // ═══════════════════════════════════════════════════════════════
+                case "dynamic_sql_query":
+                    _logger.LogInformation("[Phase 6] Intent is dynamic SQL query. Generating SQL...");
+                    
+                    try
+                    {
+                        // 1. Generate SQL from NLQ (context-aware with history)
+                        // Note: We pass history context through userQuery enrichment
+                        var sqlQuery = await _sqlGenerator.GenerateSqlAsync(userQuery, cancellationToken);
+                        
+                        if (string.IsNullOrWhiteSpace(sqlQuery))
+                        {
+                            stepResult = new OrchestrationStepResult
+                            {
+                                IsSuccess = false,
+                                ErrorMessage = "I couldn't generate a valid SQL query for that question. Please try rephrasing it."
+                            };
+                            break;
+                        }
+                        
+                        // 2. Validate SQL
+                        var (isValid, validationError) = _sqlValidator.ValidateSql(sqlQuery);
+                        if (!isValid)
+                        {
+                            _logger.LogWarning("[Phase 6] SQL validation failed: {Reason}", validationError);
+                            stepResult = new OrchestrationStepResult
+                            {
+                                IsSuccess = false,
+                                ErrorMessage = $"Generated query failed security validation: {validationError}"
+                            };
+                            break;
+                        }
+                        
+                        // 3. Ensure row limit
+                        sqlQuery = _sqlValidator.EnsureLimit(sqlQuery, _maxResultRows);
+                        
+                        // 4. Execute SQL
+                        var queryData = await _safeSqlExecutor.ExecuteQueryAsync(sqlQuery, cancellationToken);
+                        
+                        // 5. Summarize Results
+                        var resultsJson = JsonSerializer.Serialize(queryData);
+                        using var doc = JsonDocument.Parse(resultsJson);
+                        var resultsElement = doc.RootElement;
+                        int rowCount = (resultsElement.ValueKind == JsonValueKind.Array) ? resultsElement.GetArrayLength() : 0;
+                        
+                        var summary = await _summarizer.SummarizeAsync(userQuery, sqlQuery, resultsElement, rowCount, cancellationToken);
+
+                        stepResult = new OrchestrationStepResult
+                        {
+                            IsSuccess = true,
+                            ReportData = new ReportResult
+                            {
+                                Title = "Query Result",
+                                UiSpec = JsonDocument.Parse(JsonSerializer.Serialize(new { text = summary }))
+                            }
+                        };
+                        
+                        _logger.LogInformation("[Phase 6] Dynamic SQL query executed successfully. Rows: {RowCount}", rowCount);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "[Phase 6] Dynamic SQL query failed.");
+                        stepResult = new OrchestrationStepResult
+                        {
+                            IsSuccess = false,
+                            ErrorMessage = "I'm sorry, I encountered an error trying to answer that specific question. Please try again or rephrase your question."
+                        };
+                    }
                     break;
 
                 case "chitchat":
