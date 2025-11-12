@@ -206,13 +206,45 @@ public class ChatController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing chat query: {Query}", request.Query);
-            return StatusCode(500, new ProblemDetails
+            var errorId = Guid.NewGuid();
+            var sessionIdForError = request.SessionId ?? Guid.NewGuid();
+            
+            // Try to get userId from JWT if available, otherwise use empty GUID
+            Guid userIdForError = Guid.Empty;
+            if (TryResolveCallerUserId(out var resolvedUserId, out _))
             {
-                Status = 500,
-                Title = "Internal Server Error",
-                Detail = "An error occurred while processing your query. Please try again."
-            });
+                userIdForError = resolvedUserId;
+            }
+            
+            // CRITICAL: Log FULL exception details for debugging
+            _logger.LogError(ex, 
+                "FATAL: Unhandled exception in ChatController processing query for SessionId {SessionId}. " +
+                "ErrorId: {ErrorId}. Exception: {Exception}", 
+                sessionIdForError, errorId, ex.ToString());
+
+            // CRITICAL: Return ChatQueryResponse (NOT ProblemDetails) so React UI can unstuck from loading state
+            var errorResponse = new ChatQueryResponse
+            {
+                UserQuery = request.Query,
+                Response = $"An internal server error occurred. Please contact support with Error ID: {errorId}",
+                Intent = "error",
+                SessionId = sessionIdForError,
+                UserId = userIdForError,
+                IsSuccess = false,
+                ErrorMessage = $"{ex.GetType().Name}: {ex.Message}",
+                GeneratedSql = null,
+                ResultCount = null,
+                TotalLatencyMs = 0,
+                Latency = new LatencyBreakdown
+                {
+                    IntentClassificationMs = 0,
+                    SqlGenerationMs = 0,
+                    QueryExecutionMs = 0,
+                    SummarizationMs = 0
+                }
+            };
+
+            return StatusCode(500, errorResponse);
         }
     }
 
