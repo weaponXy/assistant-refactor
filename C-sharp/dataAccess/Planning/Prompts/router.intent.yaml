@@ -111,13 +111,13 @@ system: |
   Explanation: Dynamic query about "which item" - context from Turn 1 applies (today)
   
   **Example 4 (Using History - Standard Report with Period Inheritance):**
-  Turn 1:
-    User: "Show sales for last week."
-    Assistant: { "intent": "reports.sales", "period_start": "last week", "confidence": 0.95 }
+  Chat History:
+    user: Show sales for October 2025
+    assistant: Here's your sales report for October 2025 [Slots: period_start=2025-10-01, period_end=2025-10-31]
   Turn 2 (current):
     User: "How about inventory?"
-  Response: { "intent": "reports.inventory", "period_start": "last week", "confidence": 0.9 }
-  Explanation: No date in Turn 2, so inherit "last week" from Turn 1
+  Response: { "intent": "reports.inventory", "period_start": "2025-10-01", "period_end": "2025-10-31", "confidence": 0.9 }
+  Explanation: No date in Turn 2, so inherit period_start=2025-10-01 and period_end=2025-10-31 from [Slots: ...] in assistant's previous message
   
   **Example 5 (Context Switch):**
   Turn 1:
@@ -144,11 +144,21 @@ system: |
   
   **CRITICAL: Period Inheritance Rule**
   When the user asks a follow-up question WITHOUT specifying a date/time:
-  - Look at the previous turn's "period_start" or "period_days" in the chat history
-  - If found, YOU MUST include the SAME period in your response
-  - Example: Previous turn had "period_start": "last week" → Current turn should inherit "period_start": "last week"
+  - Look at the previous turn's [Slots: ...] section in the chat history
+  - Extract period_start, period_end, or period_days values from the most recent assistant message
+  - If found, YOU MUST include the SAME values in your response
+  - Example: Previous assistant message has "[Slots: period_start=2025-10-01, period_end=2025-10-31]"
+    → Current turn should inherit these exact values: "period_start": "2025-10-01", "period_end": "2025-10-31"
   - This applies to queries like: "How about inventory?", "What about expenses?", "Show me sales"
-  - If the user provides a NEW date ("last month", "yesterday"), use the new date instead
+  - If the user provides a NEW date ("last month", "yesterday"), use the new date instead and ignore history
+  
+  **How to read slots from history:**
+  Chat history format: "assistant: [response text] [Slots: period_start=2025-10-01, period_end=2025-10-31]"
+  1. Find the most recent "assistant:" message
+  2. Look for "[Slots: ...]" section at the end
+  3. Extract slot values (format: key=value, key=value)
+  4. If user query has NO date but previous turn has slots → copy those slot values to your output
+  5. If user query has NEW date → ignore slots from history and extract the new date
 
   ## CRITICAL: Out-of-Scope Detection
   If the user asks about topics COMPLETELY UNRELATED to business, analytics, or the BuiswAIz system, return:
@@ -434,10 +444,10 @@ examples:
   # Note: These examples assume chat history is provided in the API call
   
   - input: "how about inventory?"
-    context: "Previous: User asked 'sales for last week', Assistant responded with { period_start: 'last week' }"
+    context: "Previous: assistant: Here's your sales report for October 2025 [Slots: period_start=2025-10-01, period_end=2025-10-31]"
     output: |
-      { "intent": "reports.inventory", "period_start": "last week", "confidence": 0.9 }
-    explanation: "Follow-up question WITHOUT date - INHERIT period_start='last week' from Turn 1"
+      { "intent": "reports.inventory", "period_start": "2025-10-01", "period_end": "2025-10-31", "confidence": 0.9 }
+    explanation: "Follow-up question WITHOUT date - INHERIT period_start and period_end from [Slots: ...] in previous assistant message"
 
   - input: "what about expenses?"
     context: "Previous: User asked 'forecast sales next week', system provided forecast"
