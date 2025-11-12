@@ -16,11 +16,13 @@ public interface IChatHistoryService
     
     /// <summary>
     /// Adds a message (user or assistant) to the conversation history.
+    /// Phase 2 (Bug Fix): Now accepts optional slots parameter for context inheritance.
     /// </summary>
     /// <param name="sessionId">The chat session ID</param>
     /// <param name="role">The role: "user" or "assistant"</param>
     /// <param name="content">The message content</param>
-    Task AddMessageToHistoryAsync(Guid sessionId, string role, string content);
+    /// <param name="slots">Optional dictionary of slot values used in this turn</param>
+    Task AddMessageToHistoryAsync(Guid sessionId, string role, string content, Dictionary<string, string>? slots = null);
     
     /// <summary>
     /// Retrieves recent messages from the conversation history.
@@ -163,11 +165,13 @@ public sealed class ChatHistoryService : IChatHistoryService
     /// <summary>
     /// Adds a message (user or assistant) to the conversation history.
     /// This enables the AI to maintain context across multiple turns.
+    /// Phase 2 (Bug Fix): Now accepts optional slots parameter for context inheritance.
     /// </summary>
     /// <param name="sessionId">The chat session ID</param>
     /// <param name="role">The role: "user" or "assistant"</param>
     /// <param name="content">The message content</param>
-    public async Task AddMessageToHistoryAsync(Guid sessionId, string role, string content)
+    /// <param name="slots">Optional dictionary of slot values used in this turn (e.g., {"period_start": "2025-10-01"})</param>
+    public async Task AddMessageToHistoryAsync(Guid sessionId, string role, string content, Dictionary<string, string>? slots = null)
     {
         var message = new ChatMessage
         {
@@ -175,7 +179,8 @@ public sealed class ChatHistoryService : IChatHistoryService
             SessionId = sessionId,
             Role = role,
             Content = content,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            Slots = slots  // Phase 2: Store slots for context inheritance
         };
 
         _aiDb.ChatMessages.Add(message);
