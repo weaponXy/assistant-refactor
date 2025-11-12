@@ -1127,9 +1127,17 @@ public class ChatOrchestratorService : IChatOrchestratorService
                 var history = await _telemetryLogger.GetSessionHistoryAsync(sessionId.Value, maxMessages: 10, ct: cancellationToken);
                 if (history.Count > 0)
                 {
-                    var historyText = string.Join("\n", history.Select(m => $"{m.Role}: {m.Content}"));
+                    // CRITICAL FIX: Include slots in history so router can inherit them
+                    var historyText = string.Join("\n", history.Select(m =>
+                    {
+                        var slotText = m.Slots != null && m.Slots.Any()
+                            ? $" [Slots: {string.Join(", ", m.Slots.Select(s => $"{s.Key}={s.Value}"))}]"
+                            : "";
+                        return $"{m.Role}: {m.Content}{slotText}";
+                    }));
                     arguments["conversation_history"] = historyText;
-                    _logger.LogInformation("Injected {Count} messages of conversation history into Router context", history.Count);
+                    _logger.LogInformation("[Phase 2] Injected {Count} messages with slots into Router context:\n{History}", 
+                        history.Count, historyText);
                 }
             }
 
@@ -1396,14 +1404,15 @@ public class ChatOrchestratorService : IChatOrchestratorService
             return routerValue;
         }
 
-        // SAFE PATH: Router provided natural language (e.g., "October") → Re-parse through LlmDateParser
-        _logger.LogWarning("[Slot Validation] Router provided non-ISO date for {SlotName}: {Value}. Re-parsing through LlmDateParser...", 
+        // SAFE PATH: Router provided natural language (e.g., "October", "Oct 1, 2025") → Parse the router value itself
+        _logger.LogWarning("[Slot Validation] Router provided non-ISO date for {SlotName}: {Value}. Re-parsing router value through LlmDateParser...", 
             slotName, routerValue);
 
         try
         {
-            // Use the specialist parser to normalize the date
-            var (startDate, endDate) = await _llmDateParser.ParseDateRangeAsync(userQuery, ct);
+            // CRITICAL FIX: Parse the ROUTER VALUE, not the user query!
+            // The router gave us "Oct 1, 2025" which has date info, but "how about inventory?" doesn't.
+            var (startDate, endDate) = await _llmDateParser.ParseDateRangeAsync(routerValue, ct);
             
             var normalized = slotName == "period_start" 
                 ? startDate.ToString("yyyy-MM-dd") 
@@ -1416,10 +1425,29 @@ public class ChatOrchestratorService : IChatOrchestratorService
         }
         catch (Exception ex)
         {
-            // Parsing failed - log error and return null to trigger clarification
-            _logger.LogError(ex, "[Slot Validation] Failed to normalize date for {SlotName}. Original value: {Value}", 
-                slotName, routerValue);
-            return null;
+            // Parsing failed - try one more time with original user query as fallback
+            _logger.LogWarning(ex, "[Slot Validation] Failed to parse router value '{RouterValue}'. Trying original user query as fallback...", routerValue);
+            
+            try
+            {
+                var (startDate, endDate) = await _llmDateParser.ParseDateRangeAsync(userQuery, ct);
+                
+                var normalized = slotName == "period_start" 
+                    ? startDate.ToString("yyyy-MM-dd") 
+                    : endDate.ToString("yyyy-MM-dd");
+                
+                _logger.LogInformation("[Slot Validation] Fallback successful. Normalized to '{Normalized}' for {SlotName}", 
+                    normalized, slotName);
+                
+                return normalized;
+            }
+            catch (Exception fallbackEx)
+            {
+                // Both attempts failed - log error and return null to trigger clarification
+                _logger.LogError(fallbackEx, "[Slot Validation] Failed to normalize date for {SlotName}. Router value: {RouterValue}, User query: {UserQuery}", 
+                    slotName, routerValue, userQuery);
+                return null;
+            }
         }
     }
 }
