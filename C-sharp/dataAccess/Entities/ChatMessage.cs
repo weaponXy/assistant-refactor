@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json;
 
 namespace dataAccess.Entities;
 
@@ -75,6 +76,42 @@ public class ChatMessage
 
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    // Phase 2: Context Inheritance - Store slots for conversational memory
+    /// <summary>
+    /// Stores the slot values (e.g., period_start, period_end) extracted/used in this turn.
+    /// This enables context inheritance in follow-up queries.
+    /// Example: { "period_start": "2025-10-01", "period_end": "2025-10-31" }
+    /// </summary>
+    [Column("slots", TypeName = "jsonb")]
+    public string? SlotsJson { get; set; }
+
+    /// <summary>
+    /// Transient property for easy access to slots as a dictionary.
+    /// Not mapped to database - use SlotsJson for persistence.
+    /// </summary>
+    [NotMapped]
+    public Dictionary<string, string>? Slots
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(SlotsJson))
+                return null;
+            
+            try
+            {
+                return JsonSerializer.Deserialize<Dictionary<string, string>>(SlotsJson);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+        set
+        {
+            SlotsJson = value == null ? null : JsonSerializer.Serialize(value);
+        }
+    }
 
     // Navigation property to parent session
     [ForeignKey("SessionId")]

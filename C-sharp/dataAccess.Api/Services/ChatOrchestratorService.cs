@@ -225,6 +225,61 @@ public class ChatOrchestratorService : IChatOrchestratorService
             }
 
             // ═══════════════════════════════════════════════════════════════
+            // B.5: NORMALIZE ROUTER SLOTS (Phase 1: Hybrid Dynamic Validation)
+            // ═══════════════════════════════════════════════════════════════
+            _logger.LogInformation("[Phase 1] Validating and normalizing router slots. Current slots: {Slots}", 
+                JsonSerializer.Serialize(finalPlan.Slots));
+
+            // Normalize period_start if router provided it
+            if (finalPlan.Slots.ContainsKey("period_start"))
+            {
+                var normalizedStart = await NormalizeAndValidateDateSlot(
+                    "period_start",
+                    finalPlan.Slots["period_start"],
+                    userQuery,
+                    cancellationToken);
+
+                if (normalizedStart != null)
+                {
+                    // Valid - update with normalized value
+                    finalPlan.Slots["period_start"] = normalizedStart;
+                    _logger.LogInformation("[Phase 1] period_start normalized: {Value}", normalizedStart);
+                }
+                else
+                {
+                    // Invalid or failed parsing - remove slot to trigger clarification
+                    finalPlan.Slots.Remove("period_start");
+                    _logger.LogWarning("[Phase 1] period_start validation failed. Removed from slots to trigger clarification.");
+                }
+            }
+
+            // Normalize period_end if router provided it
+            if (finalPlan.Slots.ContainsKey("period_end"))
+            {
+                var normalizedEnd = await NormalizeAndValidateDateSlot(
+                    "period_end",
+                    finalPlan.Slots["period_end"],
+                    userQuery,
+                    cancellationToken);
+
+                if (normalizedEnd != null)
+                {
+                    // Valid - update with normalized value
+                    finalPlan.Slots["period_end"] = normalizedEnd;
+                    _logger.LogInformation("[Phase 1] period_end normalized: {Value}", normalizedEnd);
+                }
+                else
+                {
+                    // Invalid or failed parsing - remove slot to trigger clarification
+                    finalPlan.Slots.Remove("period_end");
+                    _logger.LogWarning("[Phase 1] period_end validation failed. Removed from slots to trigger clarification.");
+                }
+            }
+
+            _logger.LogInformation("[Phase 1] After normalization. Final slots: {Slots}", 
+                JsonSerializer.Serialize(finalPlan.Slots));
+
+            // ═══════════════════════════════════════════════════════════════
             // C. EXECUTE THE PLAN (Stage 2: Parameter Check with Pre-emptive Slot Filling)
             // ═══════════════════════════════════════════════════════════════
             _logger.LogInformation("[Phase 4] Executing plan for intent: {Intent}, SubIntent: {SubIntent}", 
@@ -609,8 +664,37 @@ public class ChatOrchestratorService : IChatOrchestratorService
             // ═══════════════════════════════════════════════════════════════
             try
             {
+                // Save user message (no slots)
                 await _chatHistory.AddMessageToHistoryAsync(session.Id, "user", userQuery);
-                await _chatHistory.AddMessageToHistoryAsync(session.Id, "assistant", result.Response);
+                
+                // Phase 2: Save assistant message WITH slots for context inheritance
+                // Only save slots if execution was successful and we have normalized slots
+                Dictionary<string, string>? slotsToSave = null;
+                if (stepResult.IsSuccess && finalPlan.Slots != null && finalPlan.Slots.Count > 0)
+                {
+                    // Only save date/numeric slots that were actually used
+                    slotsToSave = new Dictionary<string, string>();
+                    foreach (var slot in finalPlan.Slots)
+                    {
+                        // Save period_start, period_end, forecast_days, period_days
+                        if (slot.Key is "period_start" or "period_end" or "forecast_days" or "period_days")
+                        {
+                            slotsToSave[slot.Key] = slot.Value;
+                        }
+                    }
+                    
+                    if (slotsToSave.Count > 0)
+                    {
+                        _logger.LogInformation("[Phase 2] Saving slots to conversation history: {Slots}", 
+                            JsonSerializer.Serialize(slotsToSave));
+                    }
+                    else
+                    {
+                        slotsToSave = null; // Don't save empty dictionary
+                    }
+                }
+                
+                await _chatHistory.AddMessageToHistoryAsync(session.Id, "assistant", result.Response, slotsToSave);
                 _logger.LogInformation("[Phase 4] Saved conversation turn to history");
             }
             catch (Exception historyEx)
@@ -1276,6 +1360,65 @@ public class ChatOrchestratorService : IChatOrchestratorService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "[Phase 4.5] Pre-emptive parse failed for {SlotName}", slotName);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Phase 1 (Bug Fix): Normalize and validate date slot from router output.
+    /// HYBRID DYNAMIC APPROACH - Validates router output format, re-parses if needed.
+    /// </summary>
+    /// <param name="slotName">Name of the slot (e.g., "period_start", "period_end")</param>
+    /// <param name="routerValue">The value provided by the router (may be natural language)</param>
+    /// <param name="userQuery">Original user query for re-parsing context</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Normalized ISO date string (yyyy-MM-dd) or null if validation/parsing fails</returns>
+    private async Task<string?> NormalizeAndValidateDateSlot(
+        string slotName,
+        string? routerValue,
+        string userQuery,
+        CancellationToken ct)
+    {
+        // If router didn't provide a value, return null (will trigger clarification)
+        if (string.IsNullOrWhiteSpace(routerValue))
+        {
+            _logger.LogInformation("[Slot Validation] Router did not provide value for {SlotName}", slotName);
+            return null;
+        }
+
+        // FAST PATH: Check if router output is already in valid ISO format (yyyy-MM-dd)
+        if (DateTime.TryParseExact(routerValue, "yyyy-MM-dd", null, 
+            System.Globalization.DateTimeStyles.None, out var _))
+        {
+            // ✅ Router already provided valid ISO format → Use it directly
+            _logger.LogInformation("[Slot Validation] Router provided valid ISO date for {SlotName}: {Value}", 
+                slotName, routerValue);
+            return routerValue;
+        }
+
+        // SAFE PATH: Router provided natural language (e.g., "October") → Re-parse through LlmDateParser
+        _logger.LogWarning("[Slot Validation] Router provided non-ISO date for {SlotName}: {Value}. Re-parsing through LlmDateParser...", 
+            slotName, routerValue);
+
+        try
+        {
+            // Use the specialist parser to normalize the date
+            var (startDate, endDate) = await _llmDateParser.ParseDateRangeAsync(userQuery, ct);
+            
+            var normalized = slotName == "period_start" 
+                ? startDate.ToString("yyyy-MM-dd") 
+                : endDate.ToString("yyyy-MM-dd");
+            
+            _logger.LogInformation("[Slot Validation] Successfully normalized '{Original}' to '{Normalized}' for {SlotName}", 
+                routerValue, normalized, slotName);
+            
+            return normalized;
+        }
+        catch (Exception ex)
+        {
+            // Parsing failed - log error and return null to trigger clarification
+            _logger.LogError(ex, "[Slot Validation] Failed to normalize date for {SlotName}. Original value: {Value}", 
+                slotName, routerValue);
             return null;
         }
     }
