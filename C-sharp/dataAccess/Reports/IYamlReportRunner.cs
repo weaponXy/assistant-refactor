@@ -13,5 +13,8 @@ public interface IYamlReportRunner
     /// Performs slot validation against YAML rules before execution.
     /// Returns OrchestrationStepResult with clarification request if slots are missing.
     /// </summary>
-    Task<OrchestrationStepResult> RunReportAsync(PlannerResult plannerResult, CancellationToken ct = default);
+    /// <param name="intent">The intent string (e.g., "reports.sales", "reports.inventory", "reports.expenses")</param>
+    /// <param name="plannerResult">The validated planner result with slots</param>
+    /// <param name="ct">Cancellation token</param>
+    Task<OrchestrationStepResult> RunReportAsync(string intent, PlannerResult plannerResult, CancellationToken ct = default);
 }

@@ -73,6 +73,18 @@ public class ChatOrchestratorServiceTests
         var logger = new Mock<ILogger<ChatOrchestratorService>>().Object;
         var sqlValidator = CreateValidator();
         var safeSqlExecutor = new Mock<ISafeSqlExecutor>().Object;
+        
+        // Mock Phase 6 dependencies - these won't be called in our report tests
+        // Since LlmSqlGenerator and LlmSummarizer have non-parameterless constructors,
+        // we can't mock them easily. Pass null since they won't be called in report flow.
+        LlmSqlGenerator? mockSqlGenerator = null!;
+        LlmSummarizer? mockSummarizer = null!;
+        
+        // Mock Phase 4.5 dependency
+        var mockDateParser = new Mock<ILlmDateParser>();
+        mockDateParser
+            .Setup(x => x.ParseDateRangeAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((DateTime.Today.AddDays(-1), DateTime.Today.AddDays(-1))); // Default to yesterday
 
         // Create orchestrator with mocked Phase 4 dependencies
         _orchestrator = new ChatOrchestratorService(
@@ -87,7 +99,10 @@ public class ChatOrchestratorServiceTests
             _promptLoader, // Use real PromptLoader
             _mockReportRunner.Object,
             _mockForecastRunner.Object,
-            _mockIntentRunner.Object
+            _mockIntentRunner.Object,
+            mockSqlGenerator!,
+            mockSummarizer!,
+            mockDateParser.Object
         );
     }
 
@@ -208,6 +223,7 @@ public class ChatOrchestratorServiceTests
 
         _mockReportRunner
             .Setup(x => x.RunReportAsync(
+                It.Is<string>(s => s.Contains("sales") || s == "report"),
                 It.Is<PlannerResult>(p => p.Intent == "report" && p.SubIntent == "Sales"),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(clarificationResult);
@@ -290,6 +306,7 @@ public class ChatOrchestratorServiceTests
 
         _mockReportRunner
             .Setup(x => x.RunReportAsync(
+                It.Is<string>(s => s.Contains("sales") || s == "report"),
                 It.Is<PlannerResult>(p => p.Intent == "report" && p.SubIntent == "Sales"),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(clarificationResult);
@@ -376,6 +393,7 @@ public class ChatOrchestratorServiceTests
 
         _mockReportRunner
             .Setup(x => x.RunReportAsync(
+                It.Is<string>(s => s.Contains("sales") || s == "report"),
                 It.Is<PlannerResult>(p => 
                     p.Intent == "report" && 
                     p.SubIntent == "Sales"),
@@ -397,6 +415,7 @@ public class ChatOrchestratorServiceTests
         // Verify: RunReportAsync was called
         _mockReportRunner.Verify(
             x => x.RunReportAsync(
+                It.Is<string>(s => s.Contains("sales") || s == "report"),
                 It.Is<PlannerResult>(p => p.SubIntent == "Sales"),
                 It.IsAny<CancellationToken>()),
             Times.Once);
@@ -446,7 +465,7 @@ public class ChatOrchestratorServiceTests
         }");
 
         _mockIntentRunner
-            .Setup(x => x.RunIntentAsync("Create a report", It.IsAny<CancellationToken>()))
+            .Setup(x => x.RunIntentAsync("Create a report", It.IsAny<List<ChatMessage>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(intentResult1);
 
         // Note: In real implementation, GetClarificationPromptForIntent reads from router.intent.yaml file
@@ -492,6 +511,7 @@ public class ChatOrchestratorServiceTests
 
         _mockReportRunner
             .Setup(x => x.RunReportAsync(
+                It.Is<string>(s => s.Contains("sales") || s == "report"),
                 It.Is<PlannerResult>(p => p.SubIntent == "Sales"),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(clarificationResult2);
@@ -537,6 +557,7 @@ public class ChatOrchestratorServiceTests
 
         _mockReportRunner
             .Setup(x => x.RunReportAsync(
+                It.Is<string>(s => s.Contains("sales") || s == "report"),
                 It.Is<PlannerResult>(p => 
                     p.SubIntent == "Sales" && 
                     p.Slots.ContainsKey("period_start") && 
@@ -561,7 +582,7 @@ public class ChatOrchestratorServiceTests
             x => x.ClearPendingStateAsync(_testSessionId),
             Times.AtLeast(2)); // Cleared twice (after Turn 1 and Turn 2)
         _mockReportRunner.Verify(
-            x => x.RunReportAsync(It.IsAny<PlannerResult>(), It.IsAny<CancellationToken>()),
+            x => x.RunReportAsync(It.IsAny<string>(), It.IsAny<PlannerResult>(), It.IsAny<CancellationToken>()),
             Times.Exactly(2)); // Called in Turn 2 and Turn 3
     }
 
