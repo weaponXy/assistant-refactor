@@ -19,12 +19,47 @@ public static class AssistantEndpoint
         YamlReportRunner yamlRunner,
         CancellationToken ct)
     {
-        var req = await ctx.Request.ReadFromJsonAsync<AskRequest>(cancellationToken: ct);
-        if (req is null || string.IsNullOrWhiteSpace(req.Text) || string.IsNullOrWhiteSpace(req.Domain))
-            return Results.BadRequest("Text and Domain are required.");
+        try
+        {
+            // Try to read as JSON node first to handle flexible property names
+            var jsonNode = await ctx.Request.ReadFromJsonAsync<JsonNode>(cancellationToken: ct);
+            if (jsonNode is null)
+                return Results.BadRequest("Request body is required.");
 
-        // For now we target report flow directly (router can set Domain upstream)
-        var ui = await yamlRunner.RunAsync(req.Domain.ToLowerInvariant(), req.Text, ct);
-        return Results.Json(new AskResponse("report", null, ui));
+            // Extract text (handle both "text" and "Text")
+            var text = jsonNode["text"]?.GetValue<string>() 
+                       ?? jsonNode["Text"]?.GetValue<string>() 
+                       ?? string.Empty;
+
+            // Extract domain (handle both "domain" and "Domain", default to empty)
+            var domain = jsonNode["domain"]?.GetValue<string>() 
+                        ?? jsonNode["Domain"]?.GetValue<string>() 
+                        ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(text))
+                return Results.BadRequest(new { error = "Text field is required." });
+
+            // Domain is optional now - will be inferred by router if not provided
+            var domainToUse = string.IsNullOrWhiteSpace(domain) ? "sales" : domain.ToLowerInvariant();
+
+            // Run the report
+            var ui = await yamlRunner.RunAsync(domainToUse, text, ct);
+            return Results.Json(new AskResponse("report", null, ui));
+        }
+        catch (Exception ex)
+        {
+            var errorId = Guid.NewGuid();
+            // Log to console for now (should use ILogger in production)
+            Console.WriteLine($"[AssistantEndpoint] ERROR {errorId}: {ex}");
+            
+            return Results.Json(
+                new { 
+                    mode = "error",
+                    error = $"An error occurred while processing your request. Error ID: {errorId}",
+                    details = ex.Message 
+                },
+                statusCode: 500
+            );
+        }
     }
 }

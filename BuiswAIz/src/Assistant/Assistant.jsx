@@ -203,90 +203,31 @@ const Assistant = () => {
     setLoading(true);
 
     try {
-      const res = await apiPost("/api/assistant", { text: trimmed });
+      // Use the new Chat API endpoint with proper orchestration and error handling
+      const res = await apiPost("/api/Chat/query", { 
+        query: trimmed,
+        sessionId: null // Will create new session or you can track sessionId in state
+      });
 
-      if (res.mode === "report") {
-        // Show simple success message in chat instead of full report payload
-        const dom = (res.domain || "report").toLowerCase();
-        const reportType = dom === "expenses" ? "Expense" : dom === "inventory" ? "Inventory" : "Sales";
-        const successMessage = `✓ ${reportType} report has been successfully created! You can view the full report in the panel above.`;
-        
+      // Check if error response
+      if (!res.isSuccess) {
         setMessages((prev) => [
           ...prev,
-          { id: newId(), role: "assistant", text: successMessage }
-        ]);
-
-        // 1) push a placeholder card (fast UI), but include the domain
-        const placeholder = normalizeReportForSpotlightRow({ ui_spec: res.uiSpec, domain: dom });
-        if (placeholder) setReports((prev) => [placeholder, ...prev].slice(0, 2));
-
-        // 2) then fetch the latest saved run for that domain to get the real runId
-        try {
-          const latest = await fetchRecentReports(1, dom);
-          if (Array.isArray(latest) && latest.length > 0) {
-            // replace the first card with the saved one that has runId
-            setReports((prev) => [latest[0], ...prev.slice(1)]);
+          { 
+            id: newId(), 
+            role: "assistant", 
+            text: res.errorMessage || "Sorry, I couldn't process that request." 
           }
-        } catch { /* ignore */ }
-
-        return;
-      }
-
-      if (res.mode === "faq") {
-        const md = res.uiSpec?.render?.content || "No answer available.";
-        const actions = Array.isArray(res.uiSpec?.suggestedActions)
-          ? res.uiSpec.suggestedActions.map((a) => ({ id: a.id || a.label, label: a.label }))
-          : null;
-        setMessages((p) => [...p, { id: newId(), role: "assistant", text: md, actions }]);
-        return;
-      }
-
-      if (res.mode === "chitchat") {
-        const md = res.uiSpec?.render?.content || "…";
-        const actions = Array.isArray(res.uiSpec?.suggestedActions)
-          ? res.uiSpec.suggestedActions.map((a) => ({ id: a.id || a.label, label: a.label }))
-          : null;
-        setMessages((p) => [...p, { id: newId(), role: "assistant", text: md, actions }]);
-        return;
-      }
-
-      if (res.mode === "forecast") {
-        // 1) summary lines for the chat bubble (existing behavior)
-        const f = res.uiSpec ?? {};
-        const domain = (res.domain || "sales").toLowerCase();
-        const title = domain === "expenses" ? "Expense Forecast" : "Sales Forecast";
-
-        const lines = [
-          `${title} — ${f?.period?.label || ""}`.trim(),
-        ];
-
-        if (typeof f?.notes?.narrative === "string" && f.notes.narrative.trim()) {
-          lines.push("", f.notes.narrative.trim());
-        }
-
-        setMessages((prev) => [
-          ...prev,
-          { id: newId(), role: "assistant", text: lines.join("\n") },
         ]);
-
-        // 2) also promote to the CENTER "Forecasts" panel as a card
-        //    (so expenses show up there too)
-        const card = normalizeForecastForCard(
-          { ...f, domain }, // ensure domain is carried
-          domain
-        );
-        setForecasts((prev) => [card, ...prev].slice(0, 2));
-
         return;
       }
 
-      if (res.mode === "nlq") {
-        const md = res.uiSpec?.render?.content || res.notice || "Here's your data.";
-        setMessages((p) => [...p, { id: newId(), role: "assistant", text: md }]);
-        return;
-      }
-
-      setMessages((p) => [...p, { id: newId(), role: "assistant", text: "Hi! How can I help?" }]);
+      // Success - show response
+      const responseText = res.response || "Here's your result.";
+      setMessages((prev) => [
+        ...prev,
+        { id: newId(), role: "assistant", text: responseText }
+      ]);
     } catch (err) {
       console.error(err);
       setMessages((p) => [

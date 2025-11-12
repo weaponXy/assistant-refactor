@@ -2164,10 +2164,12 @@ app.MapPost("/api/assistant", async (
     GroqJsonClient groq,
     CancellationToken ct) =>
 {
-    // 0) Parse request
-    var req = await ctx.Request.ReadFromJsonAsync<AssistantRequest>(cancellationToken: ct);
-    if (req is null || string.IsNullOrWhiteSpace(req.Text))
-        return Results.Json(new { error = "Text is required." }, statusCode: 400);
+    try
+    {
+        // 0) Parse request
+        var req = await ctx.Request.ReadFromJsonAsync<AssistantRequest>(cancellationToken: ct);
+        if (req is null || string.IsNullOrWhiteSpace(req.Text))
+            return Results.Json(new { error = "Text is required." }, statusCode: 400);
 
     var userText = req.Text;
     var userLower = userText.ToLowerInvariant();
@@ -2745,6 +2747,30 @@ app.MapPost("/api/assistant", async (
         markdown = "Hi! How can I help?",
         router = new { intent = "chitchat", domain, confidence = conf }
     });
+    }
+    catch (Exception ex)
+    {
+        var errorId = Guid.NewGuid();
+        Console.WriteLine($"[/api/assistant] FATAL ERROR {errorId}: {ex}");
+        
+        return Results.Json(new
+        {
+            mode = "error",
+            error = $"⚠️ An internal server error occurred. Error ID: {errorId}",
+            errorId = errorId.ToString(),
+            details = ex.Message,
+            uiSpec = new
+            {
+                render = new
+                {
+                    kind = "markdown",
+                    content = $"⚠️ **An error occurred while processing your request.**\n\n" +
+                             $"Error ID: `{errorId}`\n\n" +
+                             $"Please try again or contact support with the Error ID if the problem persists."
+                }
+            }
+        }, statusCode: 500);
+    }
 }).RequireAuthorization("ApiUser"); // Enforce JWT authentication with ApiUser policy
 
 builder.WebHost.UseUrls("http://0.0.0.0:5000");
