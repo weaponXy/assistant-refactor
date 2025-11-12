@@ -49,10 +49,12 @@ public sealed class LlmDateParser : ILlmDateParser
             var systemPrompt = _promptTemplate
                 .Replace("[CURRENT_DATE]", currentDate);
 
-            // Call Groq LLM (8B specialist model)
+            // Call Groq LLM (8B specialist model - NO HISTORY)
+            // IMPORTANT: Explicitly pass data: null to use the correct overload (without history)
             var result = await _groq.CompleteJsonAsyncChat(
                 system: systemPrompt,
                 user: $"Parse this date query: \"{dateQuery}\"",
+                data: null,  // 🔧 FIX: Explicitly pass null to avoid history overload
                 temperature: 0.0,
                 ct: ct);
 
@@ -66,14 +68,33 @@ public sealed class LlmDateParser : ILlmDateParser
                     $"LLM response missing required fields. Response: {result.RootElement}");
             }
 
+            // Check for NULL values from LLM (meaning no date was found in user query)
+            if (startDateElem.ValueKind == JsonValueKind.Null || endDateElem.ValueKind == JsonValueKind.Null)
+            {
+                _logger.LogInformation(
+                    "LLM returned null dates (no date found in query '{Query}'). Triggering clarification flow.",
+                    dateQuery);
+                
+                // Throw exception to signal NO DATE FOUND → triggers clarification
+                throw new InvalidOperationException("No date found in query - clarification required");
+            }
+
             var startDateStr = startDateElem.GetString();
             var endDateStr = endDateElem.GetString();
 
-            if (!DateTime.TryParse(startDateStr, out var startDate) ||
-                !DateTime.TryParse(endDateStr, out var endDate))
+            // Validate ISO format (yyyy-MM-dd) - reject natural language strings
+            if (string.IsNullOrWhiteSpace(startDateStr) || string.IsNullOrWhiteSpace(endDateStr))
             {
                 throw new InvalidOperationException(
-                    $"Failed to parse dates from LLM response. Start: {startDateStr}, End: {endDateStr}");
+                    $"LLM returned empty date strings. Response: {result.RootElement}");
+            }
+
+            // Strict parsing - only accept valid date formats
+            if (!DateTime.TryParseExact(startDateStr, "yyyy-MM-dd", null, System.Globalization.DateTimeStyles.None, out var startDate) ||
+                !DateTime.TryParseExact(endDateStr, "yyyy-MM-dd", null, System.Globalization.DateTimeStyles.None, out var endDate))
+            {
+                throw new InvalidOperationException(
+                    $"Invalid date format from LLM (expected yyyy-MM-dd). Start: {startDateStr}, End: {endDateStr}");
             }
 
             _logger.LogInformation(
@@ -86,10 +107,9 @@ public sealed class LlmDateParser : ILlmDateParser
         {
             _logger.LogError(ex, "Failed to parse date query with LLM: {DateQuery}", dateQuery);
             
-            // Fallback: Use yesterday as a safe default
-            _logger.LogWarning("Falling back to 'yesterday' due to parsing error");
-            var yesterday = DateTime.Now.AddDays(-1).Date;
-            return (yesterday, yesterday);
+            // Re-throw to signal orchestrator that slot filling failed
+            // This will trigger clarification flow instead of using bad default dates
+            throw;
         }
     }
 }

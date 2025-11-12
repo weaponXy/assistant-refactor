@@ -47,25 +47,44 @@ namespace dataAccess.Reports
         /// Phase 3: Run report with YAML-driven slot validation.
         /// NO hardcoded fallbacks - validates required slots from YAML before execution.
         /// </summary>
-        public async Task<OrchestrationStepResult> RunReportAsync(PlannerResult plannerResult, CancellationToken ct = default)
+        /// <param name="intent">The intent string (e.g., "reports.sales", "reports.inventory", "reports.expenses")</param>
+        /// <param name="plannerResult">The validated planner result with slots</param>
+        /// <param name="ct">Cancellation token</param>
+        public async Task<OrchestrationStepResult> RunReportAsync(string intent, PlannerResult plannerResult, CancellationToken ct = default)
         {
             try
             {
-                // 1) Determine spec file based on domain
-                var domain = NormalizeDomain(plannerResult.Domain ?? "sales");
-                var specFile = domain switch
+                // 1) Extract report name from intent string (e.g., "reports.sales" → "sales")
+                var reportName = intent.Replace("reports.", "").Trim();
+                if (string.IsNullOrWhiteSpace(reportName))
                 {
-                    "expenses" => "reports.expense.yaml",
+                    throw new ArgumentException("Intent string is not a valid report name.", nameof(intent));
+                }
+
+                // 2) Determine spec file based on report name
+                var specFile = reportName.ToLowerInvariant() switch
+                {
+                    "expense" or "expenses" => "reports.expense.yaml",
                     "sales" => "reports.sales.yaml",
                     "inventory" => "reports.inventory.yaml",
-                    _ => throw new InvalidOperationException($"Unknown domain: {domain}")
+                    _ => throw new InvalidOperationException($"Unknown report type: {reportName}")
                 };
 
-                // 2) Load spec to get slot definitions
+                // 3) Determine normalized domain for later use
+                var domain = reportName.ToLowerInvariant() switch
+                {
+                    "expense" => "expenses",
+                    "expenses" => "expenses",
+                    "sales" => "sales",
+                    "inventory" => "inventory",
+                    _ => throw new InvalidOperationException($"Unknown domain: {reportName}")
+                };
+
+                // 4) Load spec to get slot definitions
                 var specYaml = _promptLoader.ReadText(specFile);
                 var spec = DomainPrompt.Parse(specYaml);
 
-                // 3) CRITICAL: Validate required slots from YAML (Phase 2 enforcement)
+                // 5) CRITICAL: Validate required slots from YAML (Phase 2 enforcement)
                 if (spec.Phase1?.Slots != null)
                 {
                     foreach (var slotDef in spec.Phase1.Slots)
@@ -94,7 +113,7 @@ namespace dataAccess.Reports
                     }
                 }
 
-                // 4) Validation passed - extract dates directly from slots (NO FALLBACKS)
+                // 6) Validation passed - extract dates directly from slots (NO FALLBACKS)
                 if (!plannerResult.Slots.TryGetValue("period_start", out var startStr) || 
                     string.IsNullOrWhiteSpace(startStr))
                 {
@@ -118,7 +137,7 @@ namespace dataAccess.Reports
                     throw new InvalidOperationException($"Invalid period_end date format: {endStr}");
                 }
 
-                // 5) Continue with existing report execution logic using validated dates
+                // 7) Continue with existing report execution logic using validated dates
                 var compareStr = plannerResult.Slots.GetValueOrDefault("compare_to_prior", "false");
                 var compare = bool.TryParse(compareStr, out var cmp) && cmp;
 

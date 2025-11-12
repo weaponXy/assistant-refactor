@@ -1,6 +1,7 @@
 using Microsoft.SemanticKernel;
 using System.Text.Json;
 using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
 using dataAccess.Services;
 using dataAccess.Planning;
 using dataAccess.Reports;
@@ -66,6 +67,9 @@ public class ChatOrchestratorService : IChatOrchestratorService
     // Phase 6: Dynamic SQL Query dependencies
     private readonly LlmSqlGenerator _sqlGenerator;
     private readonly LlmSummarizer _summarizer;
+    
+    // Phase 4.5: Pre-emptive slot filling dependencies
+    private readonly ILlmDateParser _llmDateParser;
 
     public ChatOrchestratorService(
         Kernel kernel,
@@ -81,7 +85,8 @@ public class ChatOrchestratorService : IChatOrchestratorService
         IForecastRunnerService forecastRunner,
         IYamlIntentRunner intentRunner,
         LlmSqlGenerator sqlGenerator,
-        LlmSummarizer summarizer)
+        LlmSummarizer summarizer,
+        ILlmDateParser llmDateParser)
     {
         _kernel = kernel;
         _schemaService = schemaService;
@@ -101,6 +106,9 @@ public class ChatOrchestratorService : IChatOrchestratorService
         // Phase 6 dependencies
         _sqlGenerator = sqlGenerator;
         _summarizer = summarizer;
+        
+        // Phase 4.5 dependencies
+        _llmDateParser = llmDateParser;
     }
 
     public async Task<ChatOrchestrationResult> HandleQueryAsync(
@@ -174,8 +182,8 @@ public class ChatOrchestratorService : IChatOrchestratorService
                 result.Intent = intentResult.Intent;
                 result.IntentClassificationLatencyMs = (int)(DateTime.UtcNow - startTime).TotalMilliseconds;
                 
-                _logger.LogInformation("[Phase 4] Intent classified: {Intent}, Domain: {Domain}, Confidence: {Confidence}", 
-                    intentResult.Intent, intentResult.Domain, intentResult.Confidence);
+                _logger.LogInformation("[Phase 4] Intent classified: {Intent}, Domain: {Domain}, Confidence: {Confidence}, Slots: {SlotCount}", 
+                    intentResult.Intent, intentResult.Domain, intentResult.Confidence, intentResult.Slots.Count);
 
                 // Check for ambiguous topic (Stage 1 clarification needed)
                 if ((intentResult.Intent.Equals("report", StringComparison.OrdinalIgnoreCase) || 
@@ -211,12 +219,13 @@ public class ChatOrchestratorService : IChatOrchestratorService
                     Domain = intentResult.Domain,
                     SubIntent = intentResult.SubIntent,
                     Confidence = intentResult.Confidence,
-                    UserText = userQuery
+                    UserText = userQuery,
+                    Slots = intentResult.Slots  // PHASE 4.5.1 FIX: Include slots from router
                 };
             }
 
             // ═══════════════════════════════════════════════════════════════
-            // C. EXECUTE THE PLAN (Stage 2: Parameter Check)
+            // C. EXECUTE THE PLAN (Stage 2: Parameter Check with Pre-emptive Slot Filling)
             // ═══════════════════════════════════════════════════════════════
             _logger.LogInformation("[Phase 4] Executing plan for intent: {Intent}, SubIntent: {SubIntent}", 
                 finalPlan.Intent, finalPlan.SubIntent);
@@ -229,13 +238,205 @@ public class ChatOrchestratorService : IChatOrchestratorService
                 case "reports.sales":
                 case "reports.inventory":
                 case "reports.expenses":
-                    stepResult = await _reportRunner.RunReportAsync(finalPlan, cancellationToken);
+                    // ═══════════════════════════════════════════════════════════════
+                    // PHASE 4.5: PRE-EMPTIVE SLOT FILLING FOR REPORTS
+                    // ═══════════════════════════════════════════════════════════════
+                    // Try to extract missing date slots from original query BEFORE asking user
+                    var reportIntent = finalPlan.Intent.ToLowerInvariant();
+                    
+                    // FIX: Normalize intent to use "reports." prefix for consistency
+                    if (!reportIntent.StartsWith("reports."))
+                    {
+                        // If intent is just "report", use domain to determine specific report type
+                        if (reportIntent == "report")
+                        {
+                            if (!string.IsNullOrWhiteSpace(finalPlan.Domain))
+                            {
+                                var domainLower = finalPlan.Domain.ToLowerInvariant();
+                                reportIntent = domainLower switch
+                                {
+                                    "sales" => "reports.sales",
+                                    "inventory" => "reports.inventory",
+                                    "expense" or "expenses" => "reports.expenses",
+                                    _ => "reports.sales" // Default fallback
+                                };
+                            }
+                            else if (!string.IsNullOrWhiteSpace(finalPlan.SubIntent))
+                            {
+                                var subIntentLower = finalPlan.SubIntent.ToLowerInvariant();
+                                reportIntent = subIntentLower switch
+                                {
+                                    "sales" => "reports.sales",
+                                    "inventory" => "reports.inventory",
+                                    "expense" or "expenses" => "reports.expenses",
+                                    _ => "reports.sales" // Default fallback
+                                };
+                            }
+                            else
+                            {
+                                reportIntent = "reports.sales"; // Final fallback
+                            }
+                        }
+                        else
+                        {
+                            // Intent already has domain (e.g., "reports.sales")
+                            // Keep it as-is
+                        }
+                    }
+                    
+                    _logger.LogInformation("[Phase 4.5] Report intent normalized: {Intent} (from original: {OriginalIntent})", 
+                        reportIntent, finalPlan.Intent);
+                    
+                    // Extract report name from normalized intent for spec file lookup
+                    var reportName = reportIntent.Replace("reports.", "").Trim().ToLowerInvariant();
+                    var reportSpecFile = reportName switch
+                    {
+                        "expense" or "expenses" => "reports.expense.yaml",
+                        "sales" => "reports.sales.yaml",
+                        "inventory" => "reports.inventory.yaml",
+                        _ => "reports.sales.yaml"
+                    };
+                    
+                    // Load spec to check required slots
+                    var reportSpec = DomainPrompt.Parse(_promptLoader.ReadText(reportSpecFile));
+                    
+                    // Check each required slot
+                    if (reportSpec.Phase1?.Slots != null)
+                    {
+                        foreach (var slotDef in reportSpec.Phase1.Slots)
+                        {
+                            var slotName = slotDef.Key;
+                            var slotConfig = slotDef.Value;
+                            
+                            // If slot is required AND missing, try pre-emptive fill
+                            if (slotConfig.Required && 
+                                (!finalPlan.Slots.ContainsKey(slotName) || 
+                                 string.IsNullOrWhiteSpace(finalPlan.Slots[slotName])))
+                            {
+                                _logger.LogInformation("[Phase 4.5] Slot '{SlotName}' is missing. Attempting pre-emptive parse...", 
+                                    slotName);
+                                
+                                // Try to extract the slot value from original user query
+                                var extractedValue = await TryPreemptiveSlotFillAsync(
+                                    slotName, 
+                                    userQuery, 
+                                    cancellationToken);
+                                
+                                if (extractedValue != null)
+                                {
+                                    // SUCCESS: Fill the slot and continue to execution
+                                    finalPlan.Slots[slotName] = extractedValue;
+                                    _logger.LogInformation("[Phase 4.5] Pre-emptive parse SUCCESS. Slot '{SlotName}' filled: {Value}", 
+                                        slotName, extractedValue);
+                                }
+                                else
+                                {
+                                    // FAILURE: Could not extract, need to ask user
+                                    _logger.LogInformation("[Phase 4.5] Pre-emptive parse failed for '{SlotName}'. Asking user for clarification.", 
+                                        slotName);
+                                    
+                                    // Save pending state and ask for clarification
+                                    await _chatHistory.SavePendingStateAsync(
+                                        session.Id, 
+                                        finalPlan.ToJsonDocument(), 
+                                        slotName);
+                                    
+                                    result.Response = slotConfig.ClarificationPrompt ?? $"Please provide a value for {slotName}.";
+                                    result.IsSuccess = true;
+                                    result.TotalLatencyMs = (int)(DateTime.UtcNow - startTime).TotalMilliseconds;
+                                    return result;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // If period_start was filled but period_end is missing, auto-fill period_end with same date
+                    if (finalPlan.Slots.ContainsKey("period_start") && 
+                        !string.IsNullOrWhiteSpace(finalPlan.Slots["period_start"]) &&
+                        (!finalPlan.Slots.ContainsKey("period_end") || 
+                         string.IsNullOrWhiteSpace(finalPlan.Slots["period_end"])))
+                    {
+                        var extractedEnd = await TryPreemptiveSlotFillAsync("period_end", userQuery, cancellationToken);
+                        if (extractedEnd != null)
+                        {
+                            finalPlan.Slots["period_end"] = extractedEnd;
+                            _logger.LogInformation("[Phase 4.5] Auto-filled period_end: {Value}", extractedEnd);
+                        }
+                    }
+                    
+                    // All slots filled - proceed with execution
+                    // CRITICAL FIX: Pass the normalized intent string to the report runner
+                    stepResult = await _reportRunner.RunReportAsync(reportIntent, finalPlan, cancellationToken);
                     break;
 
                 case "forecast":
                 case "forecasting":
                 case "forecast.sales":
                 case "forecast.expenses":
+                    // ═══════════════════════════════════════════════════════════════
+                    // PHASE 4.5: PRE-EMPTIVE SLOT FILLING FOR FORECASTS
+                    // ═══════════════════════════════════════════════════════════════
+                    var forecastIntent = finalPlan.Intent.ToLowerInvariant();
+                    var forecastDomain = forecastIntent.Contains("expense") ? "expenses" : "sales";
+                    
+                    var forecastSpecFile = forecastDomain == "expenses" 
+                        ? "forecast.expenses.yaml" 
+                        : "forecast.sales.yaml";
+                    
+                    // Load spec to check required slots
+                    var forecastSpec = DomainPrompt.Parse(_promptLoader.ReadText(forecastSpecFile));
+                    
+                    // Check each required slot
+                    if (forecastSpec.Phase1?.Slots != null)
+                    {
+                        foreach (var slotDef in forecastSpec.Phase1.Slots)
+                        {
+                            var slotName = slotDef.Key;
+                            var slotConfig = slotDef.Value;
+                            
+                            // If slot is required AND missing, try pre-emptive fill
+                            if (slotConfig.Required && 
+                                (!finalPlan.Slots.ContainsKey(slotName) || 
+                                 string.IsNullOrWhiteSpace(finalPlan.Slots[slotName])))
+                            {
+                                _logger.LogInformation("[Phase 4.5] Slot '{SlotName}' is missing. Attempting pre-emptive parse...", 
+                                    slotName);
+                                
+                                // Try to extract the slot value from original user query
+                                var extractedValue = await TryPreemptiveSlotFillAsync(
+                                    slotName, 
+                                    userQuery, 
+                                    cancellationToken);
+                                
+                                if (extractedValue != null)
+                                {
+                                    // SUCCESS: Fill the slot and continue to execution
+                                    finalPlan.Slots[slotName] = extractedValue;
+                                    _logger.LogInformation("[Phase 4.5] Pre-emptive parse SUCCESS. Slot '{SlotName}' filled: {Value}", 
+                                        slotName, extractedValue);
+                                }
+                                else
+                                {
+                                    // FAILURE: Could not extract, need to ask user
+                                    _logger.LogInformation("[Phase 4.5] Pre-emptive parse failed for '{SlotName}'. Asking user for clarification.", 
+                                        slotName);
+                                    
+                                    // Save pending state and ask for clarification
+                                    await _chatHistory.SavePendingStateAsync(
+                                        session.Id, 
+                                        finalPlan.ToJsonDocument(), 
+                                        slotName);
+                                    
+                                    result.Response = slotConfig.ClarificationPrompt ?? $"Please provide a value for {slotName}.";
+                                    result.IsSuccess = true;
+                                    result.TotalLatencyMs = (int)(DateTime.UtcNow - startTime).TotalMilliseconds;
+                                    return result;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // All slots filled - proceed with execution
                     stepResult = await _forecastRunner.RunForecastAsync(finalPlan, cancellationToken);
                     break;
 
@@ -432,7 +633,7 @@ public class ChatOrchestratorService : IChatOrchestratorService
     }
 
     // Helper: Parse intent classification result from JSON
-    private (string Intent, string? Domain, string? SubIntent, double Confidence) ParseIntentResult(JsonDocument doc)
+    private (string Intent, string? Domain, string? SubIntent, double Confidence, Dictionary<string, string> Slots) ParseIntentResult(JsonDocument doc)
     {
         var root = doc.RootElement;
         var intent = root.TryGetProperty("intent", out var i) ? i.GetString() ?? "" : "";
@@ -440,7 +641,29 @@ public class ChatOrchestratorService : IChatOrchestratorService
         var subIntent = root.TryGetProperty("sub_intent", out var si) ? si.GetString() : null;
         var confidence = root.TryGetProperty("confidence", out var c) ? c.GetDouble() : 0.0;
         
-        return (intent, domain, subIntent, confidence);
+        // PHASE 4.5.1 FIX: Extract period_start, period_days, and other slots from router response
+        var slots = new Dictionary<string, string>();
+        if (root.TryGetProperty("period_start", out var ps) && ps.ValueKind == JsonValueKind.String)
+        {
+            var periodStart = ps.GetString();
+            if (!string.IsNullOrWhiteSpace(periodStart))
+            {
+                slots["period_start"] = periodStart;
+                _logger.LogInformation("[Phase 4.5.1] Router provided period_start: {PeriodStart}", periodStart);
+            }
+        }
+        if (root.TryGetProperty("period_days", out var pd) && pd.ValueKind == JsonValueKind.Number)
+        {
+            slots["period_days"] = pd.GetInt32().ToString();
+            _logger.LogInformation("[Phase 4.5.1] Router provided period_days: {PeriodDays}", pd.GetInt32());
+        }
+        if (root.TryGetProperty("forecast_days", out var fd) && fd.ValueKind == JsonValueKind.Number)
+        {
+            slots["forecast_days"] = fd.GetInt32().ToString();
+            _logger.LogInformation("[Phase 4.5.1] Router provided forecast_days: {ForecastDays}", fd.GetInt32());
+        }
+        
+        return (intent, domain, subIntent, confidence, slots);
     }
 
     // Helper: Get clarification prompt from router.intent.yaml
@@ -973,6 +1196,88 @@ public class ChatOrchestratorService : IChatOrchestratorService
     private string HandleOutOfScope()
     {
         return "I'm sorry, but that question is outside my area of expertise. I'm designed to help with business-related queries like sales, inventory, expenses, and orders. Is there anything business-related I can help you with? 😊";
+    }
+
+    /// <summary>
+    /// Phase 4.5: Pre-emptive slot filling - Try to extract slot value from original user query
+    /// using specialist parsers BEFORE asking the user for clarification.
+    /// </summary>
+    /// <param name="slotName">Name of the missing slot (e.g., "period_start", "forecast_days")</param>
+    /// <param name="userQuery">Original user query text</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Extracted slot value if successful, null if extraction failed</returns>
+    private async Task<string?> TryPreemptiveSlotFillAsync(
+        string slotName,
+        string userQuery,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            _logger.LogInformation("[Phase 4.5] Attempting pre-emptive parse for slot: {SlotName}", slotName);
+
+            // Handle date-related slots using LlmDateParser
+            if (slotName is "period_start" or "period_end")
+            {
+                var (startDate, endDate) = await _llmDateParser.ParseDateRangeAsync(userQuery, cancellationToken);
+                
+                var formattedValue = slotName == "period_start" 
+                    ? startDate.ToString("yyyy-MM-dd")
+                    : endDate.ToString("yyyy-MM-dd");
+                
+                _logger.LogInformation("[Phase 4.5] Pre-emptive parse SUCCESS for {SlotName}: {Value}", 
+                    slotName, formattedValue);
+                
+                return formattedValue;
+            }
+
+            // Handle numeric slots (forecast_days) using regex extraction
+            if (slotName == "forecast_days")
+            {
+                // Try to extract number from phrases like:
+                // "next 7 days", "30 days", "for 14 days", "3 araw", "5 linggo"
+                var patterns = new[]
+                {
+                    @"(?:next|for|sa|susunod)\s+(\d+)\s+(?:day|days|araw)",
+                    @"(\d+)\s+(?:day|days|araw)",
+                    @"(\d+)\s+(?:week|weeks|linggo)",  // Convert weeks to days
+                    @"(\d+)\s+(?:month|months|buwan)" // Convert months to days (30 days per month)
+                };
+
+                foreach (var pattern in patterns)
+                {
+                    var match = Regex.Match(userQuery, pattern, RegexOptions.IgnoreCase);
+                    if (match.Success)
+                    {
+                        var number = int.Parse(match.Groups[1].Value);
+                        
+                        // Convert to days based on unit
+                        if (pattern.Contains("week") || pattern.Contains("linggo"))
+                        {
+                            number *= 7; // weeks to days
+                        }
+                        else if (pattern.Contains("month") || pattern.Contains("buwan"))
+                        {
+                            number *= 30; // months to days (approximate)
+                        }
+
+                        // Validate range (1-60 days as per ForecastRunnerService)
+                        if (number >= 1 && number <= 60)
+                        {
+                            _logger.LogInformation("[Phase 4.5] Pre-emptive parse SUCCESS for forecast_days: {Value}", number);
+                            return number.ToString();
+                        }
+                    }
+                }
+            }
+
+            _logger.LogInformation("[Phase 4.5] Pre-emptive parse failed for {SlotName} - no match found", slotName);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[Phase 4.5] Pre-emptive parse failed for {SlotName}", slotName);
+            return null;
+        }
     }
 }
 

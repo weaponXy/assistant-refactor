@@ -85,6 +85,15 @@ public class StreamingTests
         var mockReportRunner = new Mock<IYamlReportRunner>();
         var mockForecastRunner = new Mock<IForecastRunnerService>();
         var mockIntentRunner = new Mock<IYamlIntentRunner>(); // Now mockable via interface!
+        
+        // Mock Phase 6 dependencies - won't be called in streaming tests
+        // Since LlmSqlGenerator and LlmSummarizer have non-parameterless constructors,
+        // we can't mock them easily. Pass null since they won't be called in this test.
+        LlmSqlGenerator? mockSqlGenerator = null!;
+        LlmSummarizer? mockSummarizer = null!;
+        
+        // Mock Phase 4.5 dependency
+        var mockDateParser = Mock.Of<ILlmDateParser>();
 
         var orchestrator = new ChatOrchestratorService(
             kernel,
@@ -98,7 +107,10 @@ public class StreamingTests
             mockPromptLoader,
             mockReportRunner.Object,
             mockForecastRunner.Object,
-            mockIntentRunner.Object
+            mockIntentRunner.Object,
+            mockSqlGenerator!,
+            mockSummarizer!,
+            mockDateParser
         );
 
         // When - Stream a query (will fail at LLM call, but we can test structure)
