@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using dataAccess.Services;
 using dataAccess.Planning;
+using dataAccess.Planning.Nlq;
 using dataAccess.Reports;
 using dataAccess.Contracts;
 using YamlDotNet.Serialization;
@@ -69,6 +70,9 @@ public class ChatOrchestratorService : IChatOrchestratorService
     private readonly LlmSummarizer _summarizer;
     
     // Phase 4.5: Pre-emptive slot filling dependencies
+    
+    // Master Orchestrator: NLQ Service for dynamic SQL queries
+    private readonly NlqService _nlqService;
     private readonly ILlmDateParser _llmDateParser;
 
     public ChatOrchestratorService(
@@ -86,7 +90,8 @@ public class ChatOrchestratorService : IChatOrchestratorService
         IYamlIntentRunner intentRunner,
         LlmSqlGenerator sqlGenerator,
         LlmSummarizer summarizer,
-        ILlmDateParser llmDateParser)
+        ILlmDateParser llmDateParser,
+        NlqService nlqService)
     {
         _kernel = kernel;
         _schemaService = schemaService;
@@ -109,6 +114,9 @@ public class ChatOrchestratorService : IChatOrchestratorService
         
         // Phase 4.5 dependencies
         _llmDateParser = llmDateParser;
+        
+        // Master Orchestrator: NLQ Service for dynamic SQL queries
+        _nlqService = nlqService;
     }
 
     public async Task<ChatOrchestrationResult> HandleQueryAsync(
@@ -287,322 +295,301 @@ public class ChatOrchestratorService : IChatOrchestratorService
             
             OrchestrationStepResult stepResult;
 
-            switch (finalPlan.Intent.ToLowerInvariant())
+            // ═══════════════════════════════════════════════════════════════
+            // UNIFIED INTENT HANDLER - THREE PATHWAYS
+            // ═══════════════════════════════════════════════════════════════
+            // Pathway 1: Date-Sensitive (reports.*, forecast.*)
+            // Pathway 2: Dynamic SQL (nlq.query)
+            // Pathway 3: Simple YAML (faq, chitchat)
+            var normalizedIntent = finalPlan.Intent.ToLowerInvariant();
+            
+            // ═══════════════════════════════════════════════════════════════
+            // PATHWAY 1: DATE-SENSITIVE INTENTS (Reports & Forecasts)
+            // ═══════════════════════════════════════════════════════════════
+            if (normalizedIntent.StartsWith("reports.") || 
+                normalizedIntent.StartsWith("forecast.") ||
+                normalizedIntent == "report" ||
+                normalizedIntent == "forecast" ||
+                normalizedIntent == "forecasting")
             {
-                case "report":
-                case "reports.sales":
-                case "reports.inventory":
-                case "reports.expenses":
+                var isReport = normalizedIntent.StartsWith("reports.") || normalizedIntent == "report";
+                var isForecast = normalizedIntent.StartsWith("forecast.") || normalizedIntent == "forecast" || normalizedIntent == "forecasting";
+                
+                // Normalize intent based on type
+                string normalizedDomainIntent;
+                string specFileName;
+                
+                if (isReport)
+                {
                     // ═══════════════════════════════════════════════════════════════
-                    // PHASE 4.5: PRE-EMPTIVE SLOT FILLING FOR REPORTS
+                    // REPORTS: Normalize intent to use "reports." prefix
                     // ═══════════════════════════════════════════════════════════════
-                    // Try to extract missing date slots from original query BEFORE asking user
-                    var reportIntent = finalPlan.Intent.ToLowerInvariant();
+                    normalizedDomainIntent = normalizedIntent;
                     
-                    // FIX: Normalize intent to use "reports." prefix for consistency
-                    if (!reportIntent.StartsWith("reports."))
+                    if (!normalizedDomainIntent.StartsWith("reports."))
                     {
-                        // If intent is just "report", use domain to determine specific report type
-                        if (reportIntent == "report")
+                        if (normalizedDomainIntent == "report")
                         {
+                            // Use Domain or SubIntent to determine specific report type
                             if (!string.IsNullOrWhiteSpace(finalPlan.Domain))
                             {
                                 var domainLower = finalPlan.Domain.ToLowerInvariant();
-                                reportIntent = domainLower switch
+                                normalizedDomainIntent = domainLower switch
                                 {
                                     "sales" => "reports.sales",
                                     "inventory" => "reports.inventory",
                                     "expense" or "expenses" => "reports.expenses",
-                                    _ => "reports.sales" // Default fallback
+                                    _ => "reports.sales"
                                 };
                             }
                             else if (!string.IsNullOrWhiteSpace(finalPlan.SubIntent))
                             {
                                 var subIntentLower = finalPlan.SubIntent.ToLowerInvariant();
-                                reportIntent = subIntentLower switch
+                                normalizedDomainIntent = subIntentLower switch
                                 {
                                     "sales" => "reports.sales",
                                     "inventory" => "reports.inventory",
                                     "expense" or "expenses" => "reports.expenses",
-                                    _ => "reports.sales" // Default fallback
+                                    _ => "reports.sales"
                                 };
                             }
                             else
                             {
-                                reportIntent = "reports.sales"; // Final fallback
+                                normalizedDomainIntent = "reports.sales"; // Default fallback
                             }
-                        }
-                        else
-                        {
-                            // Intent already has domain (e.g., "reports.sales")
-                            // Keep it as-is
                         }
                     }
                     
-                    _logger.LogInformation("[Phase 4.5] Report intent normalized: {Intent} (from original: {OriginalIntent})", 
-                        reportIntent, finalPlan.Intent);
+                    _logger.LogInformation("[Orchestrator] Report intent normalized: {Intent}", normalizedDomainIntent);
                     
-                    // Extract report name from normalized intent for spec file lookup
-                    var reportName = reportIntent.Replace("reports.", "").Trim().ToLowerInvariant();
-                    var reportSpecFile = reportName switch
+                    // Determine spec file
+                    var reportName = normalizedDomainIntent.Replace("reports.", "").Trim().ToLowerInvariant();
+                    specFileName = reportName switch
                     {
                         "expense" or "expenses" => "reports.expense.yaml",
                         "sales" => "reports.sales.yaml",
                         "inventory" => "reports.inventory.yaml",
                         _ => "reports.sales.yaml"
                     };
-                    
-                    // Load spec to check required slots
-                    var reportSpec = DomainPrompt.Parse(_promptLoader.ReadText(reportSpecFile));
-                    
-                    // Check each required slot
-                    if (reportSpec.Phase1?.Slots != null)
-                    {
-                        foreach (var slotDef in reportSpec.Phase1.Slots)
-                        {
-                            var slotName = slotDef.Key;
-                            var slotConfig = slotDef.Value;
-                            
-                            // If slot is required AND missing, try pre-emptive fill
-                            if (slotConfig.Required && 
-                                (!finalPlan.Slots.ContainsKey(slotName) || 
-                                 string.IsNullOrWhiteSpace(finalPlan.Slots[slotName])))
-                            {
-                                _logger.LogInformation("[Phase 4.5] Slot '{SlotName}' is missing. Attempting pre-emptive parse...", 
-                                    slotName);
-                                
-                                // Try to extract the slot value from original user query
-                                var extractedValue = await TryPreemptiveSlotFillAsync(
-                                    slotName, 
-                                    userQuery, 
-                                    cancellationToken);
-                                
-                                if (extractedValue != null)
-                                {
-                                    // SUCCESS: Fill the slot and continue to execution
-                                    finalPlan.Slots[slotName] = extractedValue;
-                                    _logger.LogInformation("[Phase 4.5] Pre-emptive parse SUCCESS. Slot '{SlotName}' filled: {Value}", 
-                                        slotName, extractedValue);
-                                }
-                                else
-                                {
-                                    // FAILURE: Could not extract, need to ask user
-                                    _logger.LogInformation("[Phase 4.5] Pre-emptive parse failed for '{SlotName}'. Asking user for clarification.", 
-                                        slotName);
-                                    
-                                    // Save pending state and ask for clarification
-                                    await _chatHistory.SavePendingStateAsync(
-                                        session.Id, 
-                                        finalPlan.ToJsonDocument(), 
-                                        slotName);
-                                    
-                                    result.Response = slotConfig.ClarificationPrompt ?? $"Please provide a value for {slotName}.";
-                                    result.IsSuccess = true;
-                                    result.TotalLatencyMs = (int)(DateTime.UtcNow - startTime).TotalMilliseconds;
-                                    return result;
-                                }
-                            }
-                        }
-                    }
-                    
-                    // If period_start was filled but period_end is missing, auto-fill period_end with same date
-                    if (finalPlan.Slots.ContainsKey("period_start") && 
-                        !string.IsNullOrWhiteSpace(finalPlan.Slots["period_start"]) &&
-                        (!finalPlan.Slots.ContainsKey("period_end") || 
-                         string.IsNullOrWhiteSpace(finalPlan.Slots["period_end"])))
-                    {
-                        var extractedEnd = await TryPreemptiveSlotFillAsync("period_end", userQuery, cancellationToken);
-                        if (extractedEnd != null)
-                        {
-                            finalPlan.Slots["period_end"] = extractedEnd;
-                            _logger.LogInformation("[Phase 4.5] Auto-filled period_end: {Value}", extractedEnd);
-                        }
-                    }
-                    
-                    // All slots filled - proceed with execution
-                    // CRITICAL FIX: Pass the normalized intent string to the report runner
-                    stepResult = await _reportRunner.RunReportAsync(reportIntent, finalPlan, cancellationToken);
-                    break;
-
-                case "forecast":
-                case "forecasting":
-                case "forecast.sales":
-                case "forecast.expenses":
+                }
+                else // isForecast
+                {
                     // ═══════════════════════════════════════════════════════════════
-                    // PHASE 4.5: PRE-EMPTIVE SLOT FILLING FOR FORECASTS
+                    // FORECASTS: Normalize intent to use "forecast." prefix
                     // ═══════════════════════════════════════════════════════════════
-                    var forecastIntent = finalPlan.Intent.ToLowerInvariant();
-                    var forecastDomain = forecastIntent.Contains("expense") ? "expenses" : "sales";
+                    normalizedDomainIntent = normalizedIntent;
+                    var forecastDomain = normalizedDomainIntent.Contains("expense") ? "expenses" : "sales";
+                    normalizedDomainIntent = $"forecast.{forecastDomain}";
                     
-                    var forecastSpecFile = forecastDomain == "expenses" 
+                    _logger.LogInformation("[Orchestrator] Forecast intent normalized: {Intent}", normalizedDomainIntent);
+                    
+                    specFileName = forecastDomain == "expenses" 
                         ? "forecast.expenses.yaml" 
                         : "forecast.sales.yaml";
-                    
-                    // Load spec to check required slots
-                    var forecastSpec = DomainPrompt.Parse(_promptLoader.ReadText(forecastSpecFile));
-                    
-                    // Check each required slot
-                    if (forecastSpec.Phase1?.Slots != null)
+                }
+                
+                // ═══════════════════════════════════════════════════════════════
+                // PHASE 4.5: PRE-EMPTIVE SLOT FILLING (Shared for Reports & Forecasts)
+                // ═══════════════════════════════════════════════════════════════
+                var domainSpec = DomainPrompt.Parse(_promptLoader.ReadText(specFileName));
+                
+                if (domainSpec.Phase1?.Slots != null)
+                {
+                    foreach (var slotDef in domainSpec.Phase1.Slots)
                     {
-                        foreach (var slotDef in forecastSpec.Phase1.Slots)
+                        var slotName = slotDef.Key;
+                        var slotConfig = slotDef.Value;
+                        
+                        // If slot is required AND missing, try pre-emptive fill
+                        if (slotConfig.Required && 
+                            (!finalPlan.Slots.ContainsKey(slotName) || 
+                             string.IsNullOrWhiteSpace(finalPlan.Slots[slotName])))
                         {
-                            var slotName = slotDef.Key;
-                            var slotConfig = slotDef.Value;
+                            _logger.LogInformation("[Phase 4.5] Slot '{SlotName}' is missing. Attempting pre-emptive parse...", slotName);
                             
-                            // If slot is required AND missing, try pre-emptive fill
-                            if (slotConfig.Required && 
-                                (!finalPlan.Slots.ContainsKey(slotName) || 
-                                 string.IsNullOrWhiteSpace(finalPlan.Slots[slotName])))
+                            var extractedValue = await TryPreemptiveSlotFillAsync(slotName, userQuery, cancellationToken);
+                            
+                            if (extractedValue != null)
                             {
-                                _logger.LogInformation("[Phase 4.5] Slot '{SlotName}' is missing. Attempting pre-emptive parse...", 
-                                    slotName);
+                                finalPlan.Slots[slotName] = extractedValue;
+                                _logger.LogInformation("[Phase 4.5] Pre-emptive parse SUCCESS. Slot '{SlotName}' filled: {Value}", slotName, extractedValue);
+                            }
+                            else
+                            {
+                                _logger.LogInformation("[Phase 4.5] Pre-emptive parse failed for '{SlotName}'. Asking user for clarification.", slotName);
                                 
-                                // Try to extract the slot value from original user query
-                                var extractedValue = await TryPreemptiveSlotFillAsync(
-                                    slotName, 
-                                    userQuery, 
-                                    cancellationToken);
+                                await _chatHistory.SavePendingStateAsync(session.Id, finalPlan.ToJsonDocument(), slotName);
                                 
-                                if (extractedValue != null)
-                                {
-                                    // SUCCESS: Fill the slot and continue to execution
-                                    finalPlan.Slots[slotName] = extractedValue;
-                                    _logger.LogInformation("[Phase 4.5] Pre-emptive parse SUCCESS. Slot '{SlotName}' filled: {Value}", 
-                                        slotName, extractedValue);
-                                }
-                                else
-                                {
-                                    // FAILURE: Could not extract, need to ask user
-                                    _logger.LogInformation("[Phase 4.5] Pre-emptive parse failed for '{SlotName}'. Asking user for clarification.", 
-                                        slotName);
-                                    
-                                    // Save pending state and ask for clarification
-                                    await _chatHistory.SavePendingStateAsync(
-                                        session.Id, 
-                                        finalPlan.ToJsonDocument(), 
-                                        slotName);
-                                    
-                                    result.Response = slotConfig.ClarificationPrompt ?? $"Please provide a value for {slotName}.";
-                                    result.IsSuccess = true;
-                                    result.TotalLatencyMs = (int)(DateTime.UtcNow - startTime).TotalMilliseconds;
-                                    return result;
-                                }
+                                result.Response = slotConfig.ClarificationPrompt ?? $"Please provide a value for {slotName}.";
+                                result.IsSuccess = true;
+                                result.TotalLatencyMs = (int)(DateTime.UtcNow - startTime).TotalMilliseconds;
+                                return result;
                             }
                         }
                     }
-                    
-                    // All slots filled - proceed with execution
+                }
+                
+                // Auto-fill period_end if period_start exists but period_end is missing
+                if (finalPlan.Slots.ContainsKey("period_start") && 
+                    !string.IsNullOrWhiteSpace(finalPlan.Slots["period_start"]) &&
+                    (!finalPlan.Slots.ContainsKey("period_end") || string.IsNullOrWhiteSpace(finalPlan.Slots["period_end"])))
+                {
+                    var extractedEnd = await TryPreemptiveSlotFillAsync("period_end", userQuery, cancellationToken);
+                    if (extractedEnd != null)
+                    {
+                        finalPlan.Slots["period_end"] = extractedEnd;
+                        _logger.LogInformation("[Phase 4.5] Auto-filled period_end: {Value}", extractedEnd);
+                    }
+                }
+                
+                // Execute based on type
+                if (isReport)
+                {
+                    _logger.LogInformation("[Orchestrator] Executing report: {Intent}", normalizedDomainIntent);
+                    stepResult = await _reportRunner.RunReportAsync(normalizedDomainIntent, finalPlan, cancellationToken);
+                }
+                else // isForecast
+                {
+                    _logger.LogInformation("[Orchestrator] Executing forecast: {Intent}", normalizedDomainIntent);
                     stepResult = await _forecastRunner.RunForecastAsync(finalPlan, cancellationToken);
-                    break;
-
-                // ═══════════════════════════════════════════════════════════════
-                // PHASE 6: DYNAMIC SQL QUERY (Tool-Using Agent)
-                // ═══════════════════════════════════════════════════════════════
-                case "dynamic_sql_query":
-                    _logger.LogInformation("[Phase 6] Intent is dynamic SQL query. Generating SQL...");
+                }
+            }
+            // ═══════════════════════════════════════════════════════════════
+            // PATHWAY 2: DYNAMIC SQL (NLQ.QUERY)
+            // ═══════════════════════════════════════════════════════════════
+            else if (normalizedIntent == "nlq.query" || normalizedIntent == "nlq" || normalizedIntent == "dynamic_sql_query")
+            {
+                _logger.LogInformation("[Orchestrator] Executing dynamic SQL query via NlqService");
+                
+                try
+                {
+                    // Call NlqService.HandleAsync which returns an object (report UI or markdown answer)
+                    var nlqResult = await _nlqService.HandleAsync(userQuery, cancellationToken);
                     
-                    try
+                    if (nlqResult != null)
                     {
-                        // 1. Generate SQL from NLQ (context-aware with history)
-                        // Note: We pass history context through userQuery enrichment
-                        var sqlQuery = await _sqlGenerator.GenerateSqlAsync(userQuery, cancellationToken);
+                        // NlqService returns either:
+                        // 1. Report UI object (JsonObject with report_title, kpis, cards, charts, etc.)
+                        // 2. Markdown answer object { mode = "chat", markdown = "..." }
                         
-                        if (string.IsNullOrWhiteSpace(sqlQuery))
+                        var resultJson = JsonSerializer.Serialize(nlqResult);
+                        var resultDoc = JsonDocument.Parse(resultJson);
+                        
+                        // Check if it's a markdown answer
+                        if (resultDoc.RootElement.TryGetProperty("mode", out var modeProp) && 
+                            modeProp.GetString() == "chat" &&
+                            resultDoc.RootElement.TryGetProperty("markdown", out var markdownProp))
                         {
+                            // Simple markdown answer
                             stepResult = new OrchestrationStepResult
                             {
-                                IsSuccess = false,
-                                ErrorMessage = "I couldn't generate a valid SQL query for that question. Please try rephrasing it."
+                                IsSuccess = true,
+                                ReportData = new ReportResult
+                                {
+                                    Title = "Query Result",
+                                    UiSpec = JsonDocument.Parse(JsonSerializer.Serialize(new { text = markdownProp.GetString() }))
+                                }
                             };
-                            break;
                         }
-                        
-                        // 2. Validate SQL
-                        var (isValid, validationError) = _sqlValidator.ValidateSql(sqlQuery);
-                        if (!isValid)
+                        else
                         {
-                            _logger.LogWarning("[Phase 6] SQL validation failed: {Reason}", validationError);
+                            // Report UI object
                             stepResult = new OrchestrationStepResult
                             {
-                                IsSuccess = false,
-                                ErrorMessage = $"Generated query failed security validation: {validationError}"
+                                IsSuccess = true,
+                                ReportData = new ReportResult
+                                {
+                                    Title = resultDoc.RootElement.TryGetProperty("report_title", out var titleProp) 
+                                        ? titleProp.GetString() ?? "Query Result"
+                                        : "Query Result",
+                                    UiSpec = resultDoc
+                                }
                             };
-                            break;
                         }
                         
-                        // 3. Ensure row limit
-                        sqlQuery = _sqlValidator.EnsureLimit(sqlQuery, _maxResultRows);
-                        
-                        // 4. Execute SQL
-                        var queryData = await _safeSqlExecutor.ExecuteQueryAsync(sqlQuery, cancellationToken);
-                        
-                        // 5. Summarize Results
-                        var resultsJson = JsonSerializer.Serialize(queryData);
-                        using var doc = JsonDocument.Parse(resultsJson);
-                        var resultsElement = doc.RootElement;
-                        int rowCount = (resultsElement.ValueKind == JsonValueKind.Array) ? resultsElement.GetArrayLength() : 0;
-                        
-                        var summary = await _summarizer.SummarizeAsync(userQuery, sqlQuery, resultsElement, rowCount, cancellationToken);
-
-                        stepResult = new OrchestrationStepResult
-                        {
-                            IsSuccess = true,
-                            ReportData = new ReportResult
-                            {
-                                Title = "Query Result",
-                                UiSpec = JsonDocument.Parse(JsonSerializer.Serialize(new { text = summary }))
-                            }
-                        };
-                        
-                        _logger.LogInformation("[Phase 6] Dynamic SQL query executed successfully. Rows: {RowCount}", rowCount);
+                        _logger.LogInformation("[Orchestrator] NLQ query executed successfully");
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        _logger.LogError(ex, "[Phase 6] Dynamic SQL query failed.");
                         stepResult = new OrchestrationStepResult
                         {
                             IsSuccess = false,
-                            ErrorMessage = "I'm sorry, I encountered an error trying to answer that specific question. Please try again or rephrase your question."
+                            ErrorMessage = "I couldn't process that natural language query. Please try rephrasing it."
                         };
                     }
-                    break;
-
-                case "chitchat":
-                    stepResult = new OrchestrationStepResult
-                    {
-                        IsSuccess = true,
-                        ReportData = new ReportResult
-                        {
-                            Title = "Chitchat Response",
-                            UiSpec = JsonDocument.Parse(JsonSerializer.Serialize(new { text = HandleChitChat(userQuery) }))
-                        }
-                    };
-                    break;
-
-                case "out_of_scope":
-                    stepResult = new OrchestrationStepResult
-                    {
-                        IsSuccess = true,
-                        ReportData = new ReportResult
-                        {
-                            Title = "Out of Scope",
-                            UiSpec = JsonDocument.Parse(JsonSerializer.Serialize(new { text = HandleOutOfScope() }))
-                        }
-                    };
-                    break;
-
-                case "nlq":
-                    // Fallback to old NLQ handler
-                    await HandleDataQueryAsync(result, cancellationToken);
-                    return result;
-
-                default:
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "[Orchestrator] NLQ query failed via NlqService");
                     stepResult = new OrchestrationStepResult
                     {
                         IsSuccess = false,
-                        ErrorMessage = $"Unknown intent: {finalPlan.Intent}"
+                        ErrorMessage = "I encountered an error processing your question. Please try again or rephrase your question."
                     };
-                    break;
+                }
+            }
+            // ═══════════════════════════════════════════════════════════════
+            // PATHWAY 3: SIMPLE YAML (FAQ, CHITCHAT)
+            // ═══════════════════════════════════════════════════════════════
+            else if (normalizedIntent == "faq" || normalizedIntent == "chitchat")
+            {
+                _logger.LogInformation("[Orchestrator] Executing simple YAML intent: {Intent}", normalizedIntent);
+                
+                try
+                {
+                    // Use YamlIntentRunner for FAQ and chitchat
+                    // Note: YamlIntentRunner returns JsonDocument with intent classification
+                    // For now, return a simple text response
+                    var simpleResponse = normalizedIntent == "faq"
+                        ? "I understand you have a question. Let me help you with that."
+                        : "Hi there! I'm BuiswAIz, your business AI assistant. How can I help you today?";
+                    
+                    stepResult = new OrchestrationStepResult
+                    {
+                        IsSuccess = true,
+                        ReportData = new ReportResult
+                        {
+                            Title = normalizedIntent == "faq" ? "FAQ Response" : "Chitchat Response",
+                            UiSpec = JsonDocument.Parse(JsonSerializer.Serialize(new { text = simpleResponse }))
+                        }
+                    };
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "[Orchestrator] Simple YAML intent failed: {Intent}", normalizedIntent);
+                    stepResult = new OrchestrationStepResult
+                    {
+                        IsSuccess = false,
+                        ErrorMessage = normalizedIntent == "faq" 
+                            ? "I couldn't find an answer to that question in my knowledge base."
+                            : "Sorry, I'm having trouble with casual conversation right now."
+                    };
+                }
+            }
+            // ═══════════════════════════════════════════════════════════════
+            // OUT OF SCOPE / UNKNOWN INTENT
+            // ═══════════════════════════════════════════════════════════════
+            else if (normalizedIntent == "out_of_scope")
+            {
+                _logger.LogInformation("[Orchestrator] Intent is out of scope");
+                stepResult = new OrchestrationStepResult
+                {
+                    IsSuccess = true,
+                    ReportData = new ReportResult
+                    {
+                        Title = "Out of Scope",
+                        UiSpec = JsonDocument.Parse(JsonSerializer.Serialize(new { text = HandleOutOfScope() }))
+                    }
+                };
+            }
+            else
+            {
+                _logger.LogWarning("[Orchestrator] Unknown intent: {Intent}", normalizedIntent);
+                stepResult = new OrchestrationStepResult
+                {
+                    IsSuccess = false,
+                    ErrorMessage = $"I'm not sure how to handle that request. Intent: {normalizedIntent}"
+                };
             }
 
             // ═══════════════════════════════════════════════════════════════
