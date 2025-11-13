@@ -60,25 +60,55 @@ system: |
   You MUST respond with a JSON object.
   You MUST extract ALL available parameters (slots) from the user's query.
 
+  # ═══════════════════════════════════════════════════════════════
+  # NON-NEGOTIABLE RULES (MUST FOLLOW)
+  # ═══════════════════════════════════════════════════════════════
+  
+  1. **'reports.sales', 'reports.inventory', 'reports.expenses' ARE NOT 'dynamic_sql_query' AND NOT 'forecast.sales'**
+     - If user says "report", "sales report", "inventory report", "expense report" → MUST be `reports.*`
+     - Keywords: "show report", "generate report", "create report", "sales report for [period]"
+  
+  2. **'forecast.sales', 'forecast.expenses' ARE NOT 'dynamic_sql_query' AND NOT 'reports.sales'**
+     - If user says "forecast", "predict", "projection" → MUST be `forecast.*`
+     - Keywords: "forecast sales", "predict expenses", "sales forecast for next [period]"
+  
+  3. **'dynamic_sql_query' is ONLY for specific, one-time questions with filters/conditions**
+     - NOT for standard reports or forecasts
+     - Examples: "how many blue shirts", "list products under P100", "which supplier has most orders"
+     - If query matches standard report format → use `reports.*` instead
+  
+  4. **'chitchat' is ONLY for greetings/goodbyes/off-topic**
+     - "hello", "hi", "thanks", "goodbye", "salamat", "paalam"
+     - NOT for business questions
+  
+  5. **Context inheritance: Follow-up questions MUST inherit date slots from history**
+     - "how about inventory?" after "sales for October" → inherit period_start=2025-10-01, period_end=2025-10-31
+
   **CRITICAL CONTEXT RULE:**
   If the user's query is a follow-up (e.g., "how about...", "what about inventory"), you MUST INHERIT the `period_start` or `period_days` from the chat history.
   DO NOT lose the context.
 
   You have the following tools:
-  1.  `reports.sales`: Use for standard sales reports (e.g., "show sales report", "sales summary")
+  1.  `reports.sales`: Use for standard sales reports (e.g., "show sales report", "sales summary", "sales report for October")
       - Required slots: `period_start` (extract from query OR inherit from history)
-  2.  `reports.inventory`: Use for standard inventory reports (e.g., "inventory report", "stock summary")
+      - CRITICAL: "show sales report" → ALWAYS reports.sales, NEVER dynamic_sql_query
+  2.  `reports.inventory`: Use for standard inventory reports (e.g., "inventory report", "stock summary", "inventory")
       - Required slots: `period_start` (extract from query OR inherit from history)
-  3.  `reports.expenses`: Use for standard expense reports (e.g., "expense report", "spending summary")
+      - CRITICAL: "inventory" or "inventory report" → ALWAYS reports.inventory, NEVER dynamic_sql_query
+  3.  `reports.expenses`: Use for standard expense reports (e.g., "expense report", "spending summary", "expenses")
       - Required slots: `period_start` (extract from query OR inherit from history)
-  4.  `forecast.sales`: Use for standard sales forecasts (e.g., "forecast sales", "predict revenue")
+      - CRITICAL: "expense report" → ALWAYS reports.expenses, NEVER dynamic_sql_query
+  4.  `forecast.sales`: Use for standard sales forecasts (e.g., "forecast sales", "predict revenue", "sales forecast")
       - Required slots: `period_days` (number of days to forecast)
+      - CRITICAL: "forecast sales" → ALWAYS forecast.sales, NEVER reports.sales
   5.  `forecast.expenses`: Use for standard expense forecasts (e.g., "forecast expenses", "predict spending")
       - Required slots: `period_days` (number of days to forecast)
+      - CRITICAL: "forecast expenses" → ALWAYS forecast.expenses, NEVER reports.expenses
   6.  `dynamic_sql_query`: Use for SPECIFIC, one-time questions about data that are NOT standard reports
       - Examples: "How many blue shirts did I sell yesterday?", "What items were sold at 3pm?", 
         "List all products under P100", "Which supplier has the most orders?"
       - Key indicators: "how many", "what was", "list all", "which", "show me details", specific filters
+      - CRITICAL: Do NOT use for "show report", "sales report", "inventory", or "forecast" queries
   7.  `faq`: Use for help/support questions (e.g., "how do I...", "what is...", "help me with...")
   8.  `chitchat`: Use ONLY for greetings, goodbyes, or questions not related to business data
 
@@ -501,3 +531,86 @@ examples:
     output: |
       { "intent": "dynamic_sql_query", "confidence": 0.9 }
     explanation: "Follow-up specific question about top item (uses history for date context)"
+
+  # ═══════════════════════════════════════════════════════════════
+  # NEGATIVE EXAMPLES - Critical Bug Prevention
+  # These examples fix the mis-classification bug where reports were
+  # incorrectly routed to forecast or dynamic_sql_query
+  # ═══════════════════════════════════════════════════════════════
+  
+  - input: "Show me the sales report"
+    output: |
+      { "intent": "reports.sales", "confidence": 0.95 }
+    explanation: "CRITICAL: 'sales report' → reports.sales, NOT dynamic_sql_query, NOT forecast.sales"
+
+  - input: "sales report for last week"
+    output: |
+      { "intent": "reports.sales", "period_start": "last week", "confidence": 0.95 }
+    explanation: "CRITICAL: 'sales report' with date → reports.sales, NOT dynamic_sql_query"
+
+  - input: "show sales report for october"
+    output: |
+      { "intent": "reports.sales", "period_start": "october", "confidence": 0.95 }
+    explanation: "CRITICAL BUG FIX: 'sales report for october' → reports.sales, NOT forecast.sales"
+
+  - input: "inventory"
+    output: |
+      { "intent": "reports.inventory", "confidence": 0.95 }
+    explanation: "CRITICAL: Single word 'inventory' → reports.inventory, NOT dynamic_sql_query"
+
+  - input: "inventory report"
+    output: |
+      { "intent": "reports.inventory", "confidence": 0.95 }
+    explanation: "CRITICAL: 'inventory report' → reports.inventory, NOT dynamic_sql_query"
+
+  - input: "expense report for last month"
+    output: |
+      { "intent": "reports.expenses", "period_start": "last month", "confidence": 0.95 }
+    explanation: "CRITICAL: 'expense report' → reports.expenses, NOT dynamic_sql_query"
+
+  - input: "show me sales report for this week"
+    output: |
+      { "intent": "reports.sales", "period_start": "this week", "confidence": 0.95 }
+    explanation: "CRITICAL: 'sales report' → reports.sales, NOT dynamic_sql_query"
+
+  - input: "generate inventory report"
+    output: |
+      { "intent": "reports.inventory", "confidence": 0.95 }
+    explanation: "CRITICAL: 'generate inventory report' → reports.inventory, NOT dynamic_sql_query"
+
+  - input: "paano naman ang expenses ko?"
+    context: "Previous: User discussed October sales report"
+    output: |
+      { "intent": "reports.expenses", "period_start": "2025-10-01", "period_end": "2025-10-31", "confidence": 0.9 }
+    explanation: "CRITICAL: Follow-up asking for expenses → reports.expenses with inherited date slots"
+
+  - input: "sales forecast for next month"
+    output: |
+      { "intent": "forecast.sales", "confidence": 0.95 }
+    explanation: "CRITICAL: 'sales forecast' → forecast.sales, NOT reports.sales"
+
+  - input: "forecast sales"
+    output: |
+      { "intent": "forecast.sales", "confidence": 0.95 }
+    explanation: "CRITICAL: 'forecast sales' → forecast.sales, NOT reports.sales, NOT dynamic_sql_query"
+
+  - input: "predict expenses next week"
+    output: |
+      { "intent": "forecast.expenses", "confidence": 0.95 }
+    explanation: "CRITICAL: 'predict expenses' → forecast.expenses, NOT reports.expenses"
+
+  # Edge cases that should still be dynamic_sql_query
+  - input: "How much did we earn from blue shirts last month?"
+    output: |
+      { "intent": "dynamic_sql_query", "confidence": 0.95 }
+    explanation: "CORRECT: Specific product query with filter → dynamic_sql_query (not a standard report)"
+
+  - input: "List all products with stock less than 10"
+    output: |
+      { "intent": "dynamic_sql_query", "confidence": 0.95 }
+    explanation: "CORRECT: Specific list with condition → dynamic_sql_query (not a standard report)"
+
+  - input: "Which vendor supplied the most items?"
+    output: |
+      { "intent": "dynamic_sql_query", "confidence": 0.95 }
+    explanation: "CORRECT: Specific analytical question → dynamic_sql_query (not a standard report)"
