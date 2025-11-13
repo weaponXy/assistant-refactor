@@ -583,14 +583,32 @@ public class ChatOrchestratorService : IChatOrchestratorService
                 
                 try
                 {
-                    // Use YamlIntentRunner for FAQ and chitchat
-                    // Note: YamlIntentRunner returns JsonDocument with intent classification
-                    // For now, return a simple text response
-                    var simpleResponse = normalizedIntent == "faq"
-                        ? "I understand you have a question. Let me help you with that."
-                        : "Hi there! I'm BuiswAIz, your business AI assistant. How can I help you today?";
+                    // Use YamlIntentRunner to process FAQ and chitchat
+                    // This calls the LLM with the appropriate YAML prompt
+                    var history = await _chatHistory.GetRecentMessagesAsync(session.Id);
+                    var intentDoc = await _intentRunner.RunIntentAsync(userQuery, history, cancellationToken);
                     
-                    _logger.LogWarning("🔍 DEBUG: RETURNING SIMPLE TEXT RESPONSE");
+                    _logger.LogWarning("🔍 DEBUG: CALLED INTENT RUNNER FOR {Intent}", normalizedIntent);
+                    
+                    // Extract the response text from the intent runner result
+                    // The intentRunner returns a JsonDocument with intent classification
+                    // For FAQ/chitchat, we need to extract a meaningful text response
+                    string responseText;
+                    if (intentDoc.RootElement.TryGetProperty("response", out var responseProp))
+                    {
+                        responseText = responseProp.GetString() ?? "I'm here to help!";
+                    }
+                    else if (intentDoc.RootElement.TryGetProperty("answer", out var answerProp))
+                    {
+                        responseText = answerProp.GetString() ?? "I'm here to help!";
+                    }
+                    else
+                    {
+                        // Fallback if no response property found
+                        responseText = normalizedIntent == "faq"
+                            ? "I understand you have a question. Let me help you with that."
+                            : "Hi there! I'm BuiswAIz, your business AI assistant. How can I help you today?";
+                    }
                     
                     stepResult = new OrchestrationStepResult
                     {
@@ -598,9 +616,11 @@ public class ChatOrchestratorService : IChatOrchestratorService
                         ReportData = new ReportResult
                         {
                             Title = normalizedIntent == "faq" ? "FAQ Response" : "Chitchat Response",
-                            UiSpec = JsonDocument.Parse(JsonSerializer.Serialize(new { text = simpleResponse }))
+                            UiSpec = JsonDocument.Parse(JsonSerializer.Serialize(new { text = responseText }))
                         }
                     };
+                    
+                    _logger.LogWarning("🔍 DEBUG: INTENT RUNNER COMPLETED - Response: {Response}", responseText);
                 }
                 catch (Exception ex)
                 {
@@ -671,26 +691,38 @@ public class ChatOrchestratorService : IChatOrchestratorService
                 // Success - format the response
                 _logger.LogInformation("[Phase 4] Execution successful");
                 
-                if (stepResult.ReportData != null)
+                if (stepResult.ReportData != null && stepResult.ReportData.UiSpec != null)
                 {
-                    // Report/Forecast result with structured data
-                    // Check if it's a simple text response (chitchat/out_of_scope)
-                    if (stepResult.ReportData.UiSpec != null && 
-                        stepResult.ReportData.UiSpec.RootElement.TryGetProperty("text", out var textProp))
+                    // ═══════════════════════════════════════════════════════════════
+                    // PHASE 2 FIX: Properly use UiSpec property instead of serializing JSON into Response
+                    // ═══════════════════════════════════════════════════════════════
+                    
+                    // Assign UiSpec to result for frontend consumption
+                    result.UiSpec = stepResult.ReportData.UiSpec;
+                    
+                    // Check if UiSpec contains a "text" property (FAQ/chitchat/out_of_scope)
+                    if (stepResult.ReportData.UiSpec.RootElement.TryGetProperty("text", out var textProp))
                     {
-                        result.Response = textProp.GetString() ?? "Operation completed successfully.";
+                        // Simple text response - set Response to the text value
+                        result.Response = textProp.GetString() ?? "Here's what I found.";
+                        _logger.LogInformation("[Phase 2] Text response extracted from UiSpec: {Response}", result.Response);
                     }
                     else
                     {
-                        result.Response = JsonSerializer.Serialize(stepResult.ReportData);
+                        // Report/Forecast with structured UI (charts, tables, KPIs, etc.)
+                        // Set Response to a friendly title/summary, NOT the entire JSON
+                        result.Response = stepResult.ReportData.Title ?? "Here is your report.";
+                        _logger.LogInformation("[Phase 2] Report/Forecast response. Title: {Title}", result.Response);
                     }
+                    
+                    result.IsSuccess = true;
                 }
                 else
                 {
+                    // No UiSpec available - fallback to generic success message
                     result.Response = "Operation completed successfully.";
+                    result.IsSuccess = true;
                 }
-                
-                result.IsSuccess = true;
             }
             else
             {
@@ -1522,6 +1554,12 @@ public class ChatOrchestrationResult
     public string Response { get; set; } = string.Empty;
     public bool IsSuccess { get; set; }
     public string? ErrorMessage { get; set; }
+    
+    /// <summary>
+    /// Structured UI specification (charts, tables, KPIs, etc.) for frontend rendering.
+    /// Contains the full report/forecast/query result data.
+    /// </summary>
+    public JsonDocument? UiSpec { get; set; }
     
     // Latency tracking
     public int IntentClassificationLatencyMs { get; set; }
