@@ -230,6 +230,19 @@ public class ChatOrchestratorService : IChatOrchestratorService
                     UserText = userQuery,
                     Slots = intentResult.Slots  // PHASE 4.5.1 FIX: Include slots from router
                 };
+                
+                // ═══════════════════════════════════════════════════════════════
+                // 🔍 DEBUG POINT: INTENT CLASSIFICATION RESULT
+                // ═══════════════════════════════════════════════════════════════
+                _logger.LogWarning("═══════════════════════════════════════════════════════════════");
+                _logger.LogWarning("🔍 DEBUG: INTENT CLASSIFICATION RESULT");
+                _logger.LogWarning("User Query: {Query}", userQuery);
+                _logger.LogWarning("Classified Intent: {Intent}", intentResult.Intent);
+                _logger.LogWarning("Domain: {Domain}", intentResult.Domain ?? "null");
+                _logger.LogWarning("SubIntent: {SubIntent}", intentResult.SubIntent ?? "null");
+                _logger.LogWarning("Confidence: {Confidence}", intentResult.Confidence);
+                _logger.LogWarning("Slots from Router: {Slots}", JsonSerializer.Serialize(intentResult.Slots));
+                _logger.LogWarning("═══════════════════════════════════════════════════════════════");
             }
 
             // ═══════════════════════════════════════════════════════════════
@@ -303,6 +316,9 @@ public class ChatOrchestratorService : IChatOrchestratorService
             // Pathway 3: Simple YAML (faq, chitchat)
             var normalizedIntent = finalPlan.Intent.ToLowerInvariant();
             
+            // 🔍 DEBUG: Show which pathway will be chosen
+            _logger.LogWarning("🔍 DEBUG: ROUTING TO PATHWAY - Normalized Intent: {NormalizedIntent}", normalizedIntent);
+            
             // ═══════════════════════════════════════════════════════════════
             // PATHWAY 1: DATE-SENSITIVE INTENTS (Reports & Forecasts)
             // ═══════════════════════════════════════════════════════════════
@@ -312,6 +328,10 @@ public class ChatOrchestratorService : IChatOrchestratorService
                 normalizedIntent == "forecast" ||
                 normalizedIntent == "forecasting")
             {
+                _logger.LogWarning("═══════════════════════════════════════════════════════════════");
+                _logger.LogWarning("✅ PATHWAY 1: DATE-SENSITIVE INTENTS (Reports & Forecasts)");
+                _logger.LogWarning("Intent: {Intent}", normalizedIntent);
+                _logger.LogWarning("═══════════════════════════════════════════════════════════════");
                 var isReport = normalizedIntent.StartsWith("reports.") || normalizedIntent == "report";
                 var isForecast = normalizedIntent.StartsWith("forecast.") || normalizedIntent == "forecast" || normalizedIntent == "forecasting";
                 
@@ -445,13 +465,27 @@ public class ChatOrchestratorService : IChatOrchestratorService
                 // Execute based on type
                 if (isReport)
                 {
-                    _logger.LogInformation("[Orchestrator] Executing report: {Intent}", normalizedDomainIntent);
+                    _logger.LogWarning("🔍 DEBUG: CALLING REPORT RUNNER");
+                    _logger.LogWarning("   Service: YamlReportRunner");
+                    _logger.LogWarning("   Intent: {Intent}", normalizedDomainIntent);
+                    _logger.LogWarning("   Spec File: {SpecFile}", specFileName);
+                    _logger.LogWarning("   Slots: {Slots}", JsonSerializer.Serialize(finalPlan.Slots));
+                    
                     stepResult = await _reportRunner.RunReportAsync(normalizedDomainIntent, finalPlan, cancellationToken);
+                    
+                    _logger.LogWarning("🔍 DEBUG: REPORT RUNNER COMPLETED - Success: {Success}", stepResult.IsSuccess);
                 }
                 else // isForecast
                 {
-                    _logger.LogInformation("[Orchestrator] Executing forecast: {Intent}", normalizedDomainIntent);
+                    _logger.LogWarning("🔍 DEBUG: CALLING FORECAST RUNNER");
+                    _logger.LogWarning("   Service: ForecastRunnerService");
+                    _logger.LogWarning("   Intent: {Intent}", normalizedDomainIntent);
+                    _logger.LogWarning("   Spec File: {SpecFile}", specFileName);
+                    _logger.LogWarning("   Slots: {Slots}", JsonSerializer.Serialize(finalPlan.Slots));
+                    
                     stepResult = await _forecastRunner.RunForecastAsync(finalPlan, cancellationToken);
+                    
+                    _logger.LogWarning("🔍 DEBUG: FORECAST RUNNER COMPLETED - Success: {Success}", stepResult.IsSuccess);
                 }
             }
             // ═══════════════════════════════════════════════════════════════
@@ -459,12 +493,21 @@ public class ChatOrchestratorService : IChatOrchestratorService
             // ═══════════════════════════════════════════════════════════════
             else if (normalizedIntent == "nlq.query" || normalizedIntent == "nlq" || normalizedIntent == "dynamic_sql_query")
             {
-                _logger.LogInformation("[Orchestrator] Executing dynamic SQL query via NlqService");
+                _logger.LogWarning("═══════════════════════════════════════════════════════════════");
+                _logger.LogWarning("✅ PATHWAY 2: DYNAMIC SQL (NLQ.QUERY)");
+                _logger.LogWarning("Intent: {Intent}", normalizedIntent);
+                _logger.LogWarning("Service: NlqService");
+                _logger.LogWarning("═══════════════════════════════════════════════════════════════");
                 
                 try
                 {
+                    _logger.LogWarning("🔍 DEBUG: CALLING NLQ SERVICE");
+                    _logger.LogWarning("   Query: {Query}", userQuery);
+                    
                     // Call NlqService.HandleAsync which returns an object (report UI or markdown answer)
                     var nlqResult = await _nlqService.HandleAsync(userQuery, cancellationToken);
+                    
+                    _logger.LogWarning("🔍 DEBUG: NLQ SERVICE COMPLETED - Result: {HasResult}", nlqResult != null);
                     
                     if (nlqResult != null)
                     {
@@ -533,7 +576,10 @@ public class ChatOrchestratorService : IChatOrchestratorService
             // ═══════════════════════════════════════════════════════════════
             else if (normalizedIntent == "faq" || normalizedIntent == "chitchat")
             {
-                _logger.LogInformation("[Orchestrator] Executing simple YAML intent: {Intent}", normalizedIntent);
+                _logger.LogWarning("═══════════════════════════════════════════════════════════════");
+                _logger.LogWarning("✅ PATHWAY 3: SIMPLE YAML (FAQ, CHITCHAT)");
+                _logger.LogWarning("Intent: {Intent}", normalizedIntent);
+                _logger.LogWarning("═══════════════════════════════════════════════════════════════");
                 
                 try
                 {
@@ -543,6 +589,8 @@ public class ChatOrchestratorService : IChatOrchestratorService
                     var simpleResponse = normalizedIntent == "faq"
                         ? "I understand you have a question. Let me help you with that."
                         : "Hi there! I'm BuiswAIz, your business AI assistant. How can I help you today?";
+                    
+                    _logger.LogWarning("🔍 DEBUG: RETURNING SIMPLE TEXT RESPONSE");
                     
                     stepResult = new OrchestrationStepResult
                     {
@@ -571,7 +619,11 @@ public class ChatOrchestratorService : IChatOrchestratorService
             // ═══════════════════════════════════════════════════════════════
             else if (normalizedIntent == "out_of_scope")
             {
-                _logger.LogInformation("[Orchestrator] Intent is out of scope");
+                _logger.LogWarning("═══════════════════════════════════════════════════════════════");
+                _logger.LogWarning("⚠️  OUT OF SCOPE INTENT");
+                _logger.LogWarning("Intent: {Intent}", normalizedIntent);
+                _logger.LogWarning("═══════════════════════════════════════════════════════════════");
+                
                 stepResult = new OrchestrationStepResult
                 {
                     IsSuccess = true,
@@ -584,7 +636,12 @@ public class ChatOrchestratorService : IChatOrchestratorService
             }
             else
             {
-                _logger.LogWarning("[Orchestrator] Unknown intent: {Intent}", normalizedIntent);
+                _logger.LogWarning("═══════════════════════════════════════════════════════════════");
+                _logger.LogWarning("❌ UNKNOWN INTENT - NO PATHWAY MATCHED");
+                _logger.LogWarning("Intent: {Intent}", normalizedIntent);
+                _logger.LogWarning("This should NOT happen! Check router.intent.yaml");
+                _logger.LogWarning("═══════════════════════════════════════════════════════════════");
+                
                 stepResult = new OrchestrationStepResult
                 {
                     IsSuccess = false,
