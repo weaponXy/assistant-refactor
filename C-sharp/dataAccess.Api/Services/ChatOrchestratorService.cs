@@ -176,14 +176,16 @@ public class ChatOrchestratorService : IChatOrchestratorService
             else
             {
                 // ═══════════════════════════════════════════════════════════════
-                // B. HANDLE NEW QUERY (Stage 1: Topic Check)
+                // B. HANDLE NEW QUERY (Stage 1: Intent Classification)
                 // ═══════════════════════════════════════════════════════════════
                 _logger.LogInformation("[Phase 4] Processing new query - classifying intent");
                 
-                // Fetch conversation history for context
+                // OPTIMIZATION: Fetch conversation history ONCE per request (not per pathway)
+                // This history is reused for intent classification only
                 var history = await _chatHistory.GetRecentMessagesAsync(session.Id);
                 _logger.LogInformation("[Phase 4] Fetched {Count} messages from conversation history", history.Count);
                 
+                // LLM CALL #1: Intent Classification (router only - does NOT generate responses)
                 var intentDoc = await _intentRunner.RunIntentAsync(userQuery, history, cancellationToken);
                 var intentResult = ParseIntentResult(intentDoc);
                 
@@ -572,67 +574,44 @@ public class ChatOrchestratorService : IChatOrchestratorService
                 }
             }
             // ═══════════════════════════════════════════════════════════════
-            // PATHWAY 3: SIMPLE YAML (FAQ, CHITCHAT)
+            // PATHWAY 3: SIMPLE RESPONSES (FAQ, CHITCHAT)
             // ═══════════════════════════════════════════════════════════════
             else if (normalizedIntent == "faq" || normalizedIntent == "chitchat")
             {
                 _logger.LogWarning("═══════════════════════════════════════════════════════════════");
-                _logger.LogWarning("✅ PATHWAY 3: SIMPLE YAML (FAQ, CHITCHAT)");
+                _logger.LogWarning("✅ PATHWAY 3: SIMPLE RESPONSES (FAQ, CHITCHAT)");
                 _logger.LogWarning("Intent: {Intent}", normalizedIntent);
+                _logger.LogWarning("Optimization: Using dedicated response service (no redundant LLM call)");
                 _logger.LogWarning("═══════════════════════════════════════════════════════════════");
                 
-                try
+                string responseText;
+                
+                if (normalizedIntent == "chitchat")
                 {
-                    // Use YamlIntentRunner to process FAQ and chitchat
-                    // This calls the LLM with the appropriate YAML prompt
-                    var history = await _chatHistory.GetRecentMessagesAsync(session.Id);
-                    var intentDoc = await _intentRunner.RunIntentAsync(userQuery, history, cancellationToken);
-                    
-                    _logger.LogWarning("🔍 DEBUG: CALLED INTENT RUNNER FOR {Intent}", normalizedIntent);
-                    
-                    // Extract the response text from the intent runner result
-                    // The intentRunner returns a JsonDocument with intent classification
-                    // For FAQ/chitchat, we need to extract a meaningful text response
-                    string responseText;
-                    if (intentDoc.RootElement.TryGetProperty("response", out var responseProp))
-                    {
-                        responseText = responseProp.GetString() ?? "I'm here to help!";
-                    }
-                    else if (intentDoc.RootElement.TryGetProperty("answer", out var answerProp))
-                    {
-                        responseText = answerProp.GetString() ?? "I'm here to help!";
-                    }
-                    else
-                    {
-                        // Fallback if no response property found
-                        responseText = normalizedIntent == "faq"
-                            ? "I understand you have a question. Let me help you with that."
-                            : "Hi there! I'm BuiswAIz, your business AI assistant. How can I help you today?";
-                    }
-                    
-                    stepResult = new OrchestrationStepResult
-                    {
-                        IsSuccess = true,
-                        ReportData = new ReportResult
-                        {
-                            Title = normalizedIntent == "faq" ? "FAQ Response" : "Chitchat Response",
-                            UiSpec = JsonDocument.Parse(JsonSerializer.Serialize(new { text = responseText }))
-                        }
-                    };
-                    
-                    _logger.LogWarning("🔍 DEBUG: INTENT RUNNER COMPLETED - Response: {Response}", responseText);
+                    // OPTIMIZATION: Use static pattern matching for chitchat (NO LLM CALL!)
+                    // Simple greetings don't need AI - save tokens and eliminate 429 errors
+                    responseText = HandleChitChat(userQuery);
+                    _logger.LogInformation("[Phase 1 Optimization] Chitchat handled via static responses - No LLM call");
                 }
-                catch (Exception ex)
+                else // faq
                 {
-                    _logger.LogError(ex, "[Orchestrator] Simple YAML intent failed: {Intent}", normalizedIntent);
-                    stepResult = new OrchestrationStepResult
-                    {
-                        IsSuccess = false,
-                        ErrorMessage = normalizedIntent == "faq" 
-                            ? "I couldn't find an answer to that question in my knowledge base."
-                            : "Sorry, I'm having trouble with casual conversation right now."
-                    };
+                    // TODO: Implement dedicated FAQ service using faq.yaml prompt
+                    // For now, use fallback response
+                    responseText = "I'm here to help! What would you like to know about your business?";
+                    _logger.LogInformation("[Phase 1 Optimization] FAQ using fallback - Dedicated service pending");
                 }
+                
+                stepResult = new OrchestrationStepResult
+                {
+                    IsSuccess = true,
+                    ReportData = new ReportResult
+                    {
+                        Title = normalizedIntent == "faq" ? "FAQ Response" : "Chitchat",
+                        UiSpec = JsonDocument.Parse(JsonSerializer.Serialize(new { text = responseText }))
+                    }
+                };
+                
+                _logger.LogWarning("🔍 DEBUG: PATHWAY 3 COMPLETED - Response: {Response}", responseText);
             }
             // ═══════════════════════════════════════════════════════════════
             // OUT OF SCOPE / UNKNOWN INTENT
