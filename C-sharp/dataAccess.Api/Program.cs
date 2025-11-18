@@ -1,11 +1,11 @@
 using dataAccess.Api;
 using dataAccess.Api.Endpoints;
 using dataAccess.Api.Services;
+using dataAccess.Services;
 using dataAccess.Planning;
 using dataAccess.Planning.Nlq;
 using dataAccess.Planning.Validation;
 using dataAccess.Reports;
-using dataAccess.Services;
 using dataAccess.Forecasts;
 using dataAccess.LLM;
 using DotNetEnv;
@@ -169,6 +169,26 @@ builder.Services.AddScoped<IYamlReportRunner, YamlReportRunner>();
 builder.Services.AddScoped<YamlReportRunner>();
 builder.Services.AddScoped<IYamlIntentRunner, dataAccess.Reports.YamlIntentRunner>();
 builder.Services.AddScoped<dataAccess.Reports.YamlIntentRunner>(); // Keep for backward compatibility
+
+// ====================================================================
+// RAG CLASSIFIER SERVICES (Phase 2 - Token Optimization)
+// ====================================================================
+// Embedding service for semantic similarity search (local ONNX inference)
+builder.Services.AddSingleton<dataAccess.Services.IEmbeddingService, dataAccess.Services.LocalEmbeddingService>();
+
+// Example retriever for RAG-based intent classification
+builder.Services.AddSingleton<dataAccess.Services.IntentExampleRetriever>();
+
+// NOTE: YamlIntentRunner is already registered above.
+// It will automatically receive IntentExampleRetriever via constructor injection.
+
+// ====================================================================
+// LOCAL DECODER SERVICE (Phase 3 - Free Local LLM)
+// ====================================================================
+// Local decoder service for generating natural language responses (chitchat/faq)
+// Uses Phi-3-mini-4k-instruct ONNX model for "free" local inference
+builder.Services.AddSingleton<dataAccess.Services.ILocalDecoderService, dataAccess.Services.LocalDecoderService>();
+
 builder.Services.AddSingleton<IReportRunStore, ReportRunStore>();
 builder.Services.AddSingleton<TimeResolver>();
 builder.Services.AddSingleton<CapabilityGuard>();
